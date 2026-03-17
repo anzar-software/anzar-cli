@@ -85,7 +85,7 @@ test:
   before_script:
     - mkdir -p migrations
   script:
-    - cargo test --jobs $(nproc)
+    - DB=mongodb cargo test --jobs $(nproc)
   rules:
     - if: $CI_COMMIT_TAG
 
