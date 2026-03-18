@@ -1,12 +1,22 @@
 [package]
+edition = "2024"
+rust-version = "1.85"
+
 name = "anzar"
 description = "Anzar is a lightweight authentication and authorization framework that runs as a separate microservice"
+readme = "README.md"
 license = "GPL-3.0"
 version = "0.7.14"
-edition = "2024"
 authors = ["Hakou Guelfen <hakoudev@gmail.com>"]
-homepage = "https://gitlab.com/anzar_software/api"
+homepage = "https://anzar_software.gitlab.io/docs"
 repository = "https://gitlab.com/anzar_software/api"
+categories = ["authentication", "web-programming", "network-programming"]
+keywords = [
+  "Software Development",
+  "Authentication",
+  "Authorization",
+  "MicroService"
+]
 
 [lib]
 path = "src/lib.rs"
