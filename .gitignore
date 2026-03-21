@@ -9,6 +9,7 @@
 target/
 
 app/cert/
+app/anzar.yml
 compose.yml
 migrations/
 
