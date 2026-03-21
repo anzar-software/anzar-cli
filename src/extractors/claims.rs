@@ -5,7 +5,9 @@ use chrono::{Duration, Local};
 use serde::{Deserialize, Serialize};
 use validator::Validate;
 
+use crate::config::JWT;
 use crate::error::Error;
+use crate::scopes::user::Role;
 use crate::utils::validation::validate_objectid;
 
 #[derive(Debug, Default, Serialize, Deserialize, Clone, PartialEq)]
@@ -21,37 +23,43 @@ pub struct Claims {
     pub sub: String,
     pub exp: usize,
     pub iat: usize,
-    pub jti: String,
+    pub jti: uuid::Uuid,
+    pub role: Role,
     pub token_type: TokenType,
 }
 
 impl Claims {
-    pub fn new(sub: &str, token_type: TokenType, duration: Duration, jti: &str) -> Self {
+    pub fn new(user_id: &str, role: Role) -> Self {
         Claims {
-            sub: sub.into(),
-            exp: (Local::now() + duration).timestamp() as usize,
+            sub: user_id.into(),
+            role,
             iat: Local::now().timestamp() as usize,
-            jti: jti.into(),
-            token_type,
+            jti: uuid::Uuid::new_v4(),
+            ..Default::default()
         }
     }
-    pub fn access_token(sub: &str) -> Self {
-        Claims {
-            sub: sub.into(),
-            exp: (Local::now() + Duration::minutes(15)).timestamp() as usize,
-            iat: Local::now().timestamp() as usize,
-            jti: uuid::Uuid::new_v4().to_string(),
-            token_type: TokenType::AccessToken,
-        }
+}
+
+impl Claims {
+    fn with_expiry(mut self, expires_in: i64) -> Self {
+        self.exp = (Local::now() + Duration::seconds(expires_in)).timestamp() as usize;
+        self
     }
-    pub fn refresh_token(sub: &str, jti: &str) -> Self {
-        Claims {
-            sub: sub.into(),
-            exp: (Local::now() + Duration::days(15)).timestamp() as usize,
-            iat: Local::now().timestamp() as usize,
-            jti: jti.into(),
-            token_type: TokenType::RefreshToken,
-        }
+    fn with_token_type(mut self, token_type: TokenType) -> Self {
+        self.token_type = token_type;
+        self
+    }
+}
+impl Claims {
+    pub fn into_token_pair(self, jwt_config: &JWT) -> (Claims, Claims) {
+        let access = self
+            .clone()
+            .with_expiry(jwt_config.expires_in)
+            .with_token_type(TokenType::AccessToken);
+        let refresh = self
+            .with_expiry(jwt_config.refresh_expires_in)
+            .with_token_type(TokenType::RefreshToken);
+        (access, refresh)
     }
 }
 

@@ -20,9 +20,10 @@ pub enum FailureReason {
 #[derive(Debug)]
 pub enum InvalidTokenReason {
     Malformed,
-    SignatureMismatch,
+    InvalidSignature,
     Expired,
     NotFound,
+    Unknown,
 }
 #[derive(Debug)]
 pub enum CredentialField {

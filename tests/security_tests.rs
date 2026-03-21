@@ -1,7 +1,7 @@
 mod shared;
 use shared::Helpers;
 
-use anzar::{config::AuthStrategy, extractors::TokenType, scopes::auth::AuthResponse};
+use anzar::{config::AuthStrategy, scopes::auth::AuthResponse};
 
 use crate::shared::RefreshTokenRequest;
 
@@ -96,10 +96,8 @@ async fn test_complete_auth_flow() {
         assert!(!new_access_token.is_empty() && !new_refresh_token.is_empty());
 
         let secret_key = test_app.configuration.security.secret_key;
-        let access_token_claims =
-            Helpers::decode_token(new_access_token, TokenType::AccessToken, &secret_key);
-        let refresh_token_claims =
-            Helpers::decode_token(new_refresh_token, TokenType::RefreshToken, &secret_key);
+        let access_token_claims = Helpers::decode_token(new_access_token, &secret_key);
+        let refresh_token_claims = Helpers::decode_token(new_refresh_token, &secret_key);
         // assert new tokens are valid
         assert!(access_token_claims.is_ok());
         assert!(refresh_token_claims.is_ok());

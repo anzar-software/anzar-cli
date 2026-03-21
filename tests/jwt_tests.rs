@@ -1,7 +1,7 @@
 mod shared;
 use shared::{Helpers, InvalidTestCases};
 
-use anzar::{config::AuthStrategy, extractors::TokenType, scopes::auth::AuthResponse};
+use anzar::{config::AuthStrategy, scopes::auth::AuthResponse};
 
 #[actix_web::test]
 async fn test_jwt_contains_correct_claims() {
@@ -25,10 +25,8 @@ async fn test_jwt_contains_correct_claims() {
 
         assert!(!access_token.is_empty() && !refresh_token.is_empty());
         let secret_key = test_app.configuration.security.secret_key;
-        let access_token_claims =
-            Helpers::decode_token(access_token, TokenType::AccessToken, &secret_key);
-        let refresh_token_claims =
-            Helpers::decode_token(refresh_token, TokenType::RefreshToken, &secret_key);
+        let access_token_claims = Helpers::decode_token(access_token, &secret_key);
+        let refresh_token_claims = Helpers::decode_token(refresh_token, &secret_key);
 
         assert!(access_token_claims.is_ok());
         assert!(refresh_token_claims.is_ok());

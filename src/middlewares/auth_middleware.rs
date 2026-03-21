@@ -8,22 +8,15 @@ use actix_web::{
     web,
 };
 
+use crate::config::{AppState, Configuration};
 use crate::extract_service_response;
-use crate::{
-    config::AuthStrategy,
-    extractors::{Claims, TokenType},
-    scopes::auth::support,
-};
-use crate::{
-    config::{AppState, Configuration},
-    error::InvalidTokenReason,
-};
+use crate::{config::AuthStrategy, extractors::Claims, scopes::auth::support};
 
 use crate::scopes::auth::service::AuthService;
 use crate::services::session::{model::Session, service::SessionServiceTrait};
 use crate::{
     error::{Error as AuthError, TokenErrorType},
-    services::jwt::JwtDecoderBuilder,
+    services::jwt::JwtDecoder,
 };
 
 fn extract_token_from_header(req: &ServiceRequest, key: String) -> Option<&str> {
@@ -31,18 +24,6 @@ fn extract_token_from_header(req: &ServiceRequest, key: String) -> Option<&str> 
         .get(key)
         .and_then(|v| v.to_str().ok())
         .and_then(|v| v.strip_prefix("Bearer "))
-}
-
-fn decode_claims(token: &str, secret_key: &str) -> Result<Claims, AuthError> {
-    let decoding_secret = jsonwebtoken::DecodingKey::from_secret(secret_key.as_bytes());
-    JwtDecoderBuilder::new(decoding_secret)
-        .with_token(token)
-        .with_token_type(TokenType::AccessToken)
-        .build()
-        .map_err(|_| AuthError::InvalidToken {
-            token_type: TokenErrorType::AccessToken,
-            reason: InvalidTokenReason::SignatureMismatch,
-        })
 }
 
 async fn find_session(req: &ServiceRequest, token: &str) -> Result<Session, AuthError> {
@@ -102,7 +83,8 @@ async fn validate_token(req: &ServiceRequest) -> Result<(), Error> {
 
             let access_token = extract_token_from_header(req, header::AUTHORIZATION.to_string());
             if let Some(token) = access_token {
-                let claims = decode_claims(token, &secret_key)?;
+                let claims: Claims = JwtDecoder::new(token, secret_key.as_bytes()).decode()?;
+
                 req.extensions_mut().insert::<Claims>(claims.clone());
 
                 let message =

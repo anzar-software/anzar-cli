@@ -1,10 +1,12 @@
+mod decoder;
+mod encoder;
 mod model;
 mod repository;
-mod support;
-mod tokens;
 
 pub mod service;
 
-pub use model::RefreshToken;
+pub use model::{RefreshToken, Tokens};
 pub use repository::JWTRepository;
-pub use tokens::{JwtDecoderBuilder, JwtEncoderBuilder, Tokens};
+
+pub use decoder::JwtDecoder;
+pub use encoder::JwtEncoder;

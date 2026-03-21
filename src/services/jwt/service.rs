@@ -1,11 +1,11 @@
 use crate::config::Configuration;
 use crate::error::{CredentialField, Error, Result};
+use crate::extractors::Claims;
 use crate::scopes::auth::service::AuthService;
 use crate::scopes::user::User;
-use crate::services::jwt::support;
-use crate::utils::{Token, TokenHasher};
+use crate::services::jwt::JwtDecoder;
 
-use super::{JwtEncoderBuilder, RefreshToken, Tokens};
+use super::{JwtEncoder, RefreshToken, Tokens};
 
 pub trait JwtServiceTrait {
     fn consume_refresh_token(
@@ -26,7 +26,7 @@ pub trait JwtServiceTrait {
 }
 impl JwtServiceTrait for AuthService {
     async fn consume_refresh_token(&self, refresh_token: &str, secret: &str) -> Result<String> {
-        let claims = support::decode(refresh_token, secret)?;
+        let claims: Claims = JwtDecoder::new(refresh_token, secret.as_bytes()).decode()?;
 
         if self
             .jwt_service
@@ -45,40 +45,24 @@ impl JwtServiceTrait for AuthService {
         Ok(claims.sub)
     }
     async fn issue_jwt(&self, user: &User, configuration: &Configuration) -> Result<Tokens> {
-        let secret = configuration.security.secret_key.as_bytes();
-        let jwt_config = &configuration.auth.jwt;
-
         let user_id = user.id.as_ref().ok_or(Error::MalformedData {
             field: CredentialField::ObjectId,
         })?;
 
-        let encoding_secret = jsonwebtoken::EncodingKey::from_secret(secret);
-        let tokens: Tokens = JwtEncoderBuilder::new(user_id, encoding_secret, jwt_config)
-            .build()
-            .inspect_err(|e| {
-                tracing::error!("Failed to generate authentication tokens: {:?}", e)
-            })?;
+        let tokens: Tokens = JwtEncoder::new(user, configuration).encode()?;
 
-        let hashed_refresh_token = Token::hash(&tokens.refresh_token);
-
-        let refresh_token = RefreshToken::default()
+        let refresh_token = RefreshToken::new(&tokens)
             .with_user_id(user_id)
-            .with_hash(&hashed_refresh_token)
-            .with_jti(&tokens.refresh_token_jti)
-            .with_issued_at(chrono::Utc::now())
-            .with_expire_at(
-                chrono::Utc::now() + chrono::Duration::seconds(jwt_config.refresh_expires_in),
-            );
+            .with_expire_at(configuration.auth.jwt.refresh_expires_in);
 
         self.jwt_service.insert(refresh_token, None).await?;
-
         Ok(tokens)
     }
 
     async fn invalidate_jwt(&self, refresh_token: &str, secret: &str) -> Result<()> {
-        let claims = support::decode(refresh_token, secret)?;
+        let claims: Claims = JwtDecoder::new(refresh_token, secret.as_bytes()).decode()?;
 
-        self.jwt_service.invalidate(&claims.jti).await?;
+        self.jwt_service.invalidate(claims.jti).await?;
         Ok(())
     }
 

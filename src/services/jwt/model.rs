@@ -1,4 +1,4 @@
-use crate::utils::mongodb_serde::*;
+use crate::utils::{Token, TokenHasher, mongodb_serde::*};
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use sqlx::prelude::FromRow;
@@ -32,31 +32,57 @@ pub struct RefreshToken {
     #[serde(rename = "usedAt")]
     pub used_at: Option<DateTime<Utc>>,
 
-    pub jti: String,
+    pub jti: uuid::Uuid,
     pub token: String,
     pub valid: bool,
 }
 
 impl RefreshToken {
+    pub fn new(tokens: &Tokens) -> Self {
+        RefreshToken {
+            issued_at: chrono::Utc::now(),
+            jti: tokens.refresh_token_jti,
+            token: Token::hash(&tokens.refresh_token),
+            valid: true,
+            ..Default::default()
+        }
+    }
+}
+impl RefreshToken {
     pub fn with_user_id(mut self, id: &str) -> Self {
         self.user_id = id.into();
         self
     }
-    pub fn with_hash(mut self, hash: &str) -> Self {
-        self.token = hash.into();
-        self.valid = true;
+    pub fn with_expire_at(mut self, expires_in: i64) -> Self {
+        self.expires_at = chrono::Utc::now() + chrono::Duration::seconds(expires_in);
         self
     }
-    pub fn with_jti(mut self, jti: &str) -> Self {
-        self.jti = jti.into();
+}
+
+#[derive(Debug, Serialize, Deserialize, Default)]
+pub struct Tokens {
+    #[serde(rename = "accessToken")]
+    pub access_token: String,
+
+    #[serde(rename = "refreshToken")]
+    pub refresh_token: String,
+
+    #[serde(rename = "refreshTokenJti")]
+    pub refresh_token_jti: uuid::Uuid,
+}
+impl Tokens {
+    pub fn with_access_token(mut self, access_token: &str) -> Self {
+        self.access_token = access_token.into();
         self
     }
-    pub fn with_issued_at(mut self, issued_at: DateTime<Utc>) -> Self {
-        self.issued_at = issued_at;
+
+    pub fn with_refresh_token(mut self, refresh_token: &str) -> Self {
+        self.refresh_token = refresh_token.into();
         self
     }
-    pub fn with_expire_at(mut self, expire_at: DateTime<Utc>) -> Self {
-        self.expires_at = expire_at;
+
+    pub fn with_jti(mut self, jti: uuid::Uuid) -> Self {
+        self.refresh_token_jti = jti;
         self
     }
 }

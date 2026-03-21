@@ -91,7 +91,7 @@ impl JWTRepository {
         }
     }
 
-    pub async fn invalidate(&self, jti: &str) -> Result<RefreshToken> {
+    pub async fn invalidate(&self, jti: uuid::Uuid) -> Result<RefreshToken> {
         let filter = Parser::mode(self.database_driver).convert(json!({"jti": jti}));
         let update = json! ({ "$set": json! ({ "valid": false, "usedAt": Utc::now() }) });
         let update = Parser::mode(self.database_driver).convert(update);
