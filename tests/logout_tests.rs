@@ -60,7 +60,7 @@ async fn test_logout_with_invalid_token() {
         let response = test_app
             .client
             .post(format!("{}/auth/logout", test_app.address))
-            .bearer_auth(&tokens.access)
+            .bearer_auth(access_token)
             .json(&RefreshTokenRequest {
                 refresh_token: access_token.into(),
             })

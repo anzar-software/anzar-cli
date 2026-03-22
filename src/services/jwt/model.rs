@@ -32,7 +32,7 @@ pub struct RefreshToken {
     #[serde(rename = "usedAt")]
     pub used_at: Option<DateTime<Utc>>,
 
-    pub jti: uuid::Uuid,
+    pub jti: String,
     pub token: String,
     pub valid: bool,
 }
@@ -41,7 +41,7 @@ impl RefreshToken {
     pub fn new(tokens: &Tokens) -> Self {
         RefreshToken {
             issued_at: chrono::Utc::now(),
-            jti: tokens.refresh_token_jti,
+            jti: tokens.refresh_token_jti.to_string(),
             token: Token::hash(&tokens.refresh_token),
             valid: true,
             ..Default::default()
@@ -68,7 +68,7 @@ pub struct Tokens {
     pub refresh_token: String,
 
     #[serde(rename = "refreshTokenJti")]
-    pub refresh_token_jti: uuid::Uuid,
+    pub refresh_token_jti: String,
 }
 impl Tokens {
     pub fn with_access_token(mut self, access_token: &str) -> Self {
@@ -82,7 +82,7 @@ impl Tokens {
     }
 
     pub fn with_jti(mut self, jti: uuid::Uuid) -> Self {
-        self.refresh_token_jti = jti;
+        self.refresh_token_jti = jti.to_string();
         self
     }
 }

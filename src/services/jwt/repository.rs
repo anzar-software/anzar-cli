@@ -53,7 +53,7 @@ impl JWTRepository {
         refresh_token: &str,
     ) -> Result<RefreshToken> {
         let filter = json! ({
-            "jti": claims.jti,
+            "jti": claims.jti.to_string(),
             "userId": &claims.sub,
             "token": Token::hash(refresh_token),
             "valid": true

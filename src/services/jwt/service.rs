@@ -1,6 +1,6 @@
 use crate::config::Configuration;
 use crate::error::{CredentialField, Error, Result};
-use crate::extractors::Claims;
+use crate::extractors::{Claims, TokenType};
 use crate::scopes::auth::service::AuthService;
 use crate::scopes::user::User;
 use crate::services::jwt::JwtDecoder;
@@ -61,6 +61,12 @@ impl JwtServiceTrait for AuthService {
 
     async fn invalidate_jwt(&self, refresh_token: &str, secret: &str) -> Result<()> {
         let claims: Claims = JwtDecoder::new(refresh_token, secret.as_bytes()).decode()?;
+        if claims.token_type != TokenType::RefreshToken {
+            return Err(Error::InvalidToken {
+                token_type: crate::error::TokenErrorType::RefreshToken,
+                reason: crate::error::InvalidTokenReason::Malformed,
+            });
+        }
 
         self.jwt_service.invalidate(claims.jti).await?;
         Ok(())
