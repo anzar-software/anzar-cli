@@ -4,6 +4,7 @@ use uuid::Uuid;
 
 use crate::adapters::memcache::{MemCache, MemCacheAdapter};
 use crate::adapters::{factory::DatabaseAdapters, mongodb::MongoDB, sqlite::SQLite};
+use crate::config::database::cache_driver::CacheDriver;
 use crate::config::{AppConfig, Configuration, Database, DatabaseDriver};
 use crate::error::Result;
 use crate::scopes::auth::service::AuthService;
@@ -42,7 +43,7 @@ impl AppState {
         let content = fs::read_to_string(&app_config.config_path).expect("Failed to find file");
         let mut configuration: Configuration = serde_yaml::from_str(content.as_str())?;
 
-        configuration.api_url = address.into();
+        configuration.app.url = address.into();
         configuration.database.driver = app_config.database.driver;
 
         if configuration.database.driver == DatabaseDriver::MongoDB {
@@ -55,10 +56,15 @@ impl AppState {
     }
 
     async fn build_authservice(database: &Database) -> Result<AuthService> {
-        let client = MemCache::start(&database.cache).await?;
-        let memcache = MemCacheAdapter::new(client);
+        let cache_adapter = match database.cache.driver {
+            CacheDriver::MemCached => {
+                let client = MemCache::start(&database.cache.url).await?;
+                MemCacheAdapter::new(client)
+            }
+            CacheDriver::Redis => todo!(),
+        };
 
-        let adapters = match database.driver {
+        let database_adapter = match database.driver {
             DatabaseDriver::SQLite => {
                 let db = SQLite::start(&database.connection_string).await?;
                 if &database.connection_string == "sqlite::memory:" {
@@ -77,6 +83,10 @@ impl AppState {
             DatabaseDriver::PostgreSQL => todo!(),
         };
 
-        Ok(AuthService::new(adapters, database.driver, memcache))
+        Ok(AuthService::new(
+            database_adapter,
+            database.driver,
+            cache_adapter,
+        ))
     }
 }

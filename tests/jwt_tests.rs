@@ -24,9 +24,8 @@ async fn test_jwt_contains_correct_claims() {
         let refresh_token: &str = &tokens.refresh;
 
         assert!(!access_token.is_empty() && !refresh_token.is_empty());
-        let secret_key = test_app.configuration.security.secret_key;
-        let access_token_claims = Helpers::decode_token(access_token, &secret_key);
-        let refresh_token_claims = Helpers::decode_token(refresh_token, &secret_key);
+        let access_token_claims = Helpers::decode_token(access_token, &test_app.configuration);
+        let refresh_token_claims = Helpers::decode_token(refresh_token, &test_app.configuration);
 
         assert!(access_token_claims.is_ok());
         assert!(refresh_token_claims.is_ok());

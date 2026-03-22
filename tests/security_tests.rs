@@ -95,9 +95,10 @@ async fn test_complete_auth_flow() {
         // assert tokens are not empty
         assert!(!new_access_token.is_empty() && !new_refresh_token.is_empty());
 
-        let secret_key = test_app.configuration.security.secret_key;
-        let access_token_claims = Helpers::decode_token(new_access_token, &secret_key);
-        let refresh_token_claims = Helpers::decode_token(new_refresh_token, &secret_key);
+        let access_token_claims = Helpers::decode_token(new_access_token, &test_app.configuration);
+        let refresh_token_claims =
+            Helpers::decode_token(new_refresh_token, &test_app.configuration);
+
         // assert new tokens are valid
         assert!(access_token_claims.is_ok());
         assert!(refresh_token_claims.is_ok());

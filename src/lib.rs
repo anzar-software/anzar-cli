@@ -4,6 +4,7 @@ pub mod error;
 pub mod extractors;
 pub mod middlewares;
 pub mod scopes;
+pub mod server;
 pub mod services;
 pub mod startup;
 pub mod telemetry;

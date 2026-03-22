@@ -14,10 +14,10 @@ pub trait TokenHasher {
     fn verify(a: &str, b: &str) -> bool;
 }
 
-pub struct Token {
+pub struct SecureToken {
     size: usize,
 }
-impl Token {
+impl SecureToken {
     pub fn with_size32() -> Self {
         Self { size: 32 }
     }
@@ -25,7 +25,7 @@ impl Token {
         Self { size: 64 }
     }
 }
-impl TokenHasher for Token {
+impl TokenHasher for SecureToken {
     fn generate(&self) -> String {
         let mut bytes = vec![0u8; self.size];
         // FIXME: handle the Result
@@ -97,7 +97,7 @@ impl HmacSigner {
         }
     }
     pub fn issue(&mut self, id: &str) -> Option<String> {
-        let nonce = Token::with_size32().generate();
+        let nonce = SecureToken::with_size32().generate();
         let message = format!("{}|{}", id, nonce);
 
         let mut mac =

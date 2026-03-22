@@ -60,3 +60,12 @@ Audit log can be used to answer the following kinds of questions:
     * Audit Log
     * Access Control
     * Application Logic
+
+
+
+**Together they form a complete trust check:**
+```
+1. Is the signature valid?        → cryptographic check (secret/public key)
+2. Is it expired?                 → exp claim
+3. Did the right service issue it?  → iss claim
+4. Was it meant for me?           → aud claim

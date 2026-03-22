@@ -7,22 +7,19 @@ use serde::Serialize;
 pub type Result<T> = core::result::Result<T, Error>;
 
 #[derive(Debug)]
-pub enum FailureReason {
+pub enum Reason {
+    InvalidSignature,
+    InvalidIssuer,
+    InvalidAudience,
+    InvalidAlgorithm,
     NotFound,
     AlreadyExist,
     Expired,
-    Empty,
     Malformed,
     HashMismatch,
     UnauthorizedSource,
+    Empty,
     Any,
-}
-#[derive(Debug)]
-pub enum InvalidTokenReason {
-    Malformed,
-    InvalidSignature,
-    Expired,
-    NotFound,
     Unknown,
 }
 #[derive(Debug)]
@@ -56,7 +53,7 @@ pub enum Error {
     // -- Tokens
     InvalidToken {
         token_type: TokenErrorType,
-        reason: InvalidTokenReason,
+        reason: Reason,
     },
     TokenNotFound {
         token_id: String,
@@ -81,7 +78,7 @@ pub enum Error {
     },
     InvalidCredentials {
         field: CredentialField,
-        reason: FailureReason,
+        reason: Reason,
     },
     MissingCredentials {
         field: CredentialField,
@@ -104,7 +101,7 @@ pub enum Error {
     },
     TlsConfig {
         path: String,
-        reason: FailureReason,
+        reason: Reason,
     },
 
     HashingFailure,

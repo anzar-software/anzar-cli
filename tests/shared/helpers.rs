@@ -1,5 +1,6 @@
 #![allow(dead_code)]
 use anzar::{
+    config::Configuration,
     extractors::{Claims, TokenType},
     services::jwt::JwtDecoder,
 };
@@ -70,7 +71,7 @@ impl Helpers {
             .expect("Failed to execute request.")
     }
 
-    pub fn decode_token(token: &str, secret_key: &str) -> Result<Claims> {
-        JwtDecoder::new(token, secret_key.as_bytes()).decode()
+    pub fn decode_token(token: &str, configuration: &Configuration) -> Result<Claims> {
+        JwtDecoder::new(token, configuration).decode()
     }
 }
