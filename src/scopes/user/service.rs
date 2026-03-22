@@ -6,7 +6,7 @@ use crate::scopes::email::service::EmailVerificationTokenServiceTrait;
 use crate::services::account::model::{Account, AccountStatus};
 use crate::services::fake::service::FakeUserGenerator;
 use crate::services::lockout::service::LoginAttemptTracker;
-use crate::utils::{CustomPasswordHasher, HmacSigner, Password, Token, TokenHasher};
+use crate::utils::{CustomPasswordHasher, HmacSigner, Password, SecureToken, TokenHasher};
 
 use super::User;
 use crate::scopes::auth::{RegisterRequest, support};
@@ -140,8 +140,8 @@ impl UserServiceTrait for AuthService {
 
         // max_failed_attempts of authentication within for this specific cookie
         let max_failed_attempts = match device_cookie {
-            Some(_) => pass_config.security.max_failed_login_attempts * 2,
-            None => pass_config.security.max_failed_login_attempts,
+            Some(_) => pass_config.security.max_failed_attempts * 2,
+            None => pass_config.security.max_failed_attempts,
         };
         if attempts >= max_failed_attempts {
             self.user_service
@@ -181,8 +181,8 @@ impl UserServiceTrait for AuthService {
             field: CredentialField::ObjectId,
         })?;
 
-        let token = Token::with_size32().generate();
-        let hashed_token = Token::hash(&token);
+        let token = SecureToken::with_size32().generate();
+        let hashed_token = SecureToken::hash(&token);
 
         let otp = EmailVerificationToken::default()
             .with_user_id(user_id)

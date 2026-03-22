@@ -3,8 +3,8 @@ use std::sync::Arc;
 use chrono::{Duration, Utc};
 use serde_json::json;
 
-use crate::error::{Error, InvalidTokenReason, Result, TokenErrorType};
-use crate::utils::{Token, TokenHasher, parser::Parser};
+use crate::error::{Error, Reason, Result, TokenErrorType};
+use crate::utils::{SecureToken, TokenHasher, parser::Parser};
 use crate::{
     adapters::DatabaseAdapter, config::database::driver::DatabaseDriver,
     services::session::model::Session,
@@ -48,14 +48,14 @@ impl SessionRepository {
     }
 
     pub async fn find(&self, token: &str) -> Result<Session> {
-        let filter = json! ({"token": Token::hash(token)});
+        let filter = json! ({"token": SecureToken::hash(token)});
         let filter = Parser::mode(self.database_driver).convert(filter);
 
         match self.adapter.find_one(filter).await {
             Ok(Some(session)) => Ok(session),
             Ok(None) => Err(Error::InvalidToken {
                 token_type: TokenErrorType::SessionToken,
-                reason: InvalidTokenReason::NotFound,
+                reason: Reason::NotFound,
             }),
             Err(err) => Err(err),
         }

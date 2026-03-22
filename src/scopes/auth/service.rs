@@ -2,6 +2,7 @@ use crate::adapters::factory::DatabaseAdapters;
 use crate::adapters::memcache::{MemCache, MemCacheAdapter};
 use crate::adapters::{mongodb::MongoDB, sqlite::SQLite};
 
+use crate::config::database::cache_driver::CacheDriver;
 use crate::config::{Database, database::driver::DatabaseDriver};
 use crate::error::Result;
 
@@ -47,10 +48,15 @@ impl AuthService {
         }
     }
     pub async fn from_database(database: &Database) -> Result<Self> {
-        let client = MemCache::start(&database.cache).await?;
-        let memcache = MemCacheAdapter::new(client);
+        let cache_adapter = match database.cache.driver {
+            CacheDriver::MemCached => {
+                let client = MemCache::start(&database.cache.url).await?;
+                MemCacheAdapter::new(client)
+            }
+            CacheDriver::Redis => todo!(),
+        };
 
-        let adapters = match database.driver {
+        let database_adapter = match database.driver {
             // DatabaseDriver::SQLite => Ok(Self::from_sqlite("/app/test.db".into()).await?),
             DatabaseDriver::SQLite => {
                 let db = SQLite::start(&database.connection_string).await?;
@@ -64,6 +70,6 @@ impl AuthService {
             DatabaseDriver::PostgreSQL => todo!(),
         };
 
-        Ok(Self::new(adapters, database.driver, memcache))
+        Ok(Self::new(database_adapter, database.driver, cache_adapter))
     }
 }

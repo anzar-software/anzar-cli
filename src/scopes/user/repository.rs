@@ -92,7 +92,7 @@ impl UserRepository {
             .await
             .map_err(|_| Error::InvalidCredentials {
                 field: crate::error::CredentialField::Email,
-                reason: crate::error::FailureReason::AlreadyExist,
+                reason: crate::error::Reason::AlreadyExist,
             })
     }
 

@@ -10,7 +10,7 @@ use crate::extractors::{AuthServiceExtractor, ConfigurationExtractor, ValidatedQ
 use crate::middlewares::{auth_middleware, authorization_middleware, rate_limiting::RATE_LIMITS};
 use crate::{
     config::AuthStrategy,
-    error::{CredentialField, Error, ErrorResponse, FailureReason, Result},
+    error::{CredentialField, Error, ErrorResponse, Reason, Result},
     utils::HmacSigner,
 };
 
@@ -19,7 +19,7 @@ use crate::services::{
     jwt::service::JwtServiceTrait,
     session::{model::Session, service::SessionServiceTrait},
 };
-use crate::utils::{CustomPasswordHasher, Password, Token, TokenHasher};
+use crate::utils::{CustomPasswordHasher, Password, SecureToken, TokenHasher};
 
 use super::models::{
     AuthResponse, EmailRequest, LoginRequest, RefreshTokenRequest, RegisterRequest, ResetLink,
@@ -123,8 +123,10 @@ pub async fn login(
                             session.insert(support::DEVICE_COOKIE, &cookie)?;
 
                             Ok(HttpResponse::Ok().json(
-                                AuthResponse::new(user)
-                                    .with_jwt(tokens, configuration.auth.jwt.expires_in),
+                                AuthResponse::new(user).with_jwt(
+                                    tokens,
+                                    configuration.auth.jwt.access_token_expires_in,
+                                ),
                             ))
                         })?
                 }
@@ -137,7 +139,7 @@ pub async fn login(
             support::delay(attempts as u32).await;
             return Err(Error::InvalidCredentials {
                 field: CredentialField::EmailOrPassword,
-                reason: FailureReason::Any,
+                reason: Reason::Any,
             });
         }
     }
@@ -199,7 +201,7 @@ pub async fn register(
             .await?;
         let link = format!(
             "{}/email/verify?token={}",
-            &configuration.api_url, &verification_token
+            &configuration.app.url, &verification_token
         );
 
         return match configuration.auth.strategy {
@@ -215,7 +217,7 @@ pub async fn register(
                     .map(|tokens| {
                         Ok(HttpResponse::Created().json(
                             AuthResponse::new(user)
-                                .with_jwt(tokens, configuration.auth.jwt.expires_in)
+                                .with_jwt(tokens, configuration.auth.jwt.access_token_expires_in)
                                 .with_verification(&link, &verification_token),
                         ))
                     })?
@@ -233,7 +235,8 @@ pub async fn register(
             .await
             .map(|tokens| {
                 Ok(HttpResponse::Created().json(
-                    AuthResponse::new(user).with_jwt(tokens, configuration.auth.jwt.expires_in),
+                    AuthResponse::new(user)
+                        .with_jwt(tokens, configuration.auth.jwt.access_token_expires_in),
                 ))
             })?,
     }
@@ -288,7 +291,7 @@ pub async fn refresh_token(
     tracing::info!("user is refreshing token");
 
     let user_id = auth_service
-        .consume_refresh_token(&req.0.refresh_token, &configuration.security.secret_key)
+        .consume_refresh_token(&req.0.refresh_token, &configuration)
         .await?;
 
     let user: User = auth_service.find_user(&user_id).await?;
@@ -297,8 +300,10 @@ pub async fn refresh_token(
         .issue_jwt(&user, &configuration)
         .await
         .map(|tokens| {
-            Ok(HttpResponse::Ok()
-                .json(AuthResponse::new(user).with_jwt(tokens, configuration.auth.jwt.expires_in)))
+            Ok(HttpResponse::Ok().json(
+                AuthResponse::new(user)
+                    .with_jwt(tokens, configuration.auth.jwt.access_token_expires_in),
+            ))
         })?
 }
 
@@ -333,7 +338,7 @@ async fn logout(
         AuthStrategy::Session => auth_service.invalidate_session(&session.token).await,
         AuthStrategy::Jwt => {
             auth_service
-                .invalidate_jwt(&req.0.refresh_token, &configuration.security.secret_key)
+                .invalidate_jwt(&req.0.refresh_token, &configuration)
                 .await
         }
     };
@@ -380,8 +385,8 @@ async fn request_password_reset(
         auth_service.revoke_password_reset_token(user_id).await?;
 
         // 4.
-        let token = Token::with_size64().generate();
-        let hashed_token = Token::hash(&token);
+        let token = SecureToken::with_size64().generate();
+        let hashed_token = SecureToken::hash(&token);
 
         // 5.
         let expiry_timestamp = chrono::Utc::now()
@@ -401,7 +406,7 @@ async fn request_password_reset(
 
         let link = format!(
             "{}/auth/password/reset?token={}",
-            &configuration.api_url, &token
+            &configuration.app.url, &token
         );
         let reset_link = ResetLink {
             link,
@@ -446,7 +451,7 @@ async fn render_reset_form(
     let token: &str = &query.token;
     auth_service.validate_reset_password_token(token).await?;
 
-    let csrf_token = Token::with_size64().generate();
+    let csrf_token = SecureToken::with_size64().generate();
     session.clear();
     session.insert(support::CSRF_COOKIE, &csrf_token)?;
 
@@ -488,7 +493,7 @@ async fn submit_new_password(
 
     // 0.5 Verify CSRF token
     if let Some(expected) = session.get::<String>(support::CSRF_COOKIE)? {
-        if !Token::verify(&expected, &form.csrf_token) {
+        if !SecureToken::verify(&expected, &form.csrf_token) {
             return Ok(HttpResponse::Forbidden().body("Invalid CSRF token"));
         }
     } else {
@@ -516,7 +521,7 @@ async fn submit_new_password(
         tracing::warn!("Password reuse attempt for user: {}", user_id);
         return Err(Error::InvalidCredentials {
             field: CredentialField::Password,
-            reason: FailureReason::AlreadyExist,
+            reason: Reason::AlreadyExist,
         });
     }
 
@@ -537,7 +542,7 @@ async fn submit_new_password(
 
     let success_redirect = match configuration.auth.password.reset.success_redirect {
         Some(url) => url,
-        None => configuration.api_url,
+        None => configuration.app.url,
     };
     Ok(HttpResponse::Found()
         .insert_header((actix_web::http::header::LOCATION, success_redirect))

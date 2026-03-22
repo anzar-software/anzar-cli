@@ -63,7 +63,7 @@ async fn verify_email(
 
     let success_redirect = match configuration.auth.email.verification.success_redirect {
         Some(url) => url,
-        None => configuration.api_url,
+        None => configuration.app.url,
     };
     Ok(HttpResponse::Found()
         .insert_header((actix_web::http::header::LOCATION, success_redirect))

@@ -3,7 +3,7 @@ use std::sync::Arc;
 use crate::{
     adapters::DatabaseAdapter,
     config::database::driver::DatabaseDriver,
-    error::{Error, InvalidTokenReason, Result, TokenErrorType},
+    error::{Error, Reason, Result, TokenErrorType},
     scopes::email::model::EmailVerificationToken,
     utils::parser::Parser,
 };
@@ -74,7 +74,7 @@ impl EmailVerificationTokenRepository {
             Ok(Some(token)) => Ok(token),
             Ok(None) => Err(Error::InvalidToken {
                 token_type: TokenErrorType::EmailVerificationToken,
-                reason: InvalidTokenReason::NotFound,
+                reason: Reason::NotFound,
             }),
             Err(err) => Err(err),
         }
@@ -94,7 +94,7 @@ impl EmailVerificationTokenRepository {
             Ok(Some(token)) => Ok(token),
             Ok(None) => Err(Error::InvalidToken {
                 token_type: TokenErrorType::EmailVerificationToken,
-                reason: InvalidTokenReason::NotFound,
+                reason: Reason::NotFound,
             }),
             Err(err) => Err(err),
         }

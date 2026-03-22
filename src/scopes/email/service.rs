@@ -1,7 +1,7 @@
 use crate::error::{CredentialField, Error, Result, TokenErrorType};
 use crate::scopes::auth::service::AuthService;
 use crate::scopes::email::model::EmailVerificationToken;
-use crate::utils::{Token, TokenHasher};
+use crate::utils::{SecureToken, TokenHasher};
 
 pub trait EmailVerificationTokenServiceTrait {
     fn validate_email_verification_token(
@@ -24,7 +24,7 @@ impl EmailVerificationTokenServiceTrait for AuthService {
         &self,
         token: &str,
     ) -> Result<EmailVerificationToken> {
-        let hash = Token::hash(token);
+        let hash = SecureToken::hash(token);
 
         // 2. Checks the database for a matching token
         let verification_token = self.email_verification_token_service.find(&hash).await?;

@@ -1,5 +1,5 @@
 use crate::error::{CredentialField, Error, Result};
-use crate::utils::{Token, TokenHasher};
+use crate::utils::{SecureToken, TokenHasher};
 use crate::{
     scopes::{auth::service::AuthService, user::User},
     services::session::model::Session,
@@ -20,8 +20,8 @@ impl SessionServiceTrait for AuthService {
 
         self.session_service.revoke(user_id).await?;
 
-        let token = Token::with_size32().generate();
-        let hashed_token = Token::hash(&token);
+        let token = SecureToken::with_size32().generate();
+        let hashed_token = SecureToken::hash(&token);
 
         let session = Session::default()
             .with_user_id(user_id)

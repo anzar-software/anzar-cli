@@ -1,4 +1,4 @@
-use crate::utils::{Token, TokenHasher, mongodb_serde::*};
+use crate::utils::{SecureToken, TokenHasher, mongodb_serde::*};
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use sqlx::prelude::FromRow;
@@ -38,11 +38,11 @@ pub struct RefreshToken {
 }
 
 impl RefreshToken {
-    pub fn new(tokens: &Tokens) -> Self {
+    pub fn new(tokens: &IssuedTokens) -> Self {
         RefreshToken {
             issued_at: chrono::Utc::now(),
             jti: tokens.refresh_token_jti.to_string(),
-            token: Token::hash(&tokens.refresh_token),
+            token: SecureToken::hash(&tokens.refresh_token),
             valid: true,
             ..Default::default()
         }
@@ -60,7 +60,7 @@ impl RefreshToken {
 }
 
 #[derive(Debug, Serialize, Deserialize, Default)]
-pub struct Tokens {
+pub struct IssuedTokens {
     #[serde(rename = "accessToken")]
     pub access_token: String,
 
@@ -70,7 +70,7 @@ pub struct Tokens {
     #[serde(rename = "refreshTokenJti")]
     pub refresh_token_jti: String,
 }
-impl Tokens {
+impl IssuedTokens {
     pub fn with_access_token(mut self, access_token: &str) -> Self {
         self.access_token = access_token.into();
         self

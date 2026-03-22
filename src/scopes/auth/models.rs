@@ -3,7 +3,7 @@ use utoipa::ToSchema;
 use validator::Validate;
 
 use crate::scopes::user::User;
-use crate::services::jwt::Tokens;
+use crate::services::jwt::IssuedTokens;
 use crate::utils::validation::validate_password;
 
 use crate::config::PasswordRequirements;
@@ -99,7 +99,7 @@ impl AuthResponse {
 }
 
 impl AuthResponse {
-    pub fn with_jwt(mut self, tokens: Tokens, expires_in: i64) -> Self {
+    pub fn with_jwt(mut self, tokens: IssuedTokens, expires_in: i64) -> Self {
         let _ = self.tokens.insert(SessionTokens {
             access: tokens.access_token,
             expires_in,

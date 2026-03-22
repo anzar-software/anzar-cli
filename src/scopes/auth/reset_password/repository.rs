@@ -3,7 +3,7 @@ use std::sync::Arc;
 use crate::{
     adapters::DatabaseAdapter,
     config::database::driver::DatabaseDriver,
-    error::{Error, InvalidTokenReason, Result, TokenErrorType},
+    error::{Error, Reason, Result, TokenErrorType},
     utils::parser::Parser,
 };
 
@@ -72,7 +72,7 @@ impl PasswordResetTokenRepository {
             Ok(Some(password_reset_token)) => Ok(password_reset_token),
             Ok(None) => Err(Error::InvalidToken {
                 token_type: TokenErrorType::PasswordResetToken,
-                reason: InvalidTokenReason::NotFound,
+                reason: Reason::NotFound,
             }),
             Err(err) => Err(err),
         }
@@ -92,7 +92,7 @@ impl PasswordResetTokenRepository {
             Ok(Some(password_reset_token)) => Ok(password_reset_token),
             Ok(None) => Err(Error::InvalidToken {
                 token_type: TokenErrorType::PasswordResetToken,
-                reason: InvalidTokenReason::NotFound,
+                reason: Reason::NotFound,
             }),
             Err(err) => Err(err),
         }

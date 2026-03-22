@@ -5,7 +5,7 @@ use chrono::{Duration, Local};
 use serde::{Deserialize, Serialize};
 use validator::Validate;
 
-use crate::config::JWT;
+use crate::config::JwtConfig;
 use crate::error::Error;
 use crate::scopes::user::Role;
 use crate::utils::validation::validate_objectid;
@@ -23,6 +23,8 @@ pub struct Claims {
     pub sub: String,
     pub exp: usize,
     pub iat: usize,
+    pub iss: String,
+    pub aud: String,
     pub jti: uuid::Uuid,
     pub role: Role,
     pub token_type: TokenType,
@@ -41,6 +43,14 @@ impl Claims {
 }
 
 impl Claims {
+    pub fn with_issuer(mut self, issuer: &str) -> Self {
+        self.iss = issuer.into();
+        self
+    }
+    pub fn with_audience(mut self, audience: &str) -> Self {
+        self.aud = audience.into();
+        self
+    }
     fn with_expiry(mut self, expires_in: i64) -> Self {
         self.exp = (Local::now() + Duration::seconds(expires_in)).timestamp() as usize;
         self
@@ -51,13 +61,13 @@ impl Claims {
     }
 }
 impl Claims {
-    pub fn into_token_pair(self, jwt_config: &JWT) -> (Claims, Claims) {
+    pub fn into_token_pair(self, jwt_config: &JwtConfig) -> (Claims, Claims) {
         let access = self
             .clone()
-            .with_expiry(jwt_config.expires_in)
+            .with_expiry(jwt_config.access_token_expires_in)
             .with_token_type(TokenType::AccessToken);
         let refresh = self
-            .with_expiry(jwt_config.refresh_expires_in)
+            .with_expiry(jwt_config.refresh_token_expires_in)
             .with_token_type(TokenType::RefreshToken);
         (access, refresh)
     }

@@ -79,11 +79,9 @@ async fn validate_token(req: &ServiceRequest) -> Result<(), Error> {
             }
         }
         AuthStrategy::Jwt => {
-            let secret_key = configuration.security.secret_key;
-
             let access_token = extract_token_from_header(req, header::AUTHORIZATION.to_string());
             if let Some(token) = access_token {
-                let claims: Claims = JwtDecoder::new(token, secret_key.as_bytes()).decode()?;
+                let claims: Claims = JwtDecoder::new(token, &configuration).decode()?;
 
                 req.extensions_mut().insert::<Claims>(claims.clone());
 

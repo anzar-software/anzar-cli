@@ -8,7 +8,7 @@ use actix_web::{
 
 use crate::{
     config::{AppState, Configuration},
-    error::InvalidTokenReason,
+    error::Reason,
     extract_service_response,
 };
 use crate::{
@@ -62,7 +62,7 @@ fn extract_user_id_from_extensions(req: &ServiceRequest) -> Result<String, AuthE
 
             Err(AuthError::InvalidToken {
                 token_type: TokenErrorType::SessionToken,
-                reason: InvalidTokenReason::NotFound,
+                reason: Reason::NotFound,
             })
         }
         crate::config::AuthStrategy::Jwt => {
@@ -72,7 +72,7 @@ fn extract_user_id_from_extensions(req: &ServiceRequest) -> Result<String, AuthE
 
             Err(AuthError::InvalidToken {
                 token_type: TokenErrorType::AccessToken,
-                reason: InvalidTokenReason::NotFound,
+                reason: Reason::NotFound,
             })
         }
     }

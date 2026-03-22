@@ -5,28 +5,35 @@ use crate::scopes::auth::service::AuthService;
 use crate::scopes::user::User;
 use crate::services::jwt::JwtDecoder;
 
-use super::{JwtEncoder, RefreshToken, Tokens};
+use super::{IssuedTokens, JwtEncoder, RefreshToken};
 
 pub trait JwtServiceTrait {
     fn consume_refresh_token(
         &self,
         refresh_token: &str,
-        secret: &str,
+        configuration: &Configuration,
     ) -> impl Future<Output = Result<String>>;
     fn issue_jwt(
         &self,
         user: &User,
         configuration: &Configuration,
-    ) -> impl Future<Output = Result<Tokens>>;
-    fn invalidate_jwt(&self, refresh_token: &str, secret: &str)
-    -> impl Future<Output = Result<()>>;
+    ) -> impl Future<Output = Result<IssuedTokens>>;
+    fn invalidate_jwt(
+        &self,
+        refresh_token: &str,
+        configuration: &Configuration,
+    ) -> impl Future<Output = Result<()>>;
     // fn logout(&self, payload: AuthPayload) -> impl Future<Output = Result<()>>;
     fn logout_all(&self, user_id: &str) -> impl Future<Output = Result<()>>;
     fn find_jwt_by_jti(&self, jti: &str) -> impl Future<Output = Result<RefreshToken>>;
 }
 impl JwtServiceTrait for AuthService {
-    async fn consume_refresh_token(&self, refresh_token: &str, secret: &str) -> Result<String> {
-        let claims: Claims = JwtDecoder::new(refresh_token, secret.as_bytes()).decode()?;
+    async fn consume_refresh_token(
+        &self,
+        refresh_token: &str,
+        configuration: &Configuration,
+    ) -> Result<String> {
+        let claims: Claims = JwtDecoder::new(refresh_token, configuration).decode()?;
 
         if self
             .jwt_service
@@ -38,33 +45,38 @@ impl JwtServiceTrait for AuthService {
             self.jwt_service.revoke(&claims.sub).await?;
             return Err(Error::InvalidToken {
                 token_type: crate::error::TokenErrorType::RefreshToken,
-                reason: crate::error::InvalidTokenReason::Expired,
+                reason: crate::error::Reason::Expired,
             });
         }
 
         Ok(claims.sub)
     }
-    async fn issue_jwt(&self, user: &User, configuration: &Configuration) -> Result<Tokens> {
+    async fn issue_jwt(&self, user: &User, configuration: &Configuration) -> Result<IssuedTokens> {
         let user_id = user.id.as_ref().ok_or(Error::MalformedData {
             field: CredentialField::ObjectId,
         })?;
 
-        let tokens: Tokens = JwtEncoder::new(user, configuration).encode()?;
+        let tokens: IssuedTokens = JwtEncoder::new(user, configuration).encode()?;
 
         let refresh_token = RefreshToken::new(&tokens)
             .with_user_id(user_id)
-            .with_expire_at(configuration.auth.jwt.refresh_expires_in);
+            .with_expire_at(configuration.auth.jwt.refresh_token_expires_in);
 
         self.jwt_service.insert(refresh_token, None).await?;
         Ok(tokens)
     }
 
-    async fn invalidate_jwt(&self, refresh_token: &str, secret: &str) -> Result<()> {
-        let claims: Claims = JwtDecoder::new(refresh_token, secret.as_bytes()).decode()?;
+    async fn invalidate_jwt(
+        &self,
+        refresh_token: &str,
+        configuration: &Configuration,
+    ) -> Result<()> {
+        let claims: Claims = JwtDecoder::new(refresh_token, configuration).decode()?;
+
         if claims.token_type != TokenType::RefreshToken {
             return Err(Error::InvalidToken {
                 token_type: crate::error::TokenErrorType::RefreshToken,
-                reason: crate::error::InvalidTokenReason::Malformed,
+                reason: crate::error::Reason::Malformed,
             });
         }
 

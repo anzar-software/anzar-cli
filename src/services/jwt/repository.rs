@@ -7,9 +7,9 @@ use super::RefreshToken;
 use crate::{
     adapters::DatabaseAdapter,
     config::database::driver::DatabaseDriver,
-    error::{Error, InvalidTokenReason, Result, TokenErrorType},
+    error::{Error, Reason, Result, TokenErrorType},
     extractors::Claims,
-    utils::{Token, TokenHasher, parser::Parser},
+    utils::{SecureToken, TokenHasher, parser::Parser},
 };
 
 #[derive(Clone)]
@@ -55,7 +55,7 @@ impl JWTRepository {
         let filter = json! ({
             "jti": claims.jti.to_string(),
             "userId": &claims.sub,
-            "token": Token::hash(refresh_token),
+            "token": SecureToken::hash(refresh_token),
             "valid": true
         });
         let filter = Parser::mode(self.database_driver).convert(filter);
@@ -72,7 +72,7 @@ impl JWTRepository {
             Ok(Some(refresh_token)) => Ok(refresh_token),
             Ok(None) => Err(Error::InvalidToken {
                 token_type: TokenErrorType::RefreshToken,
-                reason: crate::error::InvalidTokenReason::NotFound,
+                reason: crate::error::Reason::NotFound,
             }),
             Err(err) => Err(err),
         }
@@ -85,7 +85,7 @@ impl JWTRepository {
             Ok(Some(token)) => Ok(token),
             Ok(None) => Err(Error::InvalidToken {
                 token_type: TokenErrorType::RefreshToken,
-                reason: InvalidTokenReason::NotFound,
+                reason: Reason::NotFound,
             }),
             Err(err) => Err(err),
         }
@@ -100,7 +100,7 @@ impl JWTRepository {
             Ok(Some(refresh_token)) => Ok(refresh_token),
             Ok(None) => Err(Error::InvalidToken {
                 token_type: TokenErrorType::RefreshToken,
-                reason: crate::error::InvalidTokenReason::Malformed,
+                reason: crate::error::Reason::Malformed,
             }),
             Err(err) => Err(err),
         }
