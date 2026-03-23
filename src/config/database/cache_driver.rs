@@ -1,4 +1,8 @@
-#[derive(Debug, Default, Clone, Copy, serde::Deserialize, serde::Serialize, Eq, PartialEq)]
+use utoipa::ToSchema;
+
+#[derive(
+    Debug, Default, Clone, Copy, serde::Deserialize, serde::Serialize, Eq, PartialEq, ToSchema,
+)]
 pub enum CacheDriver {
     #[default]
     MemCached,

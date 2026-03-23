@@ -2,6 +2,7 @@ use utoipa::OpenApi;
 use utoipa::openapi::security::{ApiKey, ApiKeyValue, HttpAuthScheme, HttpBuilder, SecurityScheme};
 use utoipa_swagger_ui::SwaggerUi;
 
+use crate::config::Configuration;
 use crate::scopes::auth::TokenQuery;
 use crate::scopes::{auth, email, user};
 
@@ -33,10 +34,10 @@ impl utoipa::Modify for SecurityAddon {
 #[openapi(
     info(
         title = "Anzar Software API",
-        version = "0.6.2",
+        version = "0.7.15",
         description = "REST API for the Anzar platform. All protected routes require a Bearer token.",
         contact(name = "Anzar Team", email = "dev@anzar.io"),
-        license(name = "GPLV3", identifier="GPL"),
+        license(name = "GPL-3.0", identifier="GPL"),
     ),
     paths(
         auth::login,
@@ -51,7 +52,8 @@ impl utoipa::Modify for SecurityAddon {
         email::verify_email
     ),
     components(
-        schemas(TokenQuery)
+        schemas(TokenQuery),
+        schemas(Configuration),
     ),
     modifiers(&SecurityAddon),
     tags(

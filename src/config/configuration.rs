@@ -1,7 +1,8 @@
 use super::database::{cache_driver::CacheDriver, driver::DatabaseDriver};
 use serde::{Deserialize, Serialize};
+use utoipa::ToSchema;
 
-#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize, ToSchema)]
 pub struct Configuration {
     pub app: App,           // Required
     pub database: Database, // Required
@@ -18,7 +19,7 @@ pub struct Configuration {
 // =============================================================================
 // API Configuration - REQUIRED
 // =============================================================================
-#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize, ToSchema)]
 pub struct App {
     pub environment: String,
     pub url: String,
@@ -27,7 +28,7 @@ pub struct App {
 // =============================================================================
 // Database Configuration - REQUIRED
 // =============================================================================
-#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize, ToSchema)]
 pub struct Database {
     pub driver: DatabaseDriver,
     pub connection_string: String,
@@ -43,7 +44,7 @@ impl Database {
 }
 // Cache
 // ------------------------------------------------------------
-#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize, ToSchema)]
 pub struct Cache {
     pub driver: CacheDriver,
     pub url: String,
@@ -52,7 +53,7 @@ pub struct Cache {
 // =============================================================================
 // Server Configuration - Optional
 // =============================================================================
-#[derive(Debug, Default, Clone, PartialEq, Eq, Deserialize, Serialize)]
+#[derive(Debug, Default, Clone, PartialEq, Eq, Deserialize, Serialize, ToSchema)]
 #[serde(default)]
 pub struct Server {
     pub https: HttpsConfig,
@@ -60,7 +61,7 @@ pub struct Server {
 }
 // HttpsConfig
 // ------------------------------------------------------------
-#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize, ToSchema)]
 #[serde(default)]
 pub struct HttpsConfig {
     pub enabled: bool,
@@ -80,7 +81,7 @@ impl Default for HttpsConfig {
 }
 // CorsConfig
 // ------------------------------------------------------------
-#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize, ToSchema)]
 #[serde(default)]
 pub struct CorsConfig {
     pub enabled: bool,
@@ -116,7 +117,7 @@ impl Default for CorsConfig {
 // =============================================================================
 // Authentication Configuration - Optional
 // =============================================================================
-#[derive(Debug, Default, Clone, PartialEq, Eq, Deserialize, Serialize)]
+#[derive(Debug, Default, Clone, PartialEq, Eq, Deserialize, Serialize, ToSchema)]
 #[serde(default)]
 pub struct Authentication {
     pub strategy: AuthStrategy,
@@ -127,7 +128,7 @@ pub struct Authentication {
 }
 // AuthStrategy
 // ------------------------------------------------------------
-#[derive(Debug, Default, Clone, PartialEq, Eq, Deserialize, Serialize)]
+#[derive(Debug, Default, Clone, PartialEq, Eq, Deserialize, Serialize, ToSchema)]
 pub enum AuthStrategy {
     #[default]
     Session,
@@ -135,7 +136,7 @@ pub enum AuthStrategy {
 }
 // JwtConfig
 // ------------------------------------------------------------
-#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize, ToSchema)]
 #[serde(default)]
 pub struct JwtConfig {
     pub algorithm: AlgorithmConfig,
@@ -145,7 +146,7 @@ pub struct JwtConfig {
     pub audience: String,
 }
 //
-#[derive(Debug, Default, Clone, PartialEq, Eq, Deserialize, Serialize)]
+#[derive(Debug, Default, Clone, PartialEq, Eq, Deserialize, Serialize, ToSchema)]
 pub enum AlgorithmConfig {
     #[default]
     HS256,
@@ -192,7 +193,7 @@ impl Default for JwtConfig {
 }
 // SessionConfig
 // ------------------------------------------------------------
-#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize, ToSchema)]
 #[serde(default)]
 pub struct SessionConfig {
     pub name: String,
@@ -201,7 +202,7 @@ pub struct SessionConfig {
     pub http_only: bool,
     pub same_site: SameSiteConfig,
 }
-#[derive(Debug, Default, Clone, PartialEq, Eq, Deserialize, Serialize)]
+#[derive(Debug, Default, Clone, PartialEq, Eq, Deserialize, Serialize, ToSchema)]
 pub enum SameSiteConfig {
     #[default]
     Strict,
@@ -231,13 +232,13 @@ impl Default for SessionConfig {
 
 // EmailConfig
 // ------------------------------------------------------------
-#[derive(Debug, Default, Clone, PartialEq, Eq, Deserialize, Serialize)]
+#[derive(Debug, Default, Clone, PartialEq, Eq, Deserialize, Serialize, ToSchema)]
 #[serde(default)]
 pub struct EmailConfig {
     pub verification: EmailVerification,
 }
 // ************************************************************
-#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize, ToSchema)]
 #[serde(default)]
 pub struct EmailVerification {
     pub required: bool,
@@ -249,7 +250,7 @@ impl Default for EmailVerification {
     fn default() -> Self {
         Self {
             required: false,
-            token_expires_in: 3600,
+            token_expires_in: 1800,
             success_redirect: None,
             error_redirect: None,
         }
@@ -258,7 +259,7 @@ impl Default for EmailVerification {
 
 // PasswordConfig
 // ------------------------------------------------------------
-#[derive(Debug, Default, Clone, PartialEq, Eq, Deserialize, Serialize)]
+#[derive(Debug, Default, Clone, PartialEq, Eq, Deserialize, Serialize, ToSchema)]
 #[serde(default)]
 pub struct PasswordConfig {
     // hashing:
@@ -269,7 +270,7 @@ pub struct PasswordConfig {
     pub security: PasswordSecurity,
 }
 // ************************************************************
-#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize, ToSchema)]
 #[serde(default)]
 pub struct PasswordRequirements {
     pub min_length: u16,
@@ -290,7 +291,7 @@ impl Default for PasswordRequirements {
     }
 }
 // ************************************************************
-#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize, ToSchema)]
 #[serde(default)]
 pub struct PasswordReset {
     pub token_expires_in: i64, // maybe option
@@ -301,14 +302,14 @@ pub struct PasswordReset {
 impl Default for PasswordReset {
     fn default() -> Self {
         Self {
-            token_expires_in: 3600,
+            token_expires_in: 1800,
             success_redirect: None,
             error_redirect: None,
         }
     }
 }
 // ************************************************************
-#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize, ToSchema)]
 #[serde(default)]
 pub struct PasswordSecurity {
     pub max_failed_attempts: u8,
@@ -326,7 +327,7 @@ impl Default for PasswordSecurity {
 // =============================================================================
 // Security Configuration - REQUIRED
 // =============================================================================
-#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize, ToSchema)]
 pub struct Security {
     pub secret_key: String,
     #[serde(default = "default_headers")]
