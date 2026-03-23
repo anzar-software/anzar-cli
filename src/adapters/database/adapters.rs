@@ -3,7 +3,7 @@ use std::sync::Arc;
 use sqlx::{Pool, Sqlite};
 
 use crate::{
-    adapters::{mongodb::MongodbAdapter, sqlite::SQLiteAdapter, traits::DatabaseAdapter},
+    adapters::database::{DatabaseAdapter, mongodb::MongodbAdapter, sqlite::SQLiteAdapter},
     scopes::{auth::model::PasswordResetToken, email::model::EmailVerificationToken, user::User},
     services::{
         account::model::Account,

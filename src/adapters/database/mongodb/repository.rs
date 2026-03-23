@@ -1,4 +1,4 @@
-use crate::{adapters::mongodb::indexes::MongodbIndexes, error::Error};
+use crate::{adapters::database::mongodb::indexes::MongodbIndexes, error::Error};
 
 const NO_CLIENT: &str = "No available server found for connection string '{}'. Please verify that the connection string is valid and the server is reachable.";
 const NO_DB: &str = "Failed to get default database: MongoDB client has no default database configured. Ensure 'default_database' is set in the connection string or client options.";

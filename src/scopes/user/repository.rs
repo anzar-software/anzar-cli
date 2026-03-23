@@ -4,7 +4,7 @@ use serde_json::json;
 
 use super::User;
 use crate::{
-    adapters::{DatabaseAdapter, memcache::MemCacheAdapter},
+    adapters::{cache::CacheAdapter, database::DatabaseAdapter},
     config::database::driver::DatabaseDriver,
     error::{Error, Result},
     utils::parser::Parser,
@@ -14,39 +14,49 @@ use crate::{
 pub struct UserRepository {
     adapter: Arc<dyn DatabaseAdapter<User>>,
     database_driver: DatabaseDriver,
-    memcache: MemCacheAdapter,
+    cache: Arc<dyn CacheAdapter>,
 }
 
 impl UserRepository {
     pub fn new(
         adapter: Arc<dyn DatabaseAdapter<User>>,
         database_driver: DatabaseDriver,
-        memcache: MemCacheAdapter,
+        cache: Arc<dyn CacheAdapter>,
     ) -> Self {
         Self {
             adapter,
             database_driver,
-            memcache,
+            cache,
         }
     }
-    // Memcache
-    pub fn increment(&self, key: &str) -> u8 {
-        self.memcache.increment(key)
+
+    // Cache
+    pub async fn increment(&self, key: &str) -> u8 {
+        self.cache.increment(key, 1).await.unwrap_or(1) as u8
     }
-    pub fn get_attempts(&self, key: &str) -> u8 {
-        self.memcache.get_attempts(key)
+    pub async fn get_attempts(&self, key: &str) -> u8 {
+        if let Ok(Some(val)) = self.cache.find_one(key).await {
+            return val.parse::<u8>().unwrap_or(0);
+        }
+        0
     }
-    pub fn put_cookie_in_lockout(&self, key: &str, expiration: u32) -> Result<()> {
-        Ok(self.memcache.lock_account(key, expiration)?)
+    pub async fn put_cookie_in_lockout(&self, key: &str, expiration: u32) -> Result<()> {
+        self.cache
+            .insert(
+                &format!("lockout:{}", key),
+                "locked".to_string(),
+                expiration,
+            )
+            .await
     }
-    pub fn is_locked(&self, key: &str) -> bool {
-        self.memcache.contains_key(key)
+    pub async fn is_locked(&self, key: &str) -> bool {
+        self.cache.find_one(key).await.is_ok_and(|v| v.is_some())
     }
-    pub fn reset_attempts(&self, key: &str) {
-        self.memcache.reset(key)
+    pub async fn reset_attempts(&self, key: &str) -> Result<()> {
+        self.cache.update(key, "0".to_string(), 1000000).await
     }
-    pub fn clear_key(&self, key: &str) -> bool {
-        self.memcache.clear(key)
+    pub async fn clear_key(&self, key: &str) -> bool {
+        self.cache.delete_one(key).await.unwrap_or(false)
     }
 
     // Database
@@ -82,13 +92,9 @@ impl UserRepository {
         }
     }
 
-    pub async fn insert(
-        &self,
-        user: &User,
-        session: Option<&mut mongodb::ClientSession>,
-    ) -> Result<String> {
+    pub async fn insert(&self, user: &User) -> Result<String> {
         self.adapter
-            .insert(user.to_owned(), session)
+            .insert(user.to_owned())
             .await
             .map_err(|_| Error::InvalidCredentials {
                 field: crate::error::CredentialField::Email,

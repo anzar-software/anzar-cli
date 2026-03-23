@@ -36,13 +36,13 @@ impl JwtServiceTrait for AuthService {
         let claims: Claims = JwtDecoder::new(refresh_token, configuration).decode()?;
 
         if self
-            .jwt_service
+            .jwt_repository
             .find_and_consume(&claims, refresh_token)
             .await
             .is_err()
         {
             // TODO: send an email indicating a breach
-            self.jwt_service.revoke(&claims.sub).await?;
+            self.jwt_repository.revoke(&claims.sub).await?;
             return Err(Error::InvalidToken {
                 token_type: crate::error::TokenErrorType::RefreshToken,
                 reason: crate::error::Reason::Expired,
@@ -62,7 +62,7 @@ impl JwtServiceTrait for AuthService {
             .with_user_id(user_id)
             .with_expire_at(configuration.auth.jwt.refresh_token_expires_in);
 
-        self.jwt_service.insert(refresh_token, None).await?;
+        self.jwt_repository.insert(refresh_token).await?;
         Ok(tokens)
     }
 
@@ -80,7 +80,7 @@ impl JwtServiceTrait for AuthService {
             });
         }
 
-        self.jwt_service.invalidate(claims.jti).await?;
+        self.jwt_repository.invalidate(claims.jti).await?;
         Ok(())
     }
 
@@ -90,12 +90,12 @@ impl JwtServiceTrait for AuthService {
     //     Ok(())
     // }
     async fn logout_all(&self, user_id: &str) -> Result<()> {
-        self.jwt_service.revoke(user_id).await?;
-        self.session_service.revoke(user_id).await?;
+        self.jwt_repository.revoke(user_id).await?;
+        self.session_repository.revoke(user_id).await?;
         Ok(())
     }
 
     async fn find_jwt_by_jti(&self, jti: &str) -> Result<RefreshToken> {
-        self.jwt_service.find_by_jti(jti).await
+        self.jwt_repository.find_by_jti(jti).await
     }
 }

@@ -1,6 +1,5 @@
-use crate::adapters::factory::DatabaseAdapters;
-use crate::adapters::memcache::{MemCache, MemCacheAdapter};
-use crate::adapters::{mongodb::MongoDB, sqlite::SQLite};
+use crate::adapters::cache::{CacheAdapters, memcache::MemCache};
+use crate::adapters::database::{DatabaseAdapters, mongodb::MongoDB, sqlite::SQLite};
 
 use crate::config::database::cache_driver::CacheDriver;
 use crate::config::{Database, database::driver::DatabaseDriver};
@@ -16,42 +15,47 @@ use crate::services::session::SessionRepository;
 
 #[derive(Clone)]
 pub struct AuthService {
-    pub(crate) user_service: UserRepository,
-    pub(crate) account_service: AccountRepository,
-    pub(crate) jwt_service: JWTRepository,
-    pub(crate) session_service: SessionRepository,
-    pub(crate) password_reset_token_service: PasswordResetTokenRepository,
-    pub(crate) email_verification_token_service: EmailVerificationTokenRepository,
+    pub(crate) user_repository: UserRepository,
+    pub(crate) account_repository: AccountRepository,
+    pub(crate) jwt_repository: JWTRepository,
+    pub(crate) session_repository: SessionRepository,
+    pub(crate) password_reset_token_repository: PasswordResetTokenRepository,
+    pub(crate) email_verification_token_repository: EmailVerificationTokenRepository,
     // pub(crate) transaction_repository: TransactionRepository,
 }
 
 impl AuthService {
     pub fn new(
-        adapters: DatabaseAdapters,
+        database_adapters: DatabaseAdapters,
         driver: DatabaseDriver,
-        memcache: MemCacheAdapter,
+        cache_adapters: CacheAdapters,
     ) -> Self {
         Self {
-            user_service: UserRepository::new(adapters.user_adapter, driver, memcache),
-            account_service: AccountRepository::new(adapters.account_adapter, driver),
-            jwt_service: JWTRepository::new(adapters.jwt_adapter, driver),
-            session_service: SessionRepository::new(adapters.session_adapter, driver),
-            password_reset_token_service: PasswordResetTokenRepository::new(
-                adapters.reset_token_adapter,
+            user_repository: UserRepository::new(
+                database_adapters.user_adapter,
+                driver,
+                cache_adapters.cache_adapter,
+            ),
+            account_repository: AccountRepository::new(database_adapters.account_adapter, driver),
+            jwt_repository: JWTRepository::new(database_adapters.jwt_adapter, driver),
+            session_repository: SessionRepository::new(database_adapters.session_adapter, driver),
+            password_reset_token_repository: PasswordResetTokenRepository::new(
+                database_adapters.reset_token_adapter,
                 driver,
             ),
-            email_verification_token_service: EmailVerificationTokenRepository::new(
-                adapters.email_verification_token,
+            email_verification_token_repository: EmailVerificationTokenRepository::new(
+                database_adapters.email_verification_token,
                 driver,
             ),
             // transaction_repository: TransactionRepository::new(adapters.transaction_adapter),
         }
     }
+    // TODO add from_cache()
     pub async fn from_database(database: &Database) -> Result<Self> {
         let cache_adapter = match database.cache.driver {
             CacheDriver::MemCached => {
                 let client = MemCache::start(&database.cache.url).await?;
-                MemCacheAdapter::new(client)
+                CacheAdapters::memcached(client)
             }
             CacheDriver::Redis => todo!(),
         };

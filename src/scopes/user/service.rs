@@ -49,13 +49,13 @@ impl UserServiceTrait for AuthService {
     ) -> Result<(User, String)> {
         // FIXME Single query with JOIN
         // Try to fetch real user
-        let real = self.user_service.find_by_email(email).await.ok();
+        let real = self.user_repository.find_by_email(email).await.ok();
 
         // Extract real password hash or use a fake one
         let (user, password) = match real {
             Some(user) => {
                 match self
-                    .account_service
+                    .account_repository
                     .find(&user.clone().id.unwrap_or_default())
                     .await
                 {
@@ -105,15 +105,15 @@ impl UserServiceTrait for AuthService {
 
         // FIXME
         // 4. Use cache_service instead of user_service (more readable)
-        if self.user_service.is_locked(&lockout_key) {
-            self.user_service.reset_attempts(&identity);
+        if self.user_repository.is_locked(&lockout_key).await {
+            let _ = self.user_repository.reset_attempts(&identity).await;
             return Ok((target_user.clone(), AccountStatus::Suspended, 0));
         }
 
         // 5.
         match password_valid {
             true => {
-                self.user_service.clear_key(&identity);
+                self.user_repository.clear_key(&identity).await;
                 Ok((target_user.clone(), AccountStatus::Active, 0))
             }
             _ => {
@@ -136,16 +136,17 @@ impl UserServiceTrait for AuthService {
         device_cookie: Option<&str>,
         pass_config: &PasswordConfig,
     ) -> Result<u8> {
-        let attempts = self.user_service.increment(identity);
+        let attempts = self.user_repository.increment(identity).await;
 
         // max_failed_attempts of authentication within for this specific cookie
         let max_failed_attempts = match device_cookie {
             Some(_) => pass_config.security.max_failed_attempts * 2,
             None => pass_config.security.max_failed_attempts,
         };
-        if attempts >= max_failed_attempts {
-            self.user_service
-                .put_cookie_in_lockout(identity, pass_config.security.lockout_duration as u32)?;
+        if attempts >= max_failed_attempts - 1 {
+            self.user_repository
+                .put_cookie_in_lockout(identity, pass_config.security.lockout_duration as u32)
+                .await?;
         }
 
         Ok(attempts)
@@ -164,11 +165,11 @@ impl UserServiceTrait for AuthService {
             .with_email(&req.email);
 
         // let user_id: String = self.user_service.insert(&user, Some(&mut session)).await?;
-        let user_id: String = self.user_service.insert(&user, None).await?;
+        let user_id: String = self.user_repository.insert(&user).await?;
         user.with_id(&user_id);
 
         let account = Account::user(&user_id).with_password(&password);
-        self.account_service.insert(account, None).await?;
+        self.account_repository.insert(account).await?;
 
         // self.transaction_repository
         //     .commit_transaction(session)
@@ -194,12 +195,12 @@ impl UserServiceTrait for AuthService {
     }
 
     async fn find_user_by_email(&self, email: &str) -> Result<User> {
-        self.user_service.find_by_email(email).await
+        self.user_repository.find_by_email(email).await
     }
     async fn find_user(&self, id: &str) -> Result<User> {
-        self.user_service.find(id).await
+        self.user_repository.find(id).await
     }
     async fn validate_account(&self, id: &str) -> Result<User> {
-        self.user_service.validate_account(id).await
+        self.user_repository.validate_account(id).await
     }
 }

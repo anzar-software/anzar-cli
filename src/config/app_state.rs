@@ -2,8 +2,9 @@ use std::fs;
 
 use uuid::Uuid;
 
-use crate::adapters::memcache::{MemCache, MemCacheAdapter};
-use crate::adapters::{factory::DatabaseAdapters, mongodb::MongoDB, sqlite::SQLite};
+use crate::adapters::cache::CacheAdapters;
+use crate::adapters::cache::memcache::MemCache;
+use crate::adapters::database::{DatabaseAdapters, mongodb::MongoDB, sqlite::SQLite};
 use crate::config::database::cache_driver::CacheDriver;
 use crate::config::{AppConfig, Configuration, Database, DatabaseDriver};
 use crate::error::Result;
@@ -59,7 +60,7 @@ impl AppState {
         let cache_adapter = match database.cache.driver {
             CacheDriver::MemCached => {
                 let client = MemCache::start(&database.cache.url).await?;
-                MemCacheAdapter::new(client)
+                CacheAdapters::memcached(client)
             }
             CacheDriver::Redis => todo!(),
         };

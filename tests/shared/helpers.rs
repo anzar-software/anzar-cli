@@ -16,7 +16,14 @@ use super::test_cases::ValidTestCases;
 pub struct Helpers;
 impl Helpers {
     pub async fn init_config() -> TestApp {
-        Common::spawn_app().await.unwrap()
+        let test_app = Common::spawn_app().await.unwrap();
+
+        // Clear the cache
+        let client =
+            memcache::Client::connect(test_app.configuration.database.cache.clone().url).unwrap();
+        client.flush().unwrap();
+
+        test_app
     }
 
     pub async fn login(test_app: &TestApp) -> Response {

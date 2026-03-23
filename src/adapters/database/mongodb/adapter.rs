@@ -5,7 +5,8 @@ use mongodb::{Collection, options::ReturnDocument};
 use serde::{Serialize, de::DeserializeOwned};
 use serde_json::Value;
 
-use crate::{adapters::traits::DatabaseAdapter, error::Error};
+use super::super::adapter::DatabaseAdapter;
+use crate::error::Error;
 
 #[derive(Debug, Clone)]
 pub struct MongodbAdapter<T: Send + Sync + Debug> {
@@ -25,16 +26,12 @@ impl<T> DatabaseAdapter<T> for MongodbAdapter<T>
 where
     T: Debug + Send + Sync + Serialize + DeserializeOwned + 'static,
 {
-    async fn insert(
-        &self,
-        data: T,
-        session: Option<&mut mongodb::ClientSession>,
-    ) -> Result<String, Error> {
-        let mut operation = self.collection.insert_one(data);
+    async fn insert(&self, data: T) -> Result<String, Error> {
+        let operation = self.collection.insert_one(data);
 
-        if let Some(s) = session {
-            operation = operation.session(s);
-        }
+        // if let Some(s) = session {
+        //     operation = operation.session(s);
+        // }
 
         let doc = operation
             .await

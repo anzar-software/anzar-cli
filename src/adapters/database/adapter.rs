@@ -8,16 +8,24 @@ use crate::error::Error;
 pub trait DatabaseAdapter<T: Send + Sync + Serialize + DeserializeOwned + 'static>:
     Send + Sync
 {
-    async fn insert(
-        &self,
-        data: T,
-        session: Option<&mut mongodb::ClientSession>,
-    ) -> Result<String, Error>;
-
+    async fn insert(&self, data: T) -> Result<String, Error>;
     async fn find_one(&self, filter: Value) -> Result<Option<T>, Error>;
     async fn find_one_and_update(&self, filter: Value, update: Value) -> Result<Option<T>, Error>;
     async fn update_many(&self, filter: Value, update: Value) -> Result<(), Error>;
-
     async fn delete_one(&self, filter: Value) -> Result<(), Error>;
     async fn delete_many(&self, filter: Value) -> Result<(), Error>;
+
+    // transactions as a separate concern
+    // async fn begin_transaction(&self) -> Result<Box<dyn Transaction>, Error>;
 }
+
+// pub trait Transaction: Send + Sync {
+//     fn commit(self) -> impl std::future::Future<Output = Result<(), Error>> + Send;
+//     fn rollback(self) -> impl std::future::Future<Output = Result<(), Error>> + Send;
+// }
+
+// #[async_trait]
+// pub trait Transaction: Send + Sync {
+//     async fn commit(self) -> Result<(), Error>;
+//     async fn rollback(self) -> Result<(), Error>;
+// }

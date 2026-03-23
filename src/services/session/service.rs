@@ -18,7 +18,7 @@ impl SessionServiceTrait for AuthService {
             field: CredentialField::ObjectId,
         })?;
 
-        self.session_service.revoke(user_id).await?;
+        self.session_repository.revoke(user_id).await?;
 
         let token = SecureToken::with_size32().generate();
         let hashed_token = SecureToken::hash(&token);
@@ -26,19 +26,19 @@ impl SessionServiceTrait for AuthService {
         let session = Session::default()
             .with_user_id(user_id)
             .with_token(&hashed_token);
-        self.session_service.insert(session, None).await?;
+        self.session_repository.insert(session).await?;
 
         Ok(token)
     }
     async fn find_session(&self, token: &str) -> Result<Session> {
-        self.session_service.find(token).await
+        self.session_repository.find(token).await
     }
 
     async fn invalidate_session(&self, token: &str) -> Result<()> {
-        self.session_service.invalidate(token).await?;
+        self.session_repository.invalidate(token).await?;
         Ok(())
     }
     async fn extend_timeout(&self, session_id: &str) -> Result<Session> {
-        self.session_service.extend_timeout(session_id).await
+        self.session_repository.extend_timeout(session_id).await
     }
 }

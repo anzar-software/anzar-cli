@@ -38,3 +38,31 @@ async fn test_login_failure() {
         );
     }
 }
+
+#[actix_web::test]
+async fn test_account_lockout() {
+    // Arrange
+    let test_app = Helpers::init_config().await;
+
+    // Create User
+    let response = Helpers::create_user2(&test_app).await;
+    assert!(response.status().is_success());
+
+    for _ in 0..test_app
+        .configuration
+        .auth
+        .password
+        .security
+        .max_failed_attempts
+    {
+        // Act
+        let response = Helpers::login(&test_app).await;
+        // Assert
+        assert_eq!(401, response.status().as_u16());
+    }
+
+    // Act
+    let response = Helpers::login(&test_app).await;
+    // Assert
+    assert_eq!(403, response.status().as_u16());
+}

@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
 use crate::{
-    adapters::DatabaseAdapter,
+    adapters::database::DatabaseAdapter,
     config::database::driver::DatabaseDriver,
     error::{Error, Reason, Result, TokenErrorType},
     scopes::email::model::EmailVerificationToken,
@@ -47,24 +47,16 @@ impl EmailVerificationTokenRepository {
         Ok(())
     }
 
-    pub async fn insert(
-        &self,
-        otp: EmailVerificationToken,
-        session: Option<&mut mongodb::ClientSession>,
-    ) -> Result<()> {
-        self.adapter
-            .insert(otp, session)
-            .await
-            .map(|_| ())
-            .map_err(|e| {
-                tracing::error!(
-                    "Failed to insert email verification token to database: {:?}",
-                    e
-                );
-                Error::TokenCreationFailed {
-                    token_type: crate::error::TokenErrorType::EmailVerificationToken,
-                }
-            })
+    pub async fn insert(&self, otp: EmailVerificationToken) -> Result<()> {
+        self.adapter.insert(otp).await.map(|_| ()).map_err(|e| {
+            tracing::error!(
+                "Failed to insert email verification token to database: {:?}",
+                e
+            );
+            Error::TokenCreationFailed {
+                token_type: crate::error::TokenErrorType::EmailVerificationToken,
+            }
+        })
     }
 
     pub async fn find(&self, hash: &str) -> Result<EmailVerificationToken> {

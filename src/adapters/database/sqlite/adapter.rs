@@ -5,7 +5,8 @@ use serde::{Serialize, de::DeserializeOwned};
 use serde_json::{Map, Value};
 use sqlx::{FromRow, Pool, Sqlite, query::QueryAs, sqlite::SqliteArguments};
 
-use crate::{adapters::traits::DatabaseAdapter, error::Error};
+use super::super::adapter::DatabaseAdapter;
+use crate::error::Error;
 
 #[derive(sqlx::FromRow)]
 struct IdResult {
@@ -39,11 +40,7 @@ where
         + for<'r> FromRow<'r, sqlx::sqlite::SqliteRow>
         + Unpin,
 {
-    async fn insert(
-        &self,
-        data: T,
-        _session: Option<&mut mongodb::ClientSession>,
-    ) -> Result<String, Error> {
+    async fn insert(&self, data: T) -> Result<String, Error> {
         let value = serde_json::to_value(data).unwrap();
         let obj = value.as_object().unwrap();
 

@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
 use crate::{
-    adapters::DatabaseAdapter,
+    adapters::database::DatabaseAdapter,
     config::database::driver::DatabaseDriver,
     error::{Error, Reason, Result, TokenErrorType},
     utils::parser::Parser,
@@ -46,12 +46,8 @@ impl PasswordResetTokenRepository {
         Ok(())
     }
 
-    pub async fn insert(
-        &self,
-        otp: PasswordResetToken,
-        session: Option<&mut mongodb::ClientSession>,
-    ) -> Result<String> {
-        self.adapter.insert(otp, session).await.map_err(|e| {
+    pub async fn insert(&self, otp: PasswordResetToken) -> Result<String> {
+        self.adapter.insert(otp).await.map_err(|e| {
             tracing::error!("Failed to insert password reset token to database: {:?}", e);
             Error::TokenCreationFailed {
                 token_type: crate::error::TokenErrorType::PasswordResetToken,

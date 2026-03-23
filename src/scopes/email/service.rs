@@ -27,7 +27,7 @@ impl EmailVerificationTokenServiceTrait for AuthService {
         let hash = SecureToken::hash(token);
 
         // 2. Checks the database for a matching token
-        let verification_token = self.email_verification_token_service.find(&hash).await?;
+        let verification_token = self.email_verification_token_repository.find(&hash).await?;
         let verification_token_id = verification_token.id.as_ref().ok_or(Error::MalformedData {
             field: CredentialField::ObjectId,
         })?;
@@ -39,7 +39,7 @@ impl EmailVerificationTokenServiceTrait for AuthService {
             });
         }
         if chrono::Utc::now() > verification_token.expires_at {
-            self.password_reset_token_service
+            self.password_reset_token_repository
                 .invalidate(verification_token_id)
                 .await?;
             return Err(Error::TokenExpired {
@@ -55,14 +55,16 @@ impl EmailVerificationTokenServiceTrait for AuthService {
         &self,
         id: &str,
     ) -> Result<EmailVerificationToken> {
-        self.email_verification_token_service.invalidate(id).await
+        self.email_verification_token_repository
+            .invalidate(id)
+            .await
     }
     async fn revoke_email_verification_token(&self, user_id: &str) -> Result<()> {
-        self.email_verification_token_service.revoke(user_id).await
+        self.email_verification_token_repository
+            .revoke(user_id)
+            .await
     }
     async fn insert_email_verification_token(&self, otp: EmailVerificationToken) -> Result<()> {
-        self.email_verification_token_service
-            .insert(otp, None)
-            .await
+        self.email_verification_token_repository.insert(otp).await
     }
 }

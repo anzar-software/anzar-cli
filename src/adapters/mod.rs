@@ -1,8 +1,2 @@
-mod traits;
-
-pub mod factory;
-pub mod memcache;
-pub mod mongodb;
-pub mod sqlite;
-
-pub use traits::*;
+pub mod cache;
+pub mod database;

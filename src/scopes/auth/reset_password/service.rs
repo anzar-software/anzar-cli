@@ -25,14 +25,14 @@ impl PasswordResetTokenServiceTrait for AuthService {
         // FIXME: → Must check hash + expiry + not revoked in one DB transaction.
 
         // 2. Checks the database for a matching token
-        let reset_token = self.password_reset_token_service.find(&hash).await?;
+        let reset_token = self.password_reset_token_repository.find(&hash).await?;
         let reset_token_id = reset_token.id.as_ref().ok_or(Error::MalformedData {
             field: CredentialField::ObjectId,
         })?;
 
         // 3. Verify token isn't expired
         if chrono::Utc::now() > reset_token.expires_at {
-            self.password_reset_token_service
+            self.password_reset_token_repository
                 .invalidate(reset_token_id)
                 .await?;
             return Err(Error::TokenExpired {
@@ -45,12 +45,12 @@ impl PasswordResetTokenServiceTrait for AuthService {
     }
 
     async fn invalidate_password_reset_token(&self, id: &str) -> Result<PasswordResetToken> {
-        self.password_reset_token_service.invalidate(id).await
+        self.password_reset_token_repository.invalidate(id).await
     }
     async fn revoke_password_reset_token(&self, user_id: &str) -> Result<()> {
-        self.password_reset_token_service.revoke(user_id).await
+        self.password_reset_token_repository.revoke(user_id).await
     }
     async fn insert_password_reset_token(&self, otp: PasswordResetToken) -> Result<String> {
-        self.password_reset_token_service.insert(otp, None).await
+        self.password_reset_token_repository.insert(otp).await
     }
 }

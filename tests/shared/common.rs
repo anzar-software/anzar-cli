@@ -3,7 +3,7 @@ use std::io::Write;
 use std::net::TcpListener;
 use std::sync::LazyLock;
 
-use anzar::adapters::sqlite::SQLite;
+use anzar::adapters::database::sqlite::SQLite;
 use anzar::config::AppConfig;
 use anzar::config::AppState;
 use anzar::scopes::auth::service::AuthService;
