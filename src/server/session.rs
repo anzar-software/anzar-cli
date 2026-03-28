@@ -1,9 +1,11 @@
 use actix_session::{SessionMiddleware, storage::CookieSessionStore};
 use actix_web::cookie::Key;
 
-use crate::config::Configuration;
+use crate::config::AnzarConfiguration;
 
-pub fn configure_session(configuration: &Configuration) -> SessionMiddleware<CookieSessionStore> {
+pub fn configure_session(
+    configuration: &AnzarConfiguration,
+) -> SessionMiddleware<CookieSessionStore> {
     let session_config = configuration.auth.session.clone();
 
     let key = Key::from(configuration.security.secret_key.as_bytes());

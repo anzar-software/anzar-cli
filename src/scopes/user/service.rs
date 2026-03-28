@@ -1,4 +1,4 @@
-use crate::config::{Configuration, PasswordConfig};
+use crate::config::{AnzarConfiguration, PasswordConfig};
 use crate::error::{CredentialField, Error, Result};
 use crate::scopes::auth::service::AuthService;
 use crate::scopes::email::model::EmailVerificationToken;
@@ -15,7 +15,7 @@ pub trait UserServiceTrait {
     fn find_by_email_with_password(
         &self,
         email: &str,
-        configuration: &Configuration,
+        configuration: &AnzarConfiguration,
     ) -> impl Future<Output = Result<(User, String)>>;
     fn authenticate_user(
         &self,
@@ -23,7 +23,7 @@ pub trait UserServiceTrait {
         password: &str,
         device_cookie: &HmacSigner,
         session: &actix_session::Session,
-        configuration: &Configuration,
+        configuration: &AnzarConfiguration,
     ) -> impl Future<Output = Result<(User, AccountStatus, u8)>>;
     fn register_failed_attempt(
         &self,
@@ -45,7 +45,7 @@ impl UserServiceTrait for AuthService {
     async fn find_by_email_with_password(
         &self,
         email: &str,
-        configuration: &Configuration,
+        configuration: &AnzarConfiguration,
     ) -> Result<(User, String)> {
         // FIXME Single query with JOIN
         // Try to fetch real user
@@ -86,7 +86,7 @@ impl UserServiceTrait for AuthService {
         password: &str,
         hmac_signer: &HmacSigner,
         session: &actix_session::Session,
-        configuration: &Configuration,
+        configuration: &AnzarConfiguration,
     ) -> Result<(User, AccountStatus, u8)> {
         // 1. ALWAYS verify password (constant-time even with fake hash)
         let (target_user, target_hash) = self

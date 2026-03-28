@@ -1,18 +1,18 @@
 use jsonwebtoken::{Header, encode};
 
 use super::model::IssuedTokens;
-use crate::config::Configuration;
+use crate::config::AnzarConfiguration;
 use crate::error::{CredentialField, Error, Result};
 use crate::extractors::Claims;
 use crate::scopes::user::User;
 
 pub struct JwtEncoder<'a> {
     user: &'a User,
-    config: &'a Configuration,
+    config: &'a AnzarConfiguration,
     header: Header,
 }
 impl<'a> JwtEncoder<'a> {
-    pub fn new(user: &'a User, config: &'a Configuration) -> Self {
+    pub fn new(user: &'a User, config: &'a AnzarConfiguration) -> Self {
         let header = jsonwebtoken::Header::new(config.auth.jwt.algorithm.clone().into());
 
         Self {

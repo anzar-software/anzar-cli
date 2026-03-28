@@ -8,7 +8,7 @@ use actix_web::{
     web,
 };
 
-use crate::config::{AppState, Configuration};
+use crate::config::{AnzarConfiguration, AppState};
 use crate::extract_service_response;
 use crate::{config::AuthStrategy, extractors::Claims, scopes::auth::support};
 
@@ -42,7 +42,7 @@ fn extract_auth_service(req: &ServiceRequest) -> Result<AuthService, AuthError> 
             "extract auth service".into(),
         ))
 }
-fn extract_configuration_service(req: &ServiceRequest) -> Result<Configuration, AuthError> {
+fn extract_configuration_service(req: &ServiceRequest) -> Result<AnzarConfiguration, AuthError> {
     req.app_data::<web::Data<AppState>>()
         .map(|state| state.configuration.clone())
         .ok_or(AuthError::InternalServerError(

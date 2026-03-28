@@ -1,7 +1,7 @@
-use crate::config::Configuration;
+use crate::config::AnzarConfiguration;
 use actix_web::middleware;
 
-pub fn build_default_headers(configuration: &Configuration) -> middleware::DefaultHeaders {
+pub fn build_default_headers(configuration: &AnzarConfiguration) -> middleware::DefaultHeaders {
     configuration
         .security
         .headers

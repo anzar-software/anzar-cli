@@ -2,7 +2,7 @@ use utoipa::OpenApi;
 use utoipa::openapi::security::{ApiKey, ApiKeyValue, HttpAuthScheme, HttpBuilder, SecurityScheme};
 use utoipa_swagger_ui::SwaggerUi;
 
-use crate::config::Configuration;
+use crate::config::AnzarConfiguration;
 use crate::scopes::auth::TokenQuery;
 use crate::scopes::{auth, email, user};
 
@@ -53,7 +53,7 @@ impl utoipa::Modify for SecurityAddon {
     ),
     components(
         schemas(TokenQuery),
-        schemas(Configuration),
+        schemas(AnzarConfiguration),
     ),
     modifiers(&SecurityAddon),
     tags(

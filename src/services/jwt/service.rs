@@ -1,4 +1,4 @@
-use crate::config::Configuration;
+use crate::config::AnzarConfiguration;
 use crate::error::{CredentialField, Error, Result};
 use crate::extractors::{Claims, TokenType};
 use crate::scopes::auth::service::AuthService;
@@ -11,17 +11,17 @@ pub trait JwtServiceTrait {
     fn consume_refresh_token(
         &self,
         refresh_token: &str,
-        configuration: &Configuration,
+        configuration: &AnzarConfiguration,
     ) -> impl Future<Output = Result<String>>;
     fn issue_jwt(
         &self,
         user: &User,
-        configuration: &Configuration,
+        configuration: &AnzarConfiguration,
     ) -> impl Future<Output = Result<IssuedTokens>>;
     fn invalidate_jwt(
         &self,
         refresh_token: &str,
-        configuration: &Configuration,
+        configuration: &AnzarConfiguration,
     ) -> impl Future<Output = Result<()>>;
     // fn logout(&self, payload: AuthPayload) -> impl Future<Output = Result<()>>;
     fn logout_all(&self, user_id: &str) -> impl Future<Output = Result<()>>;
@@ -31,7 +31,7 @@ impl JwtServiceTrait for AuthService {
     async fn consume_refresh_token(
         &self,
         refresh_token: &str,
-        configuration: &Configuration,
+        configuration: &AnzarConfiguration,
     ) -> Result<String> {
         let claims: Claims = JwtDecoder::new(refresh_token, configuration).decode()?;
 
@@ -51,7 +51,11 @@ impl JwtServiceTrait for AuthService {
 
         Ok(claims.sub)
     }
-    async fn issue_jwt(&self, user: &User, configuration: &Configuration) -> Result<IssuedTokens> {
+    async fn issue_jwt(
+        &self,
+        user: &User,
+        configuration: &AnzarConfiguration,
+    ) -> Result<IssuedTokens> {
         let user_id = user.id.as_ref().ok_or(Error::MalformedData {
             field: CredentialField::ObjectId,
         })?;
@@ -69,7 +73,7 @@ impl JwtServiceTrait for AuthService {
     async fn invalidate_jwt(
         &self,
         refresh_token: &str,
-        configuration: &Configuration,
+        configuration: &AnzarConfiguration,
     ) -> Result<()> {
         let claims: Claims = JwtDecoder::new(refresh_token, configuration).decode()?;
 

@@ -6,20 +6,20 @@ use crate::adapters::cache::CacheAdapters;
 use crate::adapters::cache::memcache::MemCache;
 use crate::adapters::database::{DatabaseAdapters, mongodb::MongoDB, sqlite::SQLite};
 use crate::config::database::cache_driver::CacheDriver;
-use crate::config::{AppConfig, Configuration, Database, DatabaseDriver};
+use crate::config::{AnzarConfiguration, AppConfig, Database, DatabaseDriver};
 use crate::error::Result;
 use crate::scopes::auth::service::AuthService;
 
 #[derive(Clone)]
 pub struct AppState {
     pub auth_service: AuthService,
-    pub configuration: Configuration,
+    pub configuration: AnzarConfiguration,
 }
 
 impl AppState {
     pub async fn production(app_config: &AppConfig) -> Result<Self> {
         let content = fs::read_to_string(&app_config.config_path)?;
-        let configuration: Configuration = serde_yaml::from_str(content.as_str())?;
+        let configuration: AnzarConfiguration = serde_yaml::from_str(content.as_str())?;
         let auth_service = AuthService::from_database(&configuration.database).await?;
 
         Ok(Self {
@@ -38,11 +38,11 @@ impl AppState {
         })
     }
 
-    async fn build_config(address: &str) -> Result<Configuration> {
+    async fn build_config(address: &str) -> Result<AnzarConfiguration> {
         let mut app_config = AppConfig::load().expect("Failed to read configuration");
 
         let content = fs::read_to_string(&app_config.config_path).expect("Failed to find file");
-        let mut configuration: Configuration = serde_yaml::from_str(content.as_str())?;
+        let mut configuration: AnzarConfiguration = serde_yaml::from_str(content.as_str())?;
 
         configuration.app.url = address.into();
         configuration.database.driver = app_config.database.driver;

@@ -8,7 +8,7 @@ use anzar::config::AppConfig;
 use anzar::config::AppState;
 use anzar::scopes::auth::service::AuthService;
 
-use anzar::config::{AuthStrategy, Authentication, Configuration, Database};
+use anzar::config::{AnzarConfiguration, AuthStrategy, Authentication, Database};
 
 use anzar::telemetry::{get_subscriber, init_subscriber};
 use derive_more::derive::Display;
@@ -31,7 +31,7 @@ pub struct TestApp {
     pub address: String,
     pub client: reqwest::Client,
     #[allow(dead_code)]
-    pub configuration: Configuration,
+    pub configuration: AnzarConfiguration,
 }
 
 pub struct Common;

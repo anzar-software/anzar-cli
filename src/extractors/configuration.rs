@@ -1,11 +1,11 @@
 use crate::{
-    config::{AppState, Configuration},
+    config::{AnzarConfiguration, AppState},
     error::Error,
 };
 use actix_web::{FromRequest, HttpRequest, dev::Payload, web::Data};
 use std::future::{Ready, ready};
 
-pub struct ConfigurationExtractor(pub Configuration);
+pub struct ConfigurationExtractor(pub AnzarConfiguration);
 
 impl FromRequest for ConfigurationExtractor {
     type Error = Error;

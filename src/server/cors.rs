@@ -1,8 +1,8 @@
 use actix_cors::Cors;
 
-use crate::config::Configuration;
+use crate::config::AnzarConfiguration;
 
-pub fn configure_cors(configuration: &Configuration) -> Cors {
+pub fn configure_cors(configuration: &AnzarConfiguration) -> Cors {
     let cors_config = configuration.server.cors.clone();
     let allowed_origins = configuration.server.cors.allowed_origins.clone();
 

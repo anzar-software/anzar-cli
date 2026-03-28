@@ -3,7 +3,7 @@ use jsonwebtoken::errors::ErrorKind;
 use jsonwebtoken::{Validation, decode};
 use serde::de::DeserializeOwned;
 
-use crate::config::Configuration;
+use crate::config::AnzarConfiguration;
 use crate::error::{Error, Reason, Result, TokenErrorType};
 
 pub struct JwtDecoder {
@@ -12,7 +12,7 @@ pub struct JwtDecoder {
     validation: Validation,
 }
 impl JwtDecoder {
-    pub fn new(token: impl Into<String>, configuration: &Configuration) -> Self {
+    pub fn new(token: impl Into<String>, configuration: &AnzarConfiguration) -> Self {
         let mut validation =
             jsonwebtoken::Validation::new(configuration.auth.jwt.algorithm.clone().into());
         validation.set_audience(&[configuration.auth.jwt.clone().audience]);
