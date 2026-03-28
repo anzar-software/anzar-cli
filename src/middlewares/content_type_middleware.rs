@@ -21,10 +21,10 @@ pub async fn validate_content_type(
         .and_then(|v| v.to_str().ok());
 
     if let Some(content_type) = header {
-        if req.path() == "/password/reset" {
-            if content_type != mime::TEXT_HTML_UTF_8 {
+        if req.path() == "/auth/password/reset" {
+            if content_type != mime::APPLICATION_WWW_FORM_URLENCODED {
                 return Err(AuthError::UnsupportedMediaType(
-                    "Only text/html supported for this endpoint".into(),
+                    "Only application/x-www-form-urlencoded supported for this endpoint".into(),
                 )
                 .into());
             }

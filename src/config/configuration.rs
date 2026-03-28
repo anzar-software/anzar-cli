@@ -107,6 +107,8 @@ impl Default for CorsConfig {
                 "authorization".into(),
                 "content-type".into(),
                 "accept".into(),
+                "accept-language".into(),
+                "Content-Language".into(),
             ],
             allow_credentials: true,
             max_age: 3600,
