@@ -11,7 +11,6 @@ use anzar::scopes::auth::service::AuthService;
 use anzar::config::{AnzarConfiguration, AuthStrategy, Authentication, Database};
 
 use anzar::telemetry::{get_subscriber, init_subscriber};
-use derive_more::derive::Display;
 use reqwest::Response;
 
 pub static TRACING: LazyLock<()> = LazyLock::new(|| {

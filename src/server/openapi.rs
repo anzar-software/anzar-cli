@@ -63,7 +63,7 @@ impl utoipa::Modify for SecurityAddon {
         (name = "Email", description = "Email verification flows")
     ),
     external_docs(
-        url = "https://anzar_software.gitlab.io/python-sdk/",
+        url = "https://anzar_software.gitlab.io/docs/",
         description = "Full Anzar developer documentation"
     ),
 )]

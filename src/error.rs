@@ -1,7 +1,6 @@
 use actix_session::{SessionGetError, SessionInsertError};
 use actix_web::{HttpResponse, http::StatusCode};
 use chrono::{DateTime, Duration, Utc};
-use derive_more::From;
 use serde::Serialize;
 
 pub type Result<T> = core::result::Result<T, Error>;
@@ -48,115 +47,175 @@ impl From<Error> for std::io::Error {
     }
 }
 
-#[derive(Debug, From)]
+#[derive(thiserror::Error, Debug)]
 pub enum Error {
     // -- Tokens
+    #[error("Invalid token: {token_type:?} ({reason:?})")]
     InvalidToken {
         token_type: TokenErrorType,
         reason: Reason,
     },
-    TokenNotFound {
-        token_id: String,
-    },
+    #[error("Token not found: {token_id}")]
+    TokenNotFound { token_id: String },
+    #[error("Token of type {token_type:?} expired at {expired_at}")]
     TokenExpired {
         token_type: TokenErrorType,
         expired_at: DateTime<Utc>,
     },
-    TokenAlreadyUsed {
-        token_id: String,
-    },
-    TokenCreationFailed {
-        token_type: TokenErrorType,
-    },
-    TokenRevocationFailed {
-        token_id: String,
-    },
+    #[error("Token has already been used: {token_id}")]
+    TokenAlreadyUsed { token_id: String },
+    #[error("Failed to create token of type: {token_type:?}")]
+    TokenCreationFailed { token_type: TokenErrorType },
+    #[error("Failed to revoke token: {token_id}")]
+    TokenRevocationFailed { token_id: String },
 
     // -- Accounts
-    AccountNotVerified {
-        field: CredentialField,
-    },
+    #[error("Account not verified for field: {field:?}")]
+    AccountNotVerified { field: CredentialField },
+    #[error("Invalid credentials for {field:?}: {reason:?}")]
     InvalidCredentials {
         field: CredentialField,
         reason: Reason,
     },
-    MissingCredentials {
-        field: CredentialField,
-    },
+    #[error("Missing required credentials for field: {field:?}")]
+    MissingCredentials { field: CredentialField },
+    #[error("Account has been suspended")]
     AccountSuspended {},
+    #[error("User not found (ID: {user_id:?}, Email: {email:?})")]
     UserNotFound {
         user_id: Option<String>,
         email: Option<String>,
     },
 
     // -- Rate Limiting
-    RateLimitExceeded {
-        limit: u32,
-        window: Duration,
-    },
+    #[error("Rate limit exceeded: {limit} requests allowed per {window:?}")]
+    RateLimitExceeded { limit: u32, window: Duration },
 
-    // --Communication
-    EmailSendFailed {
-        to: String,
-    },
-    TlsConfig {
-        path: String,
-        reason: Reason,
-    },
+    // -- Communication
+    #[error("Failed to send email to: {to}")]
+    EmailSendFailed { to: String },
+    #[error("TLS configuration error at {path}: {reason:?}")]
+    TlsConfig { path: String, reason: Reason },
 
+    #[error("Internal hashing failure")]
     HashingFailure,
-    MalformedData {
-        field: CredentialField,
-    },
+    #[error("Malformed data in field: {field:?}")]
+    MalformedData { field: CredentialField },
+    #[error("Database error: {0}")]
     DatabaseError(String),
+    #[error("Invalid request")]
     InvalidRequest,
+    #[error("Unsupported media type: {0}")]
     UnsupportedMediaType(String),
 
+    #[error("Bad request: {0}")]
     BadRequest(String),
+    #[error("Internal server error: {0}")]
     InternalServerError(String),
 
     // -- Externals
-    #[from]
-    Actix(actix_web::Error),
-    #[from]
-    IO(std::io::Error),
-    #[from]
-    SerdeYaml(serde_yaml::Error),
-    #[from]
-    SessionInsert(SessionInsertError),
-    #[from]
-    SessionGet(SessionGetError),
-    #[from]
-    JWT(jsonwebtoken::errors::Error),
-    #[from]
-    Validation(validator::ValidationError),
-    #[from]
-    Validations(validator::ValidationErrors),
-    #[from]
-    MemCache(memcache::MemcacheError),
-    #[from]
-    MongoDB(mongodb::error::Error),
+    #[error("Actix web error: {0}")]
+    Actix(#[from] actix_web::Error),
+    #[error("I/O error: {0}")]
+    IO(#[from] std::io::Error),
+    #[error("YAML serialization error: {0}")]
+    SerdeYaml(#[from] serde_yaml::Error),
+    #[error("Session insertion error: {0}")]
+    SessionInsert(#[from] SessionInsertError),
+    #[error("Session retrieval error: {0}")]
+    SessionGet(#[from] SessionGetError),
+    #[error("JWT error: {0}")]
+    JWT(#[from] jsonwebtoken::errors::Error),
+    #[error("Validation error: {0}")]
+    Validation(#[from] validator::ValidationError),
+    #[error("Validation errors: {0}")]
+    Validations(#[from] validator::ValidationErrors),
+    #[error("Memcache error: {0}")]
+    MemCache(#[from] memcache::MemcacheError),
+    #[error("MongoDB error: {0}")]
+    MongoDB(#[from] mongodb::error::Error),
 }
 
-impl core::fmt::Display for Error {
-    fn fmt(&self, f: &mut core::fmt::Formatter) -> core::fmt::Result {
-        write!(f, "{self:?}")
+#[derive(Serialize, utoipa::ToSchema, Debug)]
+pub enum ErrorCode {
+    InvalidToken,
+    TokenNotFound,
+    TokenExpired,
+    TokenAlreadyUsed,
+    TokenCreationFailed,
+    TokenRevocationFailed,
+    AccountNotVerified,
+    InvalidCredentials,
+    MissingCredentials,
+    AccountSuspended,
+    UserNotFound,
+    RateLimitExceeded,
+    EmailSendFailed,
+    HashingFailure,
+    MalformedData,
+    DatabaseError,
+    InvalidRequest,
+    UnsupportedMediaType,
+    BadRequest,
+    InternalServerError,
+}
+
+impl Error {
+    pub fn to_code(&self) -> ErrorCode {
+        match self {
+            Error::InvalidToken {
+                token_type: _,
+                reason: _,
+            } => ErrorCode::InvalidToken,
+            Error::TokenNotFound { token_id: _ } => ErrorCode::TokenNotFound,
+            Error::TokenExpired {
+                token_type: _,
+                expired_at: _,
+            } => ErrorCode::TokenExpired,
+            Error::TokenAlreadyUsed { token_id: _ } => ErrorCode::TokenAlreadyUsed,
+            Error::TokenCreationFailed { token_type: _ } => ErrorCode::TokenCreationFailed,
+            Error::TokenRevocationFailed { token_id: _ } => ErrorCode::TokenRevocationFailed,
+            Error::AccountNotVerified { field: _ } => ErrorCode::AccountNotVerified,
+            Error::InvalidCredentials {
+                field: _,
+                reason: _,
+            } => ErrorCode::InvalidCredentials,
+            Error::MissingCredentials { field: _ } => ErrorCode::MissingCredentials,
+            Error::AccountSuspended {} => ErrorCode::AccountSuspended,
+            Error::UserNotFound {
+                user_id: _,
+                email: _,
+            } => ErrorCode::UserNotFound,
+            Error::RateLimitExceeded {
+                limit: _,
+                window: _,
+            } => ErrorCode::RateLimitExceeded,
+            Error::EmailSendFailed { to: _ } => ErrorCode::EmailSendFailed,
+            Error::HashingFailure => ErrorCode::HashingFailure,
+            Error::MalformedData { field: _ } => ErrorCode::MalformedData,
+            Error::DatabaseError(_) => ErrorCode::DatabaseError,
+            Error::InvalidRequest => ErrorCode::InvalidRequest,
+            Error::UnsupportedMediaType(_) => ErrorCode::UnsupportedMediaType,
+            Error::BadRequest(_) => ErrorCode::BadRequest,
+            _ => ErrorCode::InternalServerError,
+        }
     }
 }
 
 #[derive(Serialize, utoipa::ToSchema)]
 #[schema(example = json!({"message": "An Error occured"}))]
 pub struct ErrorResponse {
+    code: ErrorCode,
     message: String,
 }
 impl actix_web::ResponseError for Error {
     fn error_response(&self) -> actix_web::HttpResponse {
-        let status_code = self.status_code();
         let error_response = ErrorResponse {
+            code: self.to_code(),
             message: self.to_string(),
         };
 
-        HttpResponse::build(status_code).json(error_response)
+        HttpResponse::build(self.status_code()).json(error_response)
     }
 
     fn status_code(&self) -> StatusCode {

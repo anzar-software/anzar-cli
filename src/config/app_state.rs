@@ -69,6 +69,12 @@ impl AppState {
             DatabaseDriver::SQLite => {
                 let db = SQLite::start(&database.connection_string).await?;
                 if &database.connection_string == "sqlite::memory:" {
+                    // let path = std::path::Path::new("migrations");
+                    // if path.exists() {
+                    //     let migrator = Migrator::new(path).await?;
+                    //     migrator.run(&db).await.expect("migrations to run");
+                    // }
+
                     sqlx::migrate!("./migrations")
                         .run(&db)
                         .await
