@@ -6,7 +6,9 @@ use crate::adapters::cache::CacheAdapters;
 use crate::adapters::cache::memcache::MemCache;
 use crate::adapters::database::{DatabaseAdapters, mongodb::MongoDB, sqlite::SQLite};
 use crate::config::database::cache_driver::CacheDriver;
-use crate::config::{AnzarConfiguration, AppConfig, Database, DatabaseDriver};
+use crate::config::{
+    AnzarConfiguration, App, AppConfig, Authentication, Cache, Database, DatabaseDriver, Server,
+};
 use crate::error::Result;
 use crate::scopes::auth::service::AuthService;
 
@@ -41,11 +43,37 @@ impl AppState {
     async fn build_config(address: &str) -> Result<AnzarConfiguration> {
         let mut app_config = AppConfig::load().expect("Failed to read configuration");
 
-        let content = fs::read_to_string(&app_config.config_path).expect("Failed to find file");
-        let mut configuration: AnzarConfiguration = serde_yaml::from_str(content.as_str())?;
+        let mut configuration = match fs::read_to_string(&app_config.config_path) {
+            Ok(content) => {
+                let mut configuration: AnzarConfiguration = serde_yaml::from_str(content.as_str())?;
 
-        configuration.app.url = address.into();
-        configuration.database.driver = app_config.database.driver;
+                configuration.app.url = address.into();
+                configuration.database.driver = app_config.database.driver;
+
+                configuration
+            }
+            Err(_) => AnzarConfiguration {
+                app: App {
+                    environment: "dev".into(),
+                    url: address.into(),
+                },
+                database: Database {
+                    driver: app_config.database.driver,
+                    connection_string: "".into(),
+                    cache: Cache {
+                        driver: CacheDriver::MemCached,
+                        url: "memcache://localhost:11211".into(),
+                    },
+                },
+                server: Server::default(),
+                auth: Authentication::default(),
+                security: super::Security {
+                    secret_key: "f8afd6dc9f2352e2dfff4b789e3458448a000aa4fb7010d379b998bec89679cd"
+                        .into(),
+                    headers: vec![],
+                },
+            },
+        };
 
         if configuration.database.driver == DatabaseDriver::MongoDB {
             let db_name = Uuid::new_v4().to_string();
