@@ -48,7 +48,7 @@ async fn test_account_lockout() {
     let response = Helpers::create_user2(&test_app).await;
     assert!(response.status().is_success());
 
-    for _ in 0..test_app
+    for _ in 1..test_app
         .configuration
         .auth
         .password
