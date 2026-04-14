@@ -113,14 +113,14 @@ impl UserServiceTrait for AuthService {
         // 5.
         match password_valid {
             true => {
-                self.user_repository.clear_key(&identity).await;
+                let _ = self.user_repository.clear_key(&identity).await;
                 Ok((target_user.clone(), AccountStatus::Active, 0))
             }
             _ => {
                 let attempts = self
                     .register_failed_attempt(&identity, device_cookie, &configuration.auth.password)
                     .await
-                    .unwrap_or(1);
+                    .unwrap();
                 Ok((
                     target_user.clone(),
                     AccountStatus::InvalidCredentials,
@@ -143,9 +143,9 @@ impl UserServiceTrait for AuthService {
             Some(_) => pass_config.security.max_failed_attempts * 2,
             None => pass_config.security.max_failed_attempts,
         };
-        if attempts >= max_failed_attempts - 1 {
+        if attempts >= max_failed_attempts {
             self.user_repository
-                .put_cookie_in_lockout(identity, pass_config.security.lockout_duration as u32)
+                .put_cookie_in_lockout(identity, pass_config.security.lockout_duration as u64)
                 .await?;
         }
 

@@ -42,6 +42,13 @@ impl ValidTestCases {
             password: "hakouguelfen".into(),
         }
     }
+    pub fn login_data_with_email(email: &str) -> LoginRequest {
+        LoginRequest {
+            email: email.into(),
+            password: "hakouguelfen".into(),
+        }
+    }
+
     pub fn register_data() -> RegisterRequest {
         RegisterRequest {
             username: "hakouguelfen".into(),
@@ -57,6 +64,17 @@ impl ValidTestCases {
         RegisterRequest {
             username: "hakouguelfen2".into(),
             email: "hakouguelfe2n@gmail.com".into(),
+            password: "hakouguelfen2".into(),
+            role: Role::User,
+            is_premium: false,
+            account_locked: false,
+            verified: true,
+        }
+    }
+    pub fn register_data_with_email(email: &str) -> RegisterRequest {
+        RegisterRequest {
+            username: "hakouguelfen2".into(),
+            email: email.into(),
             password: "hakouguelfen2".into(),
             role: Role::User,
             is_premium: false,

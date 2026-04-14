@@ -1,3 +1,4 @@
+use crate::adapters::cache::redis::Redis;
 use crate::adapters::cache::{CacheAdapters, memcache::MemCache};
 use crate::adapters::database::{DatabaseAdapters, mongodb::MongoDB, sqlite::SQLite};
 
@@ -50,14 +51,16 @@ impl AuthService {
             // transaction_repository: TransactionRepository::new(adapters.transaction_adapter),
         }
     }
-    // TODO add from_cache()
     pub async fn from_database(database: &Database) -> Result<Self> {
         let cache_adapter = match database.cache.driver {
             CacheDriver::MemCached => {
                 let client = MemCache::start(&database.cache.url).await?;
                 CacheAdapters::memcached(client)
             }
-            CacheDriver::Redis => todo!(),
+            CacheDriver::Redis => {
+                let connection = Redis::start(&database.cache.url).await?;
+                CacheAdapters::redis(connection)
+            }
         };
 
         let database_adapter = match database.driver {

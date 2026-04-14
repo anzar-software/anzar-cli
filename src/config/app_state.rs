@@ -4,6 +4,7 @@ use uuid::Uuid;
 
 use crate::adapters::cache::CacheAdapters;
 use crate::adapters::cache::memcache::MemCache;
+use crate::adapters::cache::redis::Redis;
 use crate::adapters::database::{DatabaseAdapters, mongodb::MongoDB, sqlite::SQLite};
 use crate::config::database::cache_driver::CacheDriver;
 use crate::config::{
@@ -43,44 +44,49 @@ impl AppState {
     async fn build_config(address: &str) -> Result<AnzarConfiguration> {
         let mut app_config = AppConfig::load().expect("Failed to read configuration");
 
-        let mut configuration = match fs::read_to_string(&app_config.config_path) {
-            Ok(content) => {
-                let mut configuration: AnzarConfiguration = serde_yaml::from_str(content.as_str())?;
+        // let mut configuration = match fs::read_to_string(&app_config.config_path) {
+        //     Ok(content) => {
+        //         let mut configuration: AnzarConfiguration = serde_yaml::from_str(content.as_str())?;
+        //         configuration.app.url = address.into();
+        //         configuration.database.driver = app_config.database.driver;
+        //         configuration.database.cache.driver = app_config.cache;
+        //         configuration
+        //     }
+        //     Err(_) => AnzarConfiguration{},
+        // };
 
-                configuration.app.url = address.into();
-                configuration.database.driver = app_config.database.driver;
-
-                configuration
-            }
-            Err(_) => AnzarConfiguration {
-                app: App {
-                    environment: "dev".into(),
-                    url: address.into(),
-                },
-                database: Database {
-                    driver: app_config.database.driver,
-                    connection_string: "".into(),
-                    cache: Cache {
-                        driver: CacheDriver::MemCached,
-                        url: "memcache://localhost:11211".into(),
-                    },
-                },
-                server: Server::default(),
-                auth: Authentication::default(),
-                security: super::Security {
-                    secret_key: "f8afd6dc9f2352e2dfff4b789e3458448a000aa4fb7010d379b998bec89679cd"
-                        .into(),
-                    headers: vec![],
-                },
-            },
+        let cache_url = match app_config.cache {
+            CacheDriver::MemCached => "memcache://localhost:11211",
+            CacheDriver::Redis => "redis://127.0.0.1/",
         };
 
-        if configuration.database.driver == DatabaseDriver::MongoDB {
+        if app_config.database.driver == DatabaseDriver::MongoDB {
             let db_name = Uuid::new_v4().to_string();
             app_config.database.name = db_name;
         }
 
-        configuration.database.connection_string = app_config.database.connection_string();
+        let configuration = AnzarConfiguration {
+            app: App {
+                environment: "dev".into(),
+                url: address.into(),
+            },
+            database: Database {
+                driver: app_config.database.driver,
+                connection_string: app_config.database.connection_string(),
+                cache: Cache {
+                    driver: app_config.cache,
+                    url: cache_url.into(),
+                },
+            },
+            server: Server::default(),
+            auth: Authentication::default(),
+            security: super::Security {
+                secret_key: "f8afd6dc9f2352e2dfff4b789e3458448a000aa4fb7010d379b998bec89679cd"
+                    .into(),
+                headers: vec![],
+            },
+        };
+
         Ok(configuration)
     }
 
@@ -90,7 +96,10 @@ impl AppState {
                 let client = MemCache::start(&database.cache.url).await?;
                 CacheAdapters::memcached(client)
             }
-            CacheDriver::Redis => todo!(),
+            CacheDriver::Redis => {
+                let connection = Redis::start(&database.cache.url).await?;
+                CacheAdapters::redis(connection)
+            }
         };
 
         let database_adapter = match database.driver {

@@ -134,6 +134,8 @@ pub enum Error {
     MemCache(#[from] memcache::MemcacheError),
     #[error("MongoDB error: {0}")]
     MongoDB(#[from] mongodb::error::Error),
+    #[error("Redis error: {0}")]
+    Redis(#[from] redis::RedisError),
 }
 
 #[derive(Serialize, utoipa::ToSchema, Debug)]
@@ -272,6 +274,7 @@ impl actix_web::ResponseError for Error {
             Error::SessionGet(_) => StatusCode::INTERNAL_SERVER_ERROR,
             Error::MemCache(_) => StatusCode::INTERNAL_SERVER_ERROR,
             Error::MongoDB(_) => StatusCode::INTERNAL_SERVER_ERROR,
+            Error::Redis(_) => StatusCode::INTERNAL_SERVER_ERROR,
         }
     }
 }

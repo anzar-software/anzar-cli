@@ -1,9 +1,10 @@
 #![allow(dead_code)]
 use anzar::{
-    config::AnzarConfiguration,
+    config::{AnzarConfiguration, database::cache_driver::CacheDriver},
     extractors::{Claims, TokenType},
     services::jwt::JwtDecoder,
 };
+use redis::TypedCommands;
 use reqwest::Response;
 use uuid::Uuid;
 
@@ -19,9 +20,19 @@ impl Helpers {
         let test_app = Common::spawn_app().await.unwrap();
 
         // Clear the cache
-        let client =
-            memcache::Client::connect(test_app.configuration.database.cache.clone().url).unwrap();
-        client.flush().unwrap();
+        match test_app.configuration.database.cache.driver {
+            CacheDriver::MemCached => {
+                let client =
+                    memcache::Client::connect(test_app.configuration.database.cache.clone().url)
+                        .unwrap();
+                client.flush().unwrap();
+            }
+            CacheDriver::Redis => {
+                let client =
+                    redis::Client::open(test_app.configuration.database.cache.clone().url).unwrap();
+                let _ = client.get_connection().unwrap().flushall();
+            }
+        }
 
         test_app
     }
@@ -36,9 +47,29 @@ impl Helpers {
             .await
             .expect("Failed to execute request.")
     }
+    pub async fn login_with_email(test_app: &TestApp, email: &str) -> Response {
+        let body = ValidTestCases::login_data_with_email(email);
+        test_app
+            .client
+            .post(format!("{}/auth/login", test_app.address))
+            .json(&body)
+            .send()
+            .await
+            .expect("Failed to execute request.")
+    }
 
     pub async fn create_user(test_app: &TestApp) -> Response {
         let body = ValidTestCases::register_data();
+        test_app
+            .client
+            .post(format!("{}/auth/register", test_app.address))
+            .json(&body)
+            .send()
+            .await
+            .expect("Failed to execute request.")
+    }
+    pub async fn create_user_with_email(test_app: &TestApp, email: &str) -> Response {
+        let body = ValidTestCases::register_data_with_email(email);
         test_app
             .client
             .post(format!("{}/auth/register", test_app.address))

@@ -13,6 +13,8 @@ use server::ServerConfig;
 use database::config::DatabaseConfig;
 use database::driver::DatabaseDriver;
 
+use crate::config::database::cache_driver::CacheDriver;
+
 #[derive(Debug, serde::Deserialize)]
 pub struct AppConfig {
     pub name: String,
@@ -20,6 +22,7 @@ pub struct AppConfig {
     pub config_path: String,
     pub server: ServerConfig,
     pub database: DatabaseConfig,
+    pub cache: CacheDriver,
 }
 
 impl AppConfig {
@@ -35,6 +38,12 @@ impl AppConfig {
             .try_into()
             .expect("Failed to parse DB")
     }
+    fn cache() -> CacheDriver {
+        std::env::var("CACHE")
+            .unwrap_or_else(|_| CacheDriver::Redis.as_str().into())
+            .try_into()
+            .expect("Failed to parse CACHE")
+    }
 
     pub fn load() -> Result<AppConfig, config::ConfigError> {
         let environment: Environment = Self::env();
@@ -47,6 +56,13 @@ impl AppConfig {
             environment.as_str(),
         );
 
+        let environment_cache = Self::cache();
+        let cache_path = format!(
+            "{}/{}.yaml",
+            environment_cache.as_str(),
+            environment_cache.as_str(),
+        );
+
         let value = match environment {
             Environment::Dev => "app/configuration",
             Environment::Prod => "/app/configuration",
@@ -57,6 +73,7 @@ impl AppConfig {
             .add_source(config::File::from(config_dir.join("base.yaml")).required(true))
             .add_source(config::File::from(config_dir.join(environment_path)))
             .add_source(config::File::from(config_dir.join(database_path)))
+            .add_source(config::File::from(config_dir.join(cache_path)))
             .build()
             .map_err(|e| dbg!(e))?;
 

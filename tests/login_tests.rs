@@ -45,7 +45,8 @@ async fn test_account_lockout() {
     let test_app = Helpers::init_config().await;
 
     // Create User
-    let response = Helpers::create_user2(&test_app).await;
+    let unique_email = format!("failure_{}@test.com", uuid::Uuid::new_v4());
+    let response = Helpers::create_user_with_email(&test_app, &unique_email).await;
     assert!(response.status().is_success());
 
     for _ in 0..test_app
@@ -56,13 +57,13 @@ async fn test_account_lockout() {
         .max_failed_attempts
     {
         // Act
-        let response = Helpers::login(&test_app).await;
+        let response = Helpers::login_with_email(&test_app, &unique_email).await;
         // Assert
         assert_eq!(401, response.status().as_u16());
     }
 
     // Act
-    let response = Helpers::login(&test_app).await;
+    let response = Helpers::login_with_email(&test_app, &unique_email).await;
     // Assert
     assert_eq!(403, response.status().as_u16());
 }

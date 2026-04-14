@@ -40,7 +40,7 @@ impl UserRepository {
         }
         0
     }
-    pub async fn put_cookie_in_lockout(&self, key: &str, expiration: u32) -> Result<()> {
+    pub async fn put_cookie_in_lockout(&self, key: &str, expiration: u64) -> Result<()> {
         self.cache
             .insert(
                 &format!("lockout:{}", key),
@@ -55,8 +55,8 @@ impl UserRepository {
     pub async fn reset_attempts(&self, key: &str) -> Result<()> {
         self.cache.update(key, "0".to_string(), 1000000).await
     }
-    pub async fn clear_key(&self, key: &str) -> bool {
-        self.cache.delete_one(key).await.unwrap_or(false)
+    pub async fn clear_key(&self, key: &str) -> Result<()> {
+        self.cache.delete_one(key).await
     }
 
     // Database
