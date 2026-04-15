@@ -10,6 +10,7 @@ pub use configuration::*;
 use environment::*;
 use server::ServerConfig;
 
+use database::cache_config::CacheConfig;
 use database::config::DatabaseConfig;
 use database::driver::DatabaseDriver;
 
@@ -22,7 +23,7 @@ pub struct AppConfig {
     pub config_path: String,
     pub server: ServerConfig,
     pub database: DatabaseConfig,
-    pub cache: CacheDriver,
+    pub cache: CacheConfig,
 }
 
 impl AppConfig {
@@ -60,7 +61,7 @@ impl AppConfig {
         let cache_path = format!(
             "{}/{}.yaml",
             environment_cache.as_str(),
-            environment_cache.as_str(),
+            environment.as_str(),
         );
 
         let value = match environment {

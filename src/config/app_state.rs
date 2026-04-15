@@ -55,11 +55,6 @@ impl AppState {
         //     Err(_) => AnzarConfiguration{},
         // };
 
-        let cache_url = match app_config.cache {
-            CacheDriver::MemCached => "memcache://localhost:11211",
-            CacheDriver::Redis => "redis://127.0.0.1/",
-        };
-
         if app_config.database.driver == DatabaseDriver::MongoDB {
             let db_name = Uuid::new_v4().to_string();
             app_config.database.name = db_name;
@@ -74,8 +69,8 @@ impl AppState {
                 driver: app_config.database.driver,
                 connection_string: app_config.database.connection_string(),
                 cache: Cache {
-                    driver: app_config.cache,
-                    url: cache_url.into(),
+                    driver: app_config.cache.driver,
+                    url: app_config.cache.url,
                 },
             },
             server: Server::default(),
