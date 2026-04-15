@@ -120,6 +120,8 @@ pub enum Error {
     IO(#[from] std::io::Error),
     #[error("YAML serialization error: {0}")]
     SerdeYaml(#[from] serde_yaml::Error),
+    #[error("JSON serialization error: {0}")]
+    SerdeJson(#[from] serde_json::Error),
     #[error("Session insertion error: {0}")]
     SessionInsert(#[from] SessionInsertError),
     #[error("Session retrieval error: {0}")]
@@ -134,6 +136,8 @@ pub enum Error {
     MemCache(#[from] memcache::MemcacheError),
     #[error("MongoDB error: {0}")]
     MongoDB(#[from] mongodb::error::Error),
+    #[error("MongoBoson error: {0}")]
+    MongoBoson(#[from] mongodb::bson::ser::Error),
     #[error("Redis error: {0}")]
     Redis(#[from] redis::RedisError),
 }
@@ -269,11 +273,13 @@ impl actix_web::ResponseError for Error {
             Error::Actix(_) => StatusCode::INTERNAL_SERVER_ERROR,
             Error::IO(_) => StatusCode::INTERNAL_SERVER_ERROR,
             Error::SerdeYaml(_) => StatusCode::INTERNAL_SERVER_ERROR,
+            Error::SerdeJson(_) => StatusCode::INTERNAL_SERVER_ERROR,
             Error::JWT(_) => StatusCode::INTERNAL_SERVER_ERROR,
             Error::SessionInsert(_) => StatusCode::INTERNAL_SERVER_ERROR,
             Error::SessionGet(_) => StatusCode::INTERNAL_SERVER_ERROR,
             Error::MemCache(_) => StatusCode::INTERNAL_SERVER_ERROR,
             Error::MongoDB(_) => StatusCode::INTERNAL_SERVER_ERROR,
+            Error::MongoBoson(_) => StatusCode::INTERNAL_SERVER_ERROR,
             Error::Redis(_) => StatusCode::INTERNAL_SERVER_ERROR,
         }
     }

@@ -20,7 +20,7 @@ impl<'a> LoginAttemptTracker<'a> {
     pub fn resolve_lockout_key(&self, cookie: Option<&str>, email: &str) -> String {
         // "what gets locked out" — verified device vs user account
         match cookie.and_then(|c| self.signer.validate(c)) {
-            Some(true) => format!("lockout:device:{}", cookie.unwrap()),
+            Some(true) => format!("lockout:device:{}", cookie.unwrap_or_default()),
             Some(false) | None => format!("lockout:user:{}", email),
         }
     }

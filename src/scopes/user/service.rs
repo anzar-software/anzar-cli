@@ -120,7 +120,7 @@ impl UserServiceTrait for AuthService {
                 let attempts = self
                     .register_failed_attempt(&identity, device_cookie, &configuration.auth.password)
                     .await
-                    .unwrap();
+                    .unwrap_or(1);
                 Ok((
                     target_user.clone(),
                     AccountStatus::InvalidCredentials,

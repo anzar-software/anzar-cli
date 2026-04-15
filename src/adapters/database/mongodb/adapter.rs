@@ -45,7 +45,7 @@ where
     }
 
     async fn find_one(&self, filter: Value) -> Result<Option<T>, Error> {
-        let mut mongo_filter = mongodb::bson::to_document(&filter).unwrap();
+        let mut mongo_filter = mongodb::bson::to_document(&filter)?;
         if let Some(id_value) = mongo_filter.remove("id") {
             mongo_filter.insert("_id", id_value);
         }
@@ -57,8 +57,8 @@ where
     }
 
     async fn find_one_and_update(&self, filter: Value, update: Value) -> Result<Option<T>, Error> {
-        let mut mongo_filter = mongodb::bson::to_document(&filter).unwrap();
-        let mongo_update = mongodb::bson::to_document(&update).unwrap();
+        let mut mongo_filter = mongodb::bson::to_document(&filter)?;
+        let mongo_update = mongodb::bson::to_document(&update)?;
 
         if let Some(id_value) = mongo_filter.remove("id") {
             mongo_filter.insert("_id", id_value);
@@ -72,8 +72,8 @@ where
     }
 
     async fn update_many(&self, filter: Value, update: Value) -> Result<(), Error> {
-        let mut mongo_filter = mongodb::bson::to_document(&filter).unwrap();
-        let mongo_update = mongodb::bson::to_document(&update).unwrap();
+        let mut mongo_filter = mongodb::bson::to_document(&filter)?;
+        let mongo_update = mongodb::bson::to_document(&update)?;
 
         if let Some(id_value) = mongo_filter.remove("id") {
             mongo_filter.insert("_id", id_value);
@@ -88,7 +88,7 @@ where
     }
 
     async fn delete_one(&self, filter: Value) -> Result<(), Error> {
-        let mut mongo_filter = mongodb::bson::to_document(&filter).unwrap();
+        let mut mongo_filter = mongodb::bson::to_document(&filter)?;
         if let Some(id_value) = mongo_filter.remove("id") {
             mongo_filter.insert("_id", id_value);
         }
@@ -102,7 +102,7 @@ where
     }
 
     async fn delete_many(&self, filter: Value) -> Result<(), Error> {
-        let mut mongo_filter = mongodb::bson::to_document(&filter).unwrap();
+        let mut mongo_filter = mongodb::bson::to_document(&filter)?;
         if let Some(id_value) = mongo_filter.remove("id") {
             mongo_filter.insert("_id", id_value);
         }

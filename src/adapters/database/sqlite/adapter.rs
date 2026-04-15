@@ -41,7 +41,7 @@ where
         + Unpin,
 {
     async fn insert(&self, data: T) -> Result<String, Error> {
-        let value = serde_json::to_value(data).unwrap();
+        let value = serde_json::to_value(data)?;
         let obj = value.as_object().unwrap();
 
         let columns: Vec<_> = obj.keys().cloned().collect();
@@ -131,10 +131,10 @@ where
             query = _bind_value(query, v.to_owned());
         }
 
-        query.fetch_optional(&self.pool).await.map_err(|e| {
-            dbg!(&e);
-            Error::DatabaseError(e.to_string())
-        })?;
+        query
+            .fetch_optional(&self.pool)
+            .await
+            .map_err(|e| Error::DatabaseError(e.to_string()))?;
 
         Ok(())
     }
@@ -148,7 +148,7 @@ where
 }
 
 fn _parse_to_map(data: Value) -> Result<Map<String, Value>, Error> {
-    let value = serde_json::to_value(data).unwrap();
+    let value = serde_json::to_value(data)?;
     let obj = value.as_object().unwrap();
     if obj.is_empty() {
         return Err(Error::InternalServerError("parsing error".into()));
