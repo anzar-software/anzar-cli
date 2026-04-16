@@ -3,5 +3,5 @@ config_dir: "app/configuration"
 database:
   host: "localhost"
   username: "hakou"
-  password: "hakou"
+  password: "password"
 

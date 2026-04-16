@@ -5,6 +5,7 @@ use utoipa::ToSchema;
 
 #[derive(Default, Debug, Serialize, Deserialize, Clone, PartialEq, Eq, sqlx::Type, ToSchema)]
 #[schema(example = json!({"role": Role::default()}))]
+#[sqlx(type_name = "role")]
 pub enum Role {
     #[default]
     User,

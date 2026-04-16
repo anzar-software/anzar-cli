@@ -140,6 +140,8 @@ pub enum Error {
     MongoBoson(#[from] mongodb::bson::ser::Error),
     #[error("Redis error: {0}")]
     Redis(#[from] redis::RedisError),
+    #[error("Sqlx error: {0}")]
+    Sqlx(#[from] sqlx::Error),
 }
 
 #[derive(Serialize, utoipa::ToSchema, Debug)]
@@ -281,6 +283,7 @@ impl actix_web::ResponseError for Error {
             Error::MongoDB(_) => StatusCode::INTERNAL_SERVER_ERROR,
             Error::MongoBoson(_) => StatusCode::INTERNAL_SERVER_ERROR,
             Error::Redis(_) => StatusCode::INTERNAL_SERVER_ERROR,
+            Error::Sqlx(_) => StatusCode::INTERNAL_SERVER_ERROR,
         }
     }
 }

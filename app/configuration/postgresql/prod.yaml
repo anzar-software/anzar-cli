@@ -1,0 +1,4 @@
+database:
+  driver: "PostgreSQL"
+  name: "prod"
+  port: 5432

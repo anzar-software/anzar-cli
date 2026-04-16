@@ -1,4 +1,5 @@
 database:
   driver: "SQLite"
-  name: "sqlite::memory:"
+  # name: "sqlite::memory:"
+  name: "./anzar.db"
   port: 27017

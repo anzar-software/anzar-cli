@@ -1,5 +1,5 @@
 use super::driver::DatabaseDriver;
-use secrecy::SecretString;
+use secrecy::{ExposeSecret, SecretString};
 
 #[derive(Default, Debug, serde::Deserialize)]
 pub struct DatabaseConfig {
@@ -19,12 +19,25 @@ impl DatabaseConfig {
                 // test: mongodb://localhost:27017/dev
                 // prod: mongodb://db:27017/production
                 format!(
-                    "mongodb://{}:{}/{}?retryWrites=false",
-                    self.host, self.port, self.name
+                    "mongodb://{}:{}@{}:{}/{}?retryWrites=false",
+                    self.username,
+                    self.password.expose_secret(),
+                    self.host,
+                    self.port,
+                    self.name
                 )
             }
             DatabaseDriver::SQLite => self.name.to_string(),
-            DatabaseDriver::PostgreSQL => todo!(),
+            DatabaseDriver::PostgreSQL => {
+                format!(
+                    "postgres://{}:{}@{}:{}/{}",
+                    self.username,
+                    self.password.expose_secret(),
+                    self.host,
+                    self.port,
+                    self.name
+                )
+            }
         }
     }
 

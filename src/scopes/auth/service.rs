@@ -1,5 +1,6 @@
 use crate::adapters::cache::redis::Redis;
 use crate::adapters::cache::{CacheAdapters, memcache::MemCache};
+use crate::adapters::database::postgres::PostgreSQL;
 use crate::adapters::database::{DatabaseAdapters, mongodb::MongoDB, sqlite::SQLite};
 
 use crate::config::database::cache_driver::CacheDriver;
@@ -74,7 +75,10 @@ impl AuthService {
                 let db_name = database.name().unwrap_or_default();
                 DatabaseAdapters::mongodb(&client, db_name)
             }
-            DatabaseDriver::PostgreSQL => todo!(),
+            DatabaseDriver::PostgreSQL => {
+                let pool = PostgreSQL::start(&database.connection_string).await?;
+                DatabaseAdapters::postgres(&pool)
+            }
         };
 
         Ok(Self::new(database_adapter, database.driver, cache_adapter))

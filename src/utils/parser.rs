@@ -16,7 +16,7 @@ impl Parser {
         match &self.database_driver {
             DatabaseDriver::MongoDB => self.mongo_convert(data),
             DatabaseDriver::SQLite => self.sqlite_convert(data),
-            DatabaseDriver::PostgreSQL => todo!(),
+            DatabaseDriver::PostgreSQL => self.postgres_convert(data),
         }
     }
 
@@ -37,6 +37,22 @@ impl Parser {
     }
 
     fn sqlite_convert(&self, doc: Value) -> Value {
+        const MONGO_KEYWORDS: [&str; 3] = ["$set", "$inc", "$unset"];
+        if let Value::Object(map) = doc.clone() {
+            for (key, value) in map {
+                if !MONGO_KEYWORDS.contains(&key.as_str()) {
+                    continue;
+                }
+                if let Value::Object(inner_doc) = value {
+                    return Value::Object(inner_doc);
+                }
+            }
+        }
+
+        doc
+    }
+
+    fn postgres_convert(&self, doc: Value) -> Value {
         const MONGO_KEYWORDS: [&str; 3] = ["$set", "$inc", "$unset"];
         if let Value::Object(map) = doc.clone() {
             for (key, value) in map {

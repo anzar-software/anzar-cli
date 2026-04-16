@@ -1,9 +1,12 @@
 use std::sync::Arc;
 
-use sqlx::{Pool, Sqlite};
+use sqlx::{Pool, Postgres, Sqlite};
 
 use crate::{
-    adapters::database::{DatabaseAdapter, mongodb::MongodbAdapter, sqlite::SQLiteAdapter},
+    adapters::database::{
+        DatabaseAdapter, mongodb::MongodbAdapter, postgres::PostgreSQLAdapter,
+        sqlite::SQLiteAdapter,
+    },
     scopes::{auth::model::PasswordResetToken, email::model::EmailVerificationToken, user::User},
     services::{
         account::model::Account,
@@ -13,12 +16,12 @@ use crate::{
     },
 };
 
-const USER: &str = "user";
-const ACCOUNT: &str = "account";
-const REFRESH_TOKEN: &str = "refresh_token";
-const PASSWORD_RESET_TOKEN: &str = "password_reset_token";
-const EMAIL_VERIFICATION_TOKEN: &str = "email_verification_token";
-const SESSION: &str = "session";
+const USER: &str = "users";
+const ACCOUNT: &str = "accounts";
+const REFRESH_TOKEN: &str = "refresh_tokens";
+const PASSWORD_RESET_TOKEN: &str = "password_reset_tokens";
+const EMAIL_VERIFICATION_TOKEN: &str = "email_verification_tokens";
+const SESSION: &str = "sessions";
 
 pub struct DatabaseAdapters {
     pub user_adapter: Arc<dyn DatabaseAdapter<User>>,
@@ -73,7 +76,21 @@ impl DatabaseAdapters {
         }
     }
 
-    pub fn postgres() -> Self {
-        todo!()
+    pub fn postgres(pool: &Pool<Postgres>) -> Self {
+        Self {
+            user_adapter: Arc::new(PostgreSQLAdapter::<User>::new(pool, USER)),
+            account_adapter: Arc::new(PostgreSQLAdapter::<Account>::new(pool, ACCOUNT)),
+            jwt_adapter: Arc::new(PostgreSQLAdapter::<RefreshToken>::new(pool, REFRESH_TOKEN)),
+            session_adapter: Arc::new(PostgreSQLAdapter::<Session>::new(pool, SESSION)),
+            reset_token_adapter: Arc::new(PostgreSQLAdapter::<PasswordResetToken>::new(
+                pool,
+                PASSWORD_RESET_TOKEN,
+            )),
+            email_verification_token: Arc::new(PostgreSQLAdapter::<EmailVerificationToken>::new(
+                pool,
+                EMAIL_VERIFICATION_TOKEN,
+            )),
+            // transaction_adapter: todo!(),
+        }
     }
 }
