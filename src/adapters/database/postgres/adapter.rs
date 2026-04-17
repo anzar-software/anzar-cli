@@ -2,19 +2,12 @@ use std::marker::PhantomData;
 
 use async_trait::async_trait;
 use serde::{Serialize, de::DeserializeOwned};
-use serde_json::{Map, Value};
-use sqlx::postgres::PgArguments;
-use sqlx::query::QueryAs;
 use sqlx::{FromRow, Pool, Postgres};
 
 use crate::adapters::database::DatabaseAdapter;
+use crate::adapters::database::bindings::traits::{IdResult, PgInsert};
 use crate::error::Error;
-use crate::scopes::user::Role;
-
-#[derive(sqlx::FromRow)]
-struct IdResult {
-    id: String,
-}
+use crate::utils::query::{IntoDbFilter, QueryBuilder};
 
 pub struct PostgreSQLAdapter<T: Send + Sync> {
     pool: Pool<Postgres>,
@@ -41,18 +34,16 @@ where
         + DeserializeOwned
         + 'static
         + for<'r> FromRow<'r, sqlx::postgres::PgRow>
-        + Unpin,
+        + Unpin
+        + PgInsert,
 {
     async fn insert(&self, data: T) -> Result<String, Error> {
-        let value = serde_json::to_value(data)?;
-        let obj = value.as_object().unwrap();
-
-        let columns: String = obj
-            .keys()
+        let columns: String = T::columns()
+            .iter()
             .map(|k| format!("\"{}\"", k))
             .collect::<Vec<String>>()
             .join(", ");
-        let values = obj
+        let values = T::columns()
             .iter()
             .enumerate()
             .map(|(i, _)| format!("${}", i + 1))
@@ -64,55 +55,27 @@ where
             self.table, columns, values
         );
 
-        let mut query = sqlx::query_as::<_, IdResult>(&sql);
+        let query = sqlx::query_as::<_, IdResult>(&sql);
 
-        for (_, v) in obj.iter() {
-            query = _bind_value(query, v.to_owned());
-        }
-
-        let row: IdResult = query.fetch_one(&self.pool).await.map_err(|e| {
-            dbg!(&e);
-            Error::DatabaseError(e.to_string())
-        })?;
+        let row: IdResult = data
+            .bind_query(query)
+            .fetch_one(&self.pool)
+            .await
+            .map_err(|e| {
+                dbg!(&e);
+                Error::DatabaseError(e.to_string())
+            })?;
 
         Ok(row.id)
     }
 
-    async fn find_one(&self, filter: Value) -> Result<Option<T>, Error> {
-        let obj = _parse_to_map(filter)?;
-        let where_clause = _parse_to_sql(&obj, " AND ", 0);
+    async fn find_one(&self, query: QueryBuilder) -> Result<Option<T>, Error> {
+        let (where_clause, values) = query.into_postgres_filter(0);
 
         let sql = format!("SELECT * FROM {} WHERE {}", self.table, where_clause);
         let mut query = sqlx::query_as::<_, T>(&sql);
-
-        for (_, v) in obj.iter() {
-            query = _bind_value(query, v.to_owned());
-        }
-
-        query.fetch_optional(&self.pool).await.map_err(|e| {
-            dbg!(&e);
-            Error::DatabaseError(e.to_string())
-        })
-    }
-
-    async fn find_one_and_update(&self, filter: Value, update: Value) -> Result<Option<T>, Error> {
-        let obj_update = _parse_to_map(update)?;
-        let clause_update = _parse_to_sql(&obj_update, ", ", 0);
-
-        let obj_filter = _parse_to_map(filter)?;
-        let clause_filter = _parse_to_sql(&obj_filter, " AND ", obj_update.len());
-
-        let sql = format!(
-            "UPDATE {} SET {} WHERE {} RETURNING *",
-            self.table, clause_update, clause_filter
-        );
-        let mut query = sqlx::query_as::<_, T>(&sql);
-
-        for (_, v) in obj_update.iter() {
-            query = _bind_value(query, v.to_owned());
-        }
-        for (_, v) in obj_filter.iter() {
-            query = _bind_value(query, v.to_owned());
+        for v in values {
+            query = v.bind_pg(query);
         }
 
         query
@@ -121,24 +84,44 @@ where
             .map_err(|e| Error::DatabaseError(e.to_string()))
     }
 
-    async fn update_many(&self, filter: Value, update: Value) -> Result<(), Error> {
-        let obj_update = _parse_to_map(update)?;
-        let clause_update = _parse_to_sql(&obj_update, ", ", 0);
-
-        let obj_filter = _parse_to_map(filter)?;
-        let clause_filter = _parse_to_sql(&obj_filter, " AND ", obj_update.len());
+    async fn find_one_and_update(
+        &self,
+        filter: QueryBuilder,
+        update: QueryBuilder,
+    ) -> Result<Option<T>, Error> {
+        let (set_clause, update_values) = update.into_postgres_update();
+        let offset = update_values.len();
+        let (where_clause, filter_values) = filter.into_postgres_filter(offset);
 
         let sql = format!(
             "UPDATE {} SET {} WHERE {} RETURNING *",
-            self.table, clause_update, clause_filter
+            self.table, set_clause, where_clause
         );
-        let mut query = sqlx::query_as::<_, T>(&sql);
 
-        for (_, v) in obj_update.iter() {
-            query = _bind_value(query, v.to_owned());
+        let mut query = sqlx::query_as::<_, T>(&sql);
+        for v in update_values.into_iter().chain(filter_values) {
+            query = v.bind_pg(query);
         }
-        for (_, v) in obj_filter.iter() {
-            query = _bind_value(query, v.to_owned());
+
+        query
+            .fetch_optional(&self.pool)
+            .await
+            .map_err(|e| Error::DatabaseError(e.to_string()))
+    }
+
+    async fn update_many(&self, filter: QueryBuilder, update: QueryBuilder) -> Result<(), Error> {
+        let (set_clause, update_values) = update.into_postgres_update();
+        let offset = update_values.len();
+        let (where_clause, filter_values) = filter.into_postgres_filter(offset);
+
+        let sql = format!(
+            "UPDATE {} SET {} WHERE {} RETURNING *",
+            self.table, set_clause, where_clause
+        );
+
+        let mut query = sqlx::query_as::<_, T>(&sql);
+        for v in update_values.into_iter().chain(filter_values) {
+            query = v.bind_pg(query);
         }
 
         query
@@ -149,52 +132,10 @@ where
         Ok(())
     }
 
-    async fn delete_one(&self, _filter: Value) -> Result<(), Error> {
+    async fn delete_one(&self, _filter: QueryBuilder) -> Result<(), Error> {
         Ok(())
     }
-    async fn delete_many(&self, _filter: Value) -> Result<(), Error> {
+    async fn delete_many(&self, _filter: QueryBuilder) -> Result<(), Error> {
         Ok(())
-    }
-}
-
-fn _parse_to_map(data: Value) -> Result<Map<String, Value>, Error> {
-    let value = serde_json::to_value(data)?;
-    let obj = value.as_object().unwrap();
-    if obj.is_empty() {
-        return Err(Error::InternalServerError("parsing error".into()));
-    }
-
-    Ok(obj.to_owned())
-}
-
-fn _parse_to_sql(obj: &Map<String, Value>, join: &str, offset: usize) -> String {
-    let conditions: Vec<String> = obj
-        .keys()
-        .enumerate()
-        .map(|(i, k)| format!("\"{}\" = ${}", k, i + 1 + offset))
-        .collect();
-    conditions.join(join)
-}
-
-fn _bind_value<T>(
-    query: QueryAs<Postgres, T, PgArguments>,
-    v: Value,
-) -> QueryAs<Postgres, T, PgArguments> {
-    match v {
-        serde_json::Value::String(s) => {
-            if let Ok(dt) = chrono::DateTime::parse_from_rfc3339(&s) {
-                query.bind(dt.with_timezone(&chrono::Utc))
-            } else if let Ok(role) = serde_json::from_value::<Role>(Value::String(s.clone())) {
-                query.bind(role)
-            } else {
-                query.bind(s)
-            }
-        }
-        serde_json::Value::Number(n) if n.is_i64() => query.bind(n.as_i64()),
-        serde_json::Value::Number(n) if n.is_f64() => query.bind(n.as_f64()),
-        serde_json::Value::Bool(b) => query.bind(b),
-        // serde_json::Value::Null => query.bind::<Option<String>>(None),
-        serde_json::Value::Null => query.bind::<Option<chrono::DateTime<chrono::Utc>>>(None),
-        _ => query.bind(v.to_string()),
     }
 }

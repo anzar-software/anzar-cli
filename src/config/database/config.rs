@@ -19,7 +19,7 @@ impl DatabaseConfig {
                 // test: mongodb://localhost:27017/dev
                 // prod: mongodb://db:27017/production
                 format!(
-                    "mongodb://{}:{}@{}:{}/{}?retryWrites=false",
+                    "mongodb://{}:{}@{}:{}/{}?retryWrites=false&authSource=admin",
                     self.username,
                     self.password.expose_secret(),
                     self.host,

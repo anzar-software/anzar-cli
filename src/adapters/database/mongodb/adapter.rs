@@ -3,10 +3,10 @@ use std::fmt::Debug;
 use async_trait::async_trait;
 use mongodb::{Collection, options::ReturnDocument};
 use serde::{Serialize, de::DeserializeOwned};
-use serde_json::Value;
 
 use super::super::adapter::DatabaseAdapter;
 use crate::error::Error;
+use crate::utils::query::{IntoDbFilter, QueryBuilder};
 
 #[derive(Debug, Clone)]
 pub struct MongodbAdapter<T: Send + Sync + Debug> {
@@ -44,71 +44,58 @@ where
         Ok(id.to_string())
     }
 
-    async fn find_one(&self, filter: Value) -> Result<Option<T>, Error> {
-        let mut mongo_filter = mongodb::bson::to_document(&filter)?;
-        if let Some(id_value) = mongo_filter.remove("id") {
-            mongo_filter.insert("_id", id_value);
-        }
+    async fn find_one(&self, query: QueryBuilder) -> Result<Option<T>, Error> {
+        let doc = query.into_mongo_filter();
 
         self.collection
-            .find_one(mongo_filter)
+            .find_one(doc)
             .await
             .map_err(|e| Error::DatabaseError(e.to_string()))
     }
 
-    async fn find_one_and_update(&self, filter: Value, update: Value) -> Result<Option<T>, Error> {
-        let mut mongo_filter = mongodb::bson::to_document(&filter)?;
-        let mongo_update = mongodb::bson::to_document(&update)?;
-
-        if let Some(id_value) = mongo_filter.remove("id") {
-            mongo_filter.insert("_id", id_value);
-        }
+    async fn find_one_and_update(
+        &self,
+        filter: QueryBuilder,
+        update: QueryBuilder,
+    ) -> Result<Option<T>, Error> {
+        let filter = filter.into_mongo_filter();
+        let update = update.into_mongo_update();
 
         self.collection
-            .find_one_and_update(mongo_filter, mongo_update)
+            .find_one_and_update(filter, update)
             .return_document(ReturnDocument::After)
             .await
             .map_err(|e| Error::DatabaseError(e.to_string()))
     }
 
-    async fn update_many(&self, filter: Value, update: Value) -> Result<(), Error> {
-        let mut mongo_filter = mongodb::bson::to_document(&filter)?;
-        let mongo_update = mongodb::bson::to_document(&update)?;
-
-        if let Some(id_value) = mongo_filter.remove("id") {
-            mongo_filter.insert("_id", id_value);
-        }
+    async fn update_many(&self, filter: QueryBuilder, update: QueryBuilder) -> Result<(), Error> {
+        let filter = filter.into_mongo_filter();
+        let update = update.into_mongo_update();
 
         self.collection
-            .update_many(mongo_filter, mongo_update)
+            .update_many(filter, update)
             .await
             .map_err(|e| Error::DatabaseError(e.to_string()))?;
 
         Ok(())
     }
 
-    async fn delete_one(&self, filter: Value) -> Result<(), Error> {
-        let mut mongo_filter = mongodb::bson::to_document(&filter)?;
-        if let Some(id_value) = mongo_filter.remove("id") {
-            mongo_filter.insert("_id", id_value);
-        }
+    async fn delete_one(&self, query: QueryBuilder) -> Result<(), Error> {
+        let filter = query.into_mongo_filter();
 
         self.collection
-            .delete_one(mongo_filter)
+            .delete_one(filter)
             .await
             .map_err(|e| Error::DatabaseError(e.to_string()))?;
 
         Ok(())
     }
 
-    async fn delete_many(&self, filter: Value) -> Result<(), Error> {
-        let mut mongo_filter = mongodb::bson::to_document(&filter)?;
-        if let Some(id_value) = mongo_filter.remove("id") {
-            mongo_filter.insert("_id", id_value);
-        }
+    async fn delete_many(&self, query: QueryBuilder) -> Result<(), Error> {
+        let filter = query.into_mongo_filter();
 
         self.collection
-            .delete_many(mongo_filter)
+            .delete_many(filter)
             .await
             .map_err(|e| Error::DatabaseError(e.to_string()))?;
 

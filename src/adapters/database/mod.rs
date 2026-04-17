@@ -1,5 +1,6 @@
 mod adapter;
 mod adapters;
+mod bindings;
 
 pub mod mongodb;
 pub mod postgres;

@@ -27,27 +27,20 @@ pub struct AuthService {
 }
 
 impl AuthService {
-    pub fn new(
-        database_adapters: DatabaseAdapters,
-        driver: DatabaseDriver,
-        cache_adapters: CacheAdapters,
-    ) -> Self {
+    pub fn new(database_adapters: DatabaseAdapters, cache_adapters: CacheAdapters) -> Self {
         Self {
             user_repository: UserRepository::new(
                 database_adapters.user_adapter,
-                driver,
                 cache_adapters.cache_adapter,
             ),
-            account_repository: AccountRepository::new(database_adapters.account_adapter, driver),
-            jwt_repository: JWTRepository::new(database_adapters.jwt_adapter, driver),
-            session_repository: SessionRepository::new(database_adapters.session_adapter, driver),
+            account_repository: AccountRepository::new(database_adapters.account_adapter),
+            jwt_repository: JWTRepository::new(database_adapters.jwt_adapter),
+            session_repository: SessionRepository::new(database_adapters.session_adapter),
             password_reset_token_repository: PasswordResetTokenRepository::new(
                 database_adapters.reset_token_adapter,
-                driver,
             ),
             email_verification_token_repository: EmailVerificationTokenRepository::new(
                 database_adapters.email_verification_token,
-                driver,
             ),
             // transaction_repository: TransactionRepository::new(adapters.transaction_adapter),
         }
@@ -81,6 +74,6 @@ impl AuthService {
             }
         };
 
-        Ok(Self::new(database_adapter, database.driver, cache_adapter))
+        Ok(Self::new(database_adapter, cache_adapter))
     }
 }

@@ -37,8 +37,8 @@ impl TryFrom<String> for DatabaseDriver {
     fn try_from(s: String) -> Result<Self, Self::Error> {
         match s.to_lowercase().as_str() {
             "sqlite" => Ok(Self::SQLite),
-            "mongodb" => Ok(Self::MongoDB),
-            "postgresql" => Ok(Self::PostgreSQL),
+            "mongo" | "mongodb" => Ok(Self::MongoDB),
+            "postgres" | "postgresql" => Ok(Self::PostgreSQL),
             other => Err(format!(
                 "{} is not supported database. Use either `sqlite`, `postgresql` or `mongodb`",
                 other

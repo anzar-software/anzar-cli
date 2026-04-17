@@ -1,50 +1,22 @@
 use std::sync::Arc;
 
+use crate::utils::query::QueryBuilder;
 use crate::{
     adapters::database::DatabaseAdapter,
-    config::database::driver::DatabaseDriver,
     error::{Error, Reason, Result, TokenErrorType},
     scopes::email::model::EmailVerificationToken,
-    utils::parser::Parser,
 };
 
 use chrono::Utc;
-use serde_json::json;
 
 #[derive(Clone)]
 pub struct EmailVerificationTokenRepository {
     adapter: Arc<dyn DatabaseAdapter<EmailVerificationToken>>,
-    database_driver: DatabaseDriver,
 }
 
 impl EmailVerificationTokenRepository {
-    pub fn new(
-        adapter: Arc<dyn DatabaseAdapter<EmailVerificationToken>>,
-        database_driver: DatabaseDriver,
-    ) -> Self {
-        Self {
-            adapter,
-            database_driver,
-        }
-    }
-
-    // FIXME delete tokens not update
-    pub async fn revoke(&self, user_id: &str) -> Result<()> {
-        let filter = Parser::mode(self.database_driver).convert(json!({"userId": user_id}));
-        let update = json! ({ "$set": json! ({"valid": false}) });
-        let update = Parser::mode(self.database_driver).convert(update);
-
-        self.adapter
-            .update_many(filter, update)
-            .await
-            .map_err(|e| {
-                tracing::error!("Failed to revoke email verification tokens: {:?}", e);
-                Error::TokenRevocationFailed {
-                    token_id: "".into(),
-                }
-            })?;
-
-        Ok(())
+    pub fn new(adapter: Arc<dyn DatabaseAdapter<EmailVerificationToken>>) -> Self {
+        Self { adapter }
     }
 
     pub async fn insert(&self, otp: EmailVerificationToken) -> Result<()> {
@@ -59,8 +31,26 @@ impl EmailVerificationTokenRepository {
         })
     }
 
+    // FIXME delete tokens not update
+    pub async fn revoke(&self, user_id: &str) -> Result<()> {
+        let filter = QueryBuilder::default().eq("userId", user_id);
+        let update = QueryBuilder::default().set("valid", false);
+
+        self.adapter
+            .update_many(filter, update)
+            .await
+            .map_err(|e| {
+                tracing::error!("Failed to revoke email verification tokens: {:?}", e);
+                Error::TokenRevocationFailed {
+                    token_id: "".into(),
+                }
+            })?;
+
+        Ok(())
+    }
+
     pub async fn find(&self, hash: &str) -> Result<EmailVerificationToken> {
-        let filter = Parser::mode(self.database_driver).convert(json!({"token": hash}));
+        let filter = QueryBuilder::default().eq("token", hash);
 
         match self.adapter.find_one(filter).await {
             Ok(Some(token)) => Ok(token),
@@ -73,14 +63,10 @@ impl EmailVerificationTokenRepository {
     }
 
     pub async fn invalidate(&self, id: &str) -> Result<EmailVerificationToken> {
-        let filter = Parser::mode(self.database_driver).convert(json!({"id": id}));
-        let update = json! ({
-            "$set": json! ({
-                "valid": false,
-                "usedAt": Utc::now().to_string()
-            })
-        });
-        let update = Parser::mode(self.database_driver).convert(update);
+        let filter = QueryBuilder::default().eq("id", id);
+        let update = QueryBuilder::default()
+            .set("valid", false)
+            .set("usedAt", Utc::now());
 
         match self.adapter.find_one_and_update(filter, update).await {
             Ok(Some(token)) => Ok(token),

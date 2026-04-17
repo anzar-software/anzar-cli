@@ -1,37 +1,36 @@
 use std::sync::Arc;
 
+use crate::utils::query::QueryBuilder;
 use crate::{
     adapters::database::DatabaseAdapter,
-    config::database::driver::DatabaseDriver,
     error::{Error, Reason, Result, TokenErrorType},
-    utils::parser::Parser,
 };
 
 use super::model::PasswordResetToken;
 use chrono::Utc;
-use serde_json::json;
 
 #[derive(Clone)]
 pub struct PasswordResetTokenRepository {
     adapter: Arc<dyn DatabaseAdapter<PasswordResetToken>>,
-    database_driver: DatabaseDriver,
 }
 
 impl PasswordResetTokenRepository {
-    pub fn new(
-        adapter: Arc<dyn DatabaseAdapter<PasswordResetToken>>,
-        database_driver: DatabaseDriver,
-    ) -> Self {
-        Self {
-            adapter,
-            database_driver,
-        }
+    pub fn new(adapter: Arc<dyn DatabaseAdapter<PasswordResetToken>>) -> Self {
+        Self { adapter }
+    }
+
+    pub async fn insert(&self, otp: PasswordResetToken) -> Result<String> {
+        self.adapter.insert(otp).await.map_err(|e| {
+            tracing::error!("Failed to insert password reset token to database: {:?}", e);
+            Error::TokenCreationFailed {
+                token_type: crate::error::TokenErrorType::PasswordResetToken,
+            }
+        })
     }
 
     pub async fn revoke(&self, user_id: &str) -> Result<()> {
-        let filter = Parser::mode(self.database_driver).convert(json!({"userId": user_id}));
-        let update = json! ({ "$set": json! ({"valid": false}) });
-        let update = Parser::mode(self.database_driver).convert(update);
+        let filter = QueryBuilder::default().eq("userId", user_id);
+        let update = QueryBuilder::default().set("valid", false);
 
         self.adapter
             .update_many(filter, update)
@@ -46,23 +45,11 @@ impl PasswordResetTokenRepository {
         Ok(())
     }
 
-    pub async fn insert(&self, otp: PasswordResetToken) -> Result<String> {
-        self.adapter.insert(otp).await.map_err(|e| {
-            tracing::error!("Failed to insert password reset token to database: {:?}", e);
-            Error::TokenCreationFailed {
-                token_type: crate::error::TokenErrorType::PasswordResetToken,
-            }
-        })
-    }
-
     pub async fn find(&self, token: &str) -> Result<PasswordResetToken> {
-        let filter = Parser::mode(self.database_driver).convert(json!({
-            "token": token,
-            "valid": true,
-            // "expiresAt": {
-            //     "$lt": Utc::now().to_string()
-            // },
-        }));
+        // "expiresAt": {
+        //     "$lt": Utc::now().to_string()
+        // },
+        let filter = QueryBuilder::default().eq("token", token).eq("valid", true);
 
         match self.adapter.find_one(filter).await {
             Ok(Some(password_reset_token)) => Ok(password_reset_token),
@@ -75,14 +62,10 @@ impl PasswordResetTokenRepository {
     }
 
     pub async fn invalidate(&self, id: &str) -> Result<PasswordResetToken> {
-        let filter = Parser::mode(self.database_driver).convert(json!({"id": id}));
-        let update = json! ({
-            "$set": json! ({
-                "valid": false,
-                "usedAt": Utc::now().to_string()
-            })
-        });
-        let update = Parser::mode(self.database_driver).convert(update);
+        let filter = QueryBuilder::default().eq("id", id);
+        let update = QueryBuilder::default()
+            .set("valid", false)
+            .set("usedAt", Utc::now());
 
         match self.adapter.find_one_and_update(filter, update).await {
             Ok(Some(password_reset_token)) => Ok(password_reset_token),

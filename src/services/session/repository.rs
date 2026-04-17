@@ -1,30 +1,20 @@
 use std::sync::Arc;
 
 use chrono::{Duration, Utc};
-use serde_json::json;
 
 use crate::error::{Error, Reason, Result, TokenErrorType};
-use crate::utils::{SecureToken, TokenHasher, parser::Parser};
-use crate::{
-    adapters::database::DatabaseAdapter, config::database::driver::DatabaseDriver,
-    services::session::model::Session,
-};
+use crate::utils::query::QueryBuilder;
+use crate::utils::{SecureToken, TokenHasher};
+use crate::{adapters::database::DatabaseAdapter, services::session::model::Session};
 
 #[derive(Clone)]
 pub struct SessionRepository {
     adapter: Arc<dyn DatabaseAdapter<Session>>,
-    database_driver: DatabaseDriver,
 }
 
 impl SessionRepository {
-    pub fn new(
-        adapter: Arc<dyn DatabaseAdapter<Session>>,
-        database_driver: DatabaseDriver,
-    ) -> Self {
-        Self {
-            adapter,
-            database_driver,
-        }
+    pub fn new(adapter: Arc<dyn DatabaseAdapter<Session>>) -> Self {
+        Self { adapter }
     }
 }
 
@@ -41,8 +31,7 @@ impl SessionRepository {
     }
 
     pub async fn find(&self, token: &str) -> Result<Session> {
-        let filter = json! ({"token": SecureToken::hash(token)});
-        let filter = Parser::mode(self.database_driver).convert(filter);
+        let filter = QueryBuilder::default().eq("token", SecureToken::hash(token));
 
         match self.adapter.find_one(filter).await {
             Ok(Some(session)) => Ok(session),
@@ -55,14 +44,10 @@ impl SessionRepository {
     }
 
     pub async fn extend_timeout(&self, id: &str) -> Result<Session> {
-        let filter = Parser::mode(self.database_driver).convert(json!({"id": id}));
-        let update = json!({
-            "$set": json!({
-                "usedAt": Utc::now(),
-                "expiresAt": Utc::now() + Duration::hours(24),
-            })
-        });
-        let update = Parser::mode(self.database_driver).convert(update);
+        let filter = QueryBuilder::default().eq("id", id);
+        let update = QueryBuilder::default()
+            .set("usedAt", Utc::now())
+            .set("expiresAt", Utc::now() + Duration::hours(24));
 
         match self.adapter.find_one_and_update(filter, update).await {
             Ok(Some(session)) => Ok(session),
@@ -74,14 +59,13 @@ impl SessionRepository {
     }
 
     pub async fn invalidate(&self, token: &str) -> Result<()> {
-        let filter = json! ({"token": token});
-        let filter = Parser::mode(self.database_driver).convert(filter);
+        let filter = QueryBuilder::default().eq("token", token);
 
         self.adapter.delete_one(filter).await
     }
 
     pub async fn revoke(&self, user_id: &str) -> Result<()> {
-        let filter = Parser::mode(self.database_driver).convert(json!({"userId": user_id}));
+        let filter = QueryBuilder::default().eq("userId", user_id);
 
         self.adapter.delete_many(filter).await.map_err(|e| {
             tracing::error!("Failed to revoke session after security breach: {:?}", e);

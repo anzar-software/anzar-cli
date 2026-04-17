@@ -1,33 +1,21 @@
 use std::sync::Arc;
 
-use serde_json::json;
-
 use super::User;
 use crate::{
     adapters::{cache::CacheAdapter, database::DatabaseAdapter},
-    config::database::driver::DatabaseDriver,
     error::{Error, Result},
-    utils::parser::Parser,
+    utils::query::QueryBuilder,
 };
 
 #[derive(Clone)]
 pub struct UserRepository {
     adapter: Arc<dyn DatabaseAdapter<User>>,
-    database_driver: DatabaseDriver,
     cache: Arc<dyn CacheAdapter>,
 }
 
 impl UserRepository {
-    pub fn new(
-        adapter: Arc<dyn DatabaseAdapter<User>>,
-        database_driver: DatabaseDriver,
-        cache: Arc<dyn CacheAdapter>,
-    ) -> Self {
-        Self {
-            adapter,
-            database_driver,
-            cache,
-        }
+    pub fn new(adapter: Arc<dyn DatabaseAdapter<User>>, cache: Arc<dyn CacheAdapter>) -> Self {
+        Self { adapter, cache }
     }
 
     // Cache
@@ -60,8 +48,18 @@ impl UserRepository {
     }
 
     // Database
+    pub async fn insert(&self, user: &User) -> Result<String> {
+        self.adapter
+            .insert(user.to_owned())
+            .await
+            .map_err(|_| Error::InvalidCredentials {
+                field: crate::error::CredentialField::Email,
+                reason: crate::error::Reason::AlreadyExist,
+            })
+    }
+
     pub async fn find(&self, user_id: &str) -> Result<User> {
-        let filter = Parser::mode(self.database_driver).convert(json!({"id": user_id}));
+        let filter = QueryBuilder::default().eq("id", user_id);
 
         match self.adapter.find_one(filter).await {
             Ok(Some(user)) => Ok(user),
@@ -77,7 +75,7 @@ impl UserRepository {
     }
 
     pub async fn find_by_email(&self, email: &str) -> Result<User> {
-        let filter = Parser::mode(self.database_driver).convert(json!( {"email": email}));
+        let filter = QueryBuilder::default().eq("email", email);
 
         match self.adapter.find_one(filter).await {
             Ok(Some(user)) => Ok(user),
@@ -92,20 +90,9 @@ impl UserRepository {
         }
     }
 
-    pub async fn insert(&self, user: &User) -> Result<String> {
-        self.adapter
-            .insert(user.to_owned())
-            .await
-            .map_err(|_| Error::InvalidCredentials {
-                field: crate::error::CredentialField::Email,
-                reason: crate::error::Reason::AlreadyExist,
-            })
-    }
-
     pub async fn validate_account(&self, user_id: &str) -> Result<User> {
-        let filter = Parser::mode(self.database_driver).convert(json!({"id": user_id}));
-        let update = json!({ "$set": json!({"verified": true}) });
-        let update = Parser::mode(self.database_driver).convert(update);
+        let filter = QueryBuilder::default().eq("id", user_id);
+        let update = QueryBuilder::default().set("verified", true);
 
         match self.adapter.find_one_and_update(filter, update).await {
             Ok(Some(user)) => Ok(user),

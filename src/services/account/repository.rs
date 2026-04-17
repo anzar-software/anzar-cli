@@ -1,28 +1,19 @@
 use std::sync::Arc;
 
-use serde_json::json;
-
+use crate::adapters::database::DatabaseAdapter;
 use crate::error::{Error, Result, TokenErrorType};
-use crate::utils::parser::Parser;
-use crate::{adapters::database::DatabaseAdapter, config::database::driver::DatabaseDriver};
+use crate::utils::query::QueryBuilder;
 
 use super::model::Account;
 
 #[derive(Clone)]
 pub struct AccountRepository {
     adapter: Arc<dyn DatabaseAdapter<Account>>,
-    database_driver: DatabaseDriver,
 }
 
 impl AccountRepository {
-    pub fn new(
-        adapter: Arc<dyn DatabaseAdapter<Account>>,
-        database_driver: DatabaseDriver,
-    ) -> Self {
-        Self {
-            adapter,
-            database_driver,
-        }
+    pub fn new(adapter: Arc<dyn DatabaseAdapter<Account>>) -> Self {
+        Self { adapter }
     }
 }
 
@@ -39,8 +30,7 @@ impl AccountRepository {
     }
 
     pub async fn find(&self, user_id: &str) -> Result<Account> {
-        let filter = json! ({"userId": user_id});
-        let filter = Parser::mode(self.database_driver).convert(filter);
+        let filter = QueryBuilder::default().eq("userId", user_id);
 
         match self.adapter.find_one(filter).await {
             Ok(Some(session)) => Ok(session),
@@ -53,9 +43,8 @@ impl AccountRepository {
     }
 
     pub async fn update_password(&self, user_id: &str, password: &str) -> Result<Account> {
-        let filter = Parser::mode(self.database_driver).convert(json!({"userId": user_id}));
-        let update = json!({ "$set": json!({"password": password}) });
-        let update = Parser::mode(self.database_driver).convert(update);
+        let filter = QueryBuilder::default().eq("userId", user_id);
+        let update = QueryBuilder::default().set("password", password);
 
         match self.adapter.find_one_and_update(filter, update).await {
             Ok(Some(account)) => Ok(account),
@@ -65,13 +54,8 @@ impl AccountRepository {
     }
 
     pub async fn lock_account(&self, user_id: &str) -> Result<Account> {
-        let filter = Parser::mode(self.database_driver).convert(json!({"userId": user_id}));
-        let update = json!( {
-            "$set": json!({
-                "locked": true
-            })
-        });
-        let update = Parser::mode(self.database_driver).convert(update);
+        let filter = QueryBuilder::default().eq("userId", user_id);
+        let update = QueryBuilder::default().set("locked", true);
 
         match self.adapter.find_one_and_update(filter, update).await {
             Ok(Some(account)) => Ok(account),
@@ -80,13 +64,8 @@ impl AccountRepository {
         }
     }
     pub async fn unlock_account(&self, user_id: &str) -> Result<Account> {
-        let filter = Parser::mode(self.database_driver).convert(json!({"userId": user_id}));
-        let update = json!( {
-            "$set": json!({
-                "locked": false
-            })
-        });
-        let update = Parser::mode(self.database_driver).convert(update);
+        let filter = QueryBuilder::default().eq("userId", user_id);
+        let update = QueryBuilder::default().set("locked", false);
 
         match self.adapter.find_one_and_update(filter, update).await {
             Ok(Some(account)) => Ok(account),

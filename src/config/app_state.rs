@@ -59,6 +59,7 @@ impl AppState {
         if app_config.database.driver == DatabaseDriver::MongoDB {
             let db_name = Uuid::new_v4().to_string();
             app_config.database.name = db_name;
+            // dbg!(&app_config.database.connection_string());
         }
         if app_config.database.driver == DatabaseDriver::PostgreSQL {
             let db_name = Uuid::new_v4().to_string();
@@ -113,9 +114,10 @@ impl AppState {
         let database_adapter = match database.driver {
             DatabaseDriver::SQLite => {
                 let db = SQLite::start(&database.connection_string).await?;
+
                 // let path = std::path::Path::new("migrations");
                 // if path.exists() {
-                //     let migrator = Migrator::new(path).await?;
+                //     let migrator = sqlx::migrate::Migrator::new(path).await?;
                 //     migrator.run(&db).await.expect("migrations to run");
                 // }
 
@@ -131,7 +133,7 @@ impl AppState {
                 DatabaseAdapters::mongodb(&client, db_name)
             }
             DatabaseDriver::PostgreSQL => {
-                dbg!(&database.connection_string);
+                // dbg!(&database.connection_string);
 
                 let pool = PostgreSQL::start(&database.connection_string).await?;
                 sqlx::migrate!("./migrations/postgres")
@@ -142,10 +144,6 @@ impl AppState {
             }
         };
 
-        Ok(AuthService::new(
-            database_adapter,
-            database.driver,
-            cache_adapter,
-        ))
+        Ok(AuthService::new(database_adapter, cache_adapter))
     }
 }
