@@ -1,7 +1,6 @@
 database:
   driver: "SQLite"
-  name: "./anzar.db"
+  # name: "./anzar.db"
+  name: "sqlite::memory:"
   port: 27014
 
-
-# for postgres PostgreSQL
