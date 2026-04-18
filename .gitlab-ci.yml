@@ -56,7 +56,7 @@ stages:
   - deploy
 
 prepare:
-  image: rust:1.87
+  image: rust:latest
   stage: prepare
   cache:
     - key: cargo-registry-${CI_COMMIT_REF_SLUG}
