@@ -142,6 +142,8 @@ pub enum Error {
     Redis(#[from] redis::RedisError),
     #[error("Sqlx error: {0}")]
     Sqlx(#[from] sqlx::Error),
+    #[error("Sqlx migration error: {0}")]
+    SqlxMigrate(#[from] sqlx::migrate::MigrateError),
 }
 
 #[derive(Serialize, utoipa::ToSchema, Debug)]
@@ -284,6 +286,7 @@ impl actix_web::ResponseError for Error {
             Error::MongoBoson(_) => StatusCode::INTERNAL_SERVER_ERROR,
             Error::Redis(_) => StatusCode::INTERNAL_SERVER_ERROR,
             Error::Sqlx(_) => StatusCode::INTERNAL_SERVER_ERROR,
+            Error::SqlxMigrate(_) => StatusCode::INTERNAL_SERVER_ERROR,
         }
     }
 }

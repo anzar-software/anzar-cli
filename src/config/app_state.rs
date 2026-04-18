@@ -115,16 +115,12 @@ impl AppState {
             DatabaseDriver::SQLite => {
                 let db = SQLite::start(&database.connection_string).await?;
 
-                // let path = std::path::Path::new("migrations");
-                // if path.exists() {
-                //     let migrator = sqlx::migrate::Migrator::new(path).await?;
-                //     migrator.run(&db).await.expect("migrations to run");
-                // }
+                let path = std::path::Path::new("migrations/sqlite");
+                if path.exists() {
+                    let migrator = sqlx::migrate::Migrator::new(path).await?;
+                    migrator.run(&db).await.expect("migrations to run");
+                }
 
-                sqlx::migrate!("./migrations/sqlite")
-                    .run(&db)
-                    .await
-                    .expect("migrations to run");
                 DatabaseAdapters::sqlite(&db)
             }
             DatabaseDriver::MongoDB => {
@@ -133,13 +129,14 @@ impl AppState {
                 DatabaseAdapters::mongodb(&client, db_name)
             }
             DatabaseDriver::PostgreSQL => {
-                // dbg!(&database.connection_string);
-
                 let pool = PostgreSQL::start(&database.connection_string).await?;
-                sqlx::migrate!("./migrations/postgres")
-                    .run(&pool)
-                    .await
-                    .expect("migrations to run");
+
+                let path = std::path::Path::new("migrations/postgres");
+                if path.exists() {
+                    let migrator = sqlx::migrate::Migrator::new(path).await?;
+                    migrator.run(&pool).await.expect("migrations to run");
+                }
+
                 DatabaseAdapters::postgres(&pool)
             }
         };

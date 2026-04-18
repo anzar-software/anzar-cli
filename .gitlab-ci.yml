@@ -2,20 +2,52 @@ variables:
   CARGO_HOME: $CI_PROJECT_DIR/.cargo
   IMAGE_NAME: $DOCKER_HUB_USERNAME/anzar
   IMAGE_TAG: $CI_COMMIT_SHORT_SHA 
-  MONGODB_URI: "mongodb://db:27017/test"
   RUST_BACKTRACE: "1"
   RUSTFLAGS: "-D warnings"
   # Enable Rust build caching
   CARGO_INCREMENTAL: 0
 
 # Cache dependencies and build artifacts
+# cache:
+#   - key: cargo-tools
+#     paths:
+#       - $CARGO_HOME/bin
+#   - key: ${CI_COMMIT_REF_SLUG}
+#     paths:
+#       - $CARGO_HOME/registry
+#
+# stages:
+#   - prepare
+#   - lint
+#   - test
+#   - deploy
+#
+# prepare:
+#   image: rust:latest
+#   stage: prepare
+#   script:
+#     - cargo build --release        # ← build ONCE here
+#     - strip target/release/anzar
+#   artifacts:
+#     paths:
+#       - target/release/anzar
+#       - target/               # ← expose full target dir so downstream jobs skip recompile
+#     expire_in: 1 day
+#   rules:
+#     - if: $CI_COMMIT_TAG
+
+
 cache:
-  - key: cargo-tools
-    paths:
-      - $CARGO_HOME/bin
-  - key: ${CI_COMMIT_REF_SLUG}
+  - key: cargo-registry-${CI_COMMIT_REF_SLUG}
     paths:
       - $CARGO_HOME/registry
+  - key: cargo-tools-${CI_COMMIT_REF_SLUG}
+    paths:
+      - $CARGO_HOME/bin
+  - key: rust-target-${CI_COMMIT_REF_SLUG}
+    paths:
+      - target/
+    policy: pull
 
 stages:
   - prepare
@@ -24,13 +56,23 @@ stages:
   - deploy
 
 prepare:
-  image: rust:latest
+  image: rust:1.87
   stage: prepare
+  cache:
+    - key: cargo-registry-${CI_COMMIT_REF_SLUG}
+      paths:
+        - $CARGO_HOME/registry
+    - key: cargo-tools-${CI_COMMIT_REF_SLUG}
+      paths:
+        - $CARGO_HOME/bin
+    - key: rust-target-${CI_COMMIT_REF_SLUG}
+      paths:
+        - target/
+      policy: push
   script:
     - mkdir -p migrations
-    - cargo build --release        # ← build ONCE here
+    - cargo build --release
     - strip target/release/anzar
-    - cargo test --no-run          # ← compile tests without running them
   artifacts:
     paths:
       - target/release/anzar
@@ -38,9 +80,15 @@ prepare:
   rules:
     - if: $CI_COMMIT_TAG
 
+
+#############################
+#############################
+#############################
+
 lint:
   image: rust:latest
   stage: lint
+  needs: []
   before_script:
     - rustup component add rustfmt 
   script:
@@ -52,10 +100,8 @@ clippy:
   image: rust:latest
   stage: lint
   allow_failure: true
-  dependencies:
-    - prepare
+  needs: [prepare]
   before_script:
-    - mkdir -p migrations
     - rustup component add clippy
   script:
     - cargo clippy -- -D warnings
@@ -78,8 +124,7 @@ security-audit:
 .test_base:
   image: rust:latest
   stage: test
-  dependencies:
-    - prepare
+  needs: [prepare]
 
 test:mongodb:
   extends: .test_base
@@ -112,6 +157,7 @@ test:postgres:
 build:
   image: docker:latest
   stage: deploy
+  needs: [prepare, test:mongodb, test:postgres]
   services:
     - docker:24-dind
   variables:
