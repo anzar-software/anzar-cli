@@ -70,7 +70,6 @@ prepare:
         - target/
       policy: push
   script:
-    - mkdir -p migrations
     - cargo build --release
     - strip target/release/anzar
   artifacts:
