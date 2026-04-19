@@ -130,6 +130,10 @@ test:mongodb:
   services:
     - name: mongo:8.0
       alias: db
+      variables:
+        MONGO_INITDB_ROOT_USERNAME: hakou
+        MONGO_INITDB_ROOT_PASSWORD: password
+        MONGO_INITDB_DATABASE: prod
     - name: memcached:latest
       alias: cache
   script:
@@ -142,6 +146,10 @@ test:postgres:
   services:
     - name: postgres:16-alpine
       alias: db
+      variables:
+        POSTGRES_PASSWORD: password
+        POSTGRES_USER: hakou
+        POSTGRES_DB: prod
     - name: memcached:latest
       alias: cache
   script:

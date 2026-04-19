@@ -45,21 +45,9 @@ impl AppState {
     async fn build_config(address: &str) -> Result<AnzarConfiguration> {
         let mut app_config = AppConfig::load().expect("Failed to read configuration");
 
-        // let mut configuration = match fs::read_to_string(&app_config.config_path) {
-        //     Ok(content) => {
-        //         let mut configuration: AnzarConfiguration = serde_yaml::from_str(content.as_str())?;
-        //         configuration.app.url = address.into();
-        //         configuration.database.driver = app_config.database.driver;
-        //         configuration.database.cache.driver = app_config.cache;
-        //         configuration
-        //     }
-        //     Err(_) => AnzarConfiguration{},
-        // };
-
         if app_config.database.driver == DatabaseDriver::MongoDB {
             let db_name = Uuid::new_v4().to_string();
             app_config.database.name = db_name;
-            // dbg!(&app_config.database.connection_string());
         }
         if app_config.database.driver == DatabaseDriver::PostgreSQL {
             let db_name = Uuid::new_v4().to_string();
