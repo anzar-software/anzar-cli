@@ -2,3 +2,4 @@ database:
   driver: "PostgreSQL"
   name: "dev"
   port: 5432
+  host: "localhost"

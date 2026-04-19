@@ -1,7 +1,6 @@
 name: "Anzar"
 config_dir: "app/configuration"
 database:
-  host: "localhost"
   username: "hakou"
   password: "password"
 
