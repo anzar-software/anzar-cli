@@ -30,7 +30,8 @@ impl PasswordResetTokenRepository {
 
     pub async fn revoke(&self, user_id: &str) -> Result<()> {
         let filter = QueryBuilder::default().eq("userId", user_id);
-        let update = QueryBuilder::default().set("valid", false);
+        // FIXME delete instead
+        let update = QueryBuilder::default().set("usedAt", Utc::now());
 
         self.adapter
             .update_many(filter, update)
@@ -49,7 +50,7 @@ impl PasswordResetTokenRepository {
         // "expiresAt": {
         //     "$lt": Utc::now().to_string()
         // },
-        let filter = QueryBuilder::default().eq("token", token).eq("valid", true);
+        let filter = QueryBuilder::default().eq("token", token);
 
         match self.adapter.find_one(filter).await {
             Ok(Some(password_reset_token)) => Ok(password_reset_token),
@@ -63,9 +64,7 @@ impl PasswordResetTokenRepository {
 
     pub async fn invalidate(&self, id: &str) -> Result<PasswordResetToken> {
         let filter = QueryBuilder::default().eq("id", id);
-        let update = QueryBuilder::default()
-            .set("valid", false)
-            .set("usedAt", Utc::now());
+        let update = QueryBuilder::default().set("usedAt", Utc::now());
 
         match self.adapter.find_one_and_update(filter, update).await {
             Ok(Some(password_reset_token)) => Ok(password_reset_token),

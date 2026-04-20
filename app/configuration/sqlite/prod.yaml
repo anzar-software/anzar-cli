@@ -3,4 +3,5 @@ database:
   # name: "./anzar.db"
   name: "sqlite::memory:"
   port: 27014
+  host: "db"
 

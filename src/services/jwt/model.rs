@@ -34,7 +34,6 @@ pub struct RefreshToken {
 
     pub jti: String,
     pub token: String,
-    pub valid: bool,
 }
 
 impl RefreshToken {
@@ -43,7 +42,6 @@ impl RefreshToken {
             issued_at: chrono::Utc::now(),
             jti: tokens.refresh_token_jti.to_string(),
             token: SecureToken::hash(&tokens.refresh_token),
-            valid: true,
             ..Default::default()
         }
     }

@@ -33,7 +33,6 @@ pub struct PasswordResetToken {
     pub used_at: Option<DateTime<Utc>>,
 
     pub token: String,
-    pub valid: bool,
 }
 
 impl Default for PasswordResetToken {
@@ -50,7 +49,6 @@ impl PasswordResetToken {
             issued_at: Utc::now(),
             expires_at: Utc::now() + chrono::Duration::seconds(86400),
             used_at: None,
-            valid: true,
         }
     }
 }

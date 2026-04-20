@@ -31,10 +31,10 @@ impl EmailVerificationTokenRepository {
         })
     }
 
-    // FIXME delete tokens not update
     pub async fn revoke(&self, user_id: &str) -> Result<()> {
         let filter = QueryBuilder::default().eq("userId", user_id);
-        let update = QueryBuilder::default().set("valid", false);
+        // FIXME delete tokens not update
+        let update = QueryBuilder::default().set("usedAt", Utc::now());
 
         self.adapter
             .update_many(filter, update)
@@ -64,9 +64,7 @@ impl EmailVerificationTokenRepository {
 
     pub async fn invalidate(&self, id: &str) -> Result<EmailVerificationToken> {
         let filter = QueryBuilder::default().eq("id", id);
-        let update = QueryBuilder::default()
-            .set("valid", false)
-            .set("usedAt", Utc::now());
+        let update = QueryBuilder::default().set("usedAt", Utc::now());
 
         match self.adapter.find_one_and_update(filter, update).await {
             Ok(Some(token)) => Ok(token),

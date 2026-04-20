@@ -2,3 +2,4 @@ database:
   driver: "SQLite"
   name: "sqlite::memory:"
   port: 27017
+  host: "localhost"

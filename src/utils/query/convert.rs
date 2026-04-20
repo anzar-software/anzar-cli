@@ -10,7 +10,6 @@ pub trait IntoDbFilter {
     fn into_mongo_update(self) -> Document;
     fn into_postgres_filter(self, offset: usize) -> (String, Vec<DbValue>);
     fn into_postgres_update(self) -> (String, Vec<DbValue>);
-    fn into_sqlite(self) -> (String, Vec<DbValue>);
 }
 
 impl IntoDbFilter for QueryBuilder {
@@ -118,9 +117,5 @@ impl IntoDbFilter for QueryBuilder {
 
         let values = self.updates.iter().map(|f| f.value.clone()).collect();
         (clause, values)
-    }
-
-    fn into_sqlite(self) -> (String, Vec<DbValue>) {
-        todo!()
     }
 }
