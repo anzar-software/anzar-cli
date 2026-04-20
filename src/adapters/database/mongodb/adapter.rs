@@ -63,7 +63,7 @@ where
 
         self.collection
             .find_one_and_update(filter, update)
-            .return_document(ReturnDocument::After)
+            .return_document(ReturnDocument::Before)
             .await
             .map_err(|e| Error::DatabaseError(e.to_string()))
     }

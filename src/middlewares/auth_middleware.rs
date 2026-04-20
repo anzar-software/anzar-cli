@@ -60,6 +60,16 @@ async fn validate_token(req: &ServiceRequest) -> Result<(), Error> {
 
             if let Some(token) = data {
                 let session = find_session(req, &token).await?;
+                let session_id = session.id.as_ref().ok_or(AuthError::MalformedData {
+                    field: crate::error::CredentialField::Token,
+                })?;
+
+                if session.used_at.is_some() {
+                    return Err(AuthError::TokenAlreadyUsed {
+                        token_id: session_id.into(),
+                    }
+                    .into());
+                }
 
                 if chrono::Utc::now() > session.expires_at {
                     return Err(AuthError::TokenExpired {
@@ -70,9 +80,6 @@ async fn validate_token(req: &ServiceRequest) -> Result<(), Error> {
                 }
 
                 // NOTE Only expires after true inactivity period
-                let session_id = session.id.as_ref().ok_or(AuthError::MalformedData {
-                    field: crate::error::CredentialField::Token,
-                })?;
                 update_session_expiray(req, session_id).await?;
 
                 req.extensions_mut().insert::<Session>(session);

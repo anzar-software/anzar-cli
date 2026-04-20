@@ -33,7 +33,7 @@ impl EmailVerificationTokenServiceTrait for AuthService {
         })?;
 
         // 3. Verify token isn't expired or already used
-        if !verification_token.valid {
+        if verification_token.used_at.is_some() {
             return Err(Error::TokenAlreadyUsed {
                 token_id: verification_token_id.into(),
             });

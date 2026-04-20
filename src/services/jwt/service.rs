@@ -35,19 +35,18 @@ impl JwtServiceTrait for AuthService {
     ) -> Result<String> {
         let claims: Claims = JwtDecoder::new(refresh_token, configuration).decode()?;
 
-        if self
-            .jwt_repository
-            .find_and_consume(&claims, refresh_token)
-            .await
-            .is_err()
-        {
-            // TODO: send an email indicating a breach
-            self.jwt_repository.revoke(&claims.sub).await?;
-            return Err(Error::InvalidToken {
-                token_type: crate::error::TokenErrorType::RefreshToken,
-                reason: crate::error::Reason::Expired,
-            });
-        }
+        let _ = match self.jwt_repository.find_and_consume(&claims).await {
+            Ok(token) => Ok(token.user_id),
+            Err(Error::TokenAlreadyUsed { .. }) => {
+                // Potential breach — revoke everything for this user
+                // TODO: Send an email indicating a breach
+                self.jwt_repository.revoke(&claims.sub).await?;
+                Err(Error::TokenAlreadyUsed {
+                    token_id: "".into(),
+                })
+            }
+            Err(e) => Err(e), // NotFound, Expired bubble up as-is
+        };
 
         Ok(claims.sub)
     }

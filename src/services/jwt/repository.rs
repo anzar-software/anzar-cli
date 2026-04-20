@@ -8,7 +8,6 @@ use crate::{
     adapters::database::DatabaseAdapter,
     error::{Error, Reason, Result, TokenErrorType},
     extractors::Claims,
-    utils::{SecureToken, TokenHasher},
 };
 
 #[derive(Clone)]
@@ -32,26 +31,27 @@ impl JWTRepository {
         Ok(())
     }
 
-    pub async fn find_and_consume(
-        &self,
-        claims: &Claims,
-        refresh_token: &str,
-    ) -> Result<RefreshToken> {
+    pub async fn find_and_consume(&self, claims: &Claims) -> Result<RefreshToken> {
         let filter = QueryBuilder::default()
             .eq("jti", claims.jti)
-            .eq("userId", claims.clone().sub)
-            .eq("token", SecureToken::hash(refresh_token))
-            .eq("valid", true);
+            .eq("userId", claims.clone().sub);
 
-        let update = QueryBuilder::default()
-            .set("valid", false)
-            .set("usedAt", Utc::now());
+        let update = QueryBuilder::default().set("usedAt", Utc::now());
 
         match self.adapter.find_one_and_update(filter, update).await {
-            Ok(Some(refresh_token)) => Ok(refresh_token),
-            Ok(None) => Err(Error::InvalidToken {
+            // Token was already consumed — potential replay attack
+            // Consider revoking ALL refresh tokens for this user
+            Ok(Some(token)) if token.used_at.is_some() => Err(Error::TokenAlreadyUsed {
+                token_id: token.id.unwrap_or_default(),
+            }),
+            Ok(Some(token)) if Utc::now() > token.expires_at => Err(Error::TokenExpired {
                 token_type: TokenErrorType::RefreshToken,
-                reason: crate::error::Reason::NotFound,
+                expired_at: token.expires_at,
+            }),
+
+            Ok(Some(token)) => Ok(token),
+            Ok(None) => Err(Error::TokenNotFound {
+                token_id: "".into(),
             }),
             Err(err) => Err(err),
         }
@@ -72,9 +72,7 @@ impl JWTRepository {
 
     pub async fn invalidate(&self, jti: uuid::Uuid) -> Result<RefreshToken> {
         let filter = QueryBuilder::default().eq("jti", jti);
-        let update = QueryBuilder::default()
-            .set("valid", false)
-            .set("usedAt", Utc::now());
+        let update = QueryBuilder::default().set("usedAt", Utc::now());
 
         match self.adapter.find_one_and_update(filter, update).await {
             Ok(Some(refresh_token)) => Ok(refresh_token),
@@ -87,9 +85,7 @@ impl JWTRepository {
     }
     pub async fn revoke(&self, user_id: &str) -> Result<()> {
         let filter = QueryBuilder::default().eq("userId", user_id);
-        let update = QueryBuilder::default()
-            .set("valid", false)
-            .set("usedAt", Utc::now());
+        let update = QueryBuilder::default().set("usedAt", Utc::now());
 
         self.adapter
             .update_many(filter, update)

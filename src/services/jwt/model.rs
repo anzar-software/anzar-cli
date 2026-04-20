@@ -1,4 +1,4 @@
-use crate::utils::{SecureToken, TokenHasher, mongodb_serde::*};
+use crate::utils::mongodb_serde::*;
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use sqlx::prelude::FromRow;
@@ -33,7 +33,6 @@ pub struct RefreshToken {
     pub used_at: Option<DateTime<Utc>>,
 
     pub jti: String,
-    pub token: String,
 }
 
 impl RefreshToken {
@@ -41,7 +40,6 @@ impl RefreshToken {
         RefreshToken {
             issued_at: chrono::Utc::now(),
             jti: tokens.refresh_token_jti.to_string(),
-            token: SecureToken::hash(&tokens.refresh_token),
             ..Default::default()
         }
     }

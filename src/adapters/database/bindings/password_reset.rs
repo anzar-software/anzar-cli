@@ -5,14 +5,7 @@ use crate::scopes::auth::model::PasswordResetToken;
 
 impl PgInsert for PasswordResetToken {
     fn columns() -> Vec<&'static str> {
-        vec![
-            "userId",
-            "issuedAt",
-            "expiresAt",
-            "usedAt",
-            "token",
-            "valid",
-        ]
+        vec!["userId", "issuedAt", "expiresAt", "usedAt", "token"]
     }
 
     fn bind_query<'q>(
@@ -25,20 +18,12 @@ impl PgInsert for PasswordResetToken {
             .bind(self.expires_at)
             .bind(self.used_at)
             .bind(self.token)
-            .bind(self.valid)
     }
 }
 
 impl SqliteInsert for PasswordResetToken {
     fn columns() -> Vec<&'static str> {
-        vec![
-            "userId",
-            "issuedAt",
-            "expiresAt",
-            "usedAt",
-            "token",
-            "valid",
-        ]
+        vec!["userId", "issuedAt", "expiresAt", "usedAt", "token"]
     }
 
     fn bind_query<'q>(
@@ -51,6 +36,5 @@ impl SqliteInsert for PasswordResetToken {
             .bind(self.expires_at)
             .bind(self.used_at)
             .bind(self.token)
-            .bind(self.valid)
     }
 }

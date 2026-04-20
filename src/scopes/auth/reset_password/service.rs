@@ -31,6 +31,12 @@ impl PasswordResetTokenServiceTrait for AuthService {
         })?;
 
         // 3. Verify token isn't expired
+        if reset_token.used_at.is_some() {
+            return Err(Error::TokenAlreadyUsed {
+                token_id: reset_token_id.into(),
+            });
+        }
+
         if chrono::Utc::now() > reset_token.expires_at {
             self.password_reset_token_repository
                 .invalidate(reset_token_id)

@@ -5,15 +5,7 @@ use crate::services::jwt::RefreshToken;
 
 impl PgInsert for RefreshToken {
     fn columns() -> Vec<&'static str> {
-        vec![
-            "userId",
-            "issuedAt",
-            "expiresAt",
-            "usedAt",
-            "jti",
-            "token",
-            "valid",
-        ]
+        vec!["userId", "issuedAt", "expiresAt", "usedAt", "jti"]
     }
 
     fn bind_query<'q>(
@@ -26,8 +18,6 @@ impl PgInsert for RefreshToken {
             .bind(self.expires_at)
             .bind(self.used_at)
             .bind(self.jti)
-            .bind(self.token)
-            .bind(self.valid)
     }
 }
 
@@ -54,7 +44,5 @@ impl SqliteInsert for RefreshToken {
             .bind(self.expires_at)
             .bind(self.used_at)
             .bind(self.jti)
-            .bind(self.token)
-            .bind(self.valid)
     }
 }

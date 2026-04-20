@@ -5,14 +5,7 @@ use crate::scopes::email::model::EmailVerificationToken;
 
 impl PgInsert for EmailVerificationToken {
     fn columns() -> Vec<&'static str> {
-        vec![
-            "userId",
-            "issuedAt",
-            "expiresAt",
-            "usedAt",
-            "token",
-            "valid",
-        ]
+        vec!["userId", "issuedAt", "expiresAt", "usedAt", "token"]
     }
 
     fn bind_query<'q>(
@@ -25,20 +18,12 @@ impl PgInsert for EmailVerificationToken {
             .bind(self.expires_at)
             .bind(self.used_at)
             .bind(self.token)
-            .bind(self.valid)
     }
 }
 
 impl SqliteInsert for EmailVerificationToken {
     fn columns() -> Vec<&'static str> {
-        vec![
-            "userId",
-            "issuedAt",
-            "expiresAt",
-            "usedAt",
-            "token",
-            "valid",
-        ]
+        vec!["userId", "issuedAt", "expiresAt", "usedAt", "token"]
     }
 
     fn bind_query<'q>(
@@ -51,6 +36,5 @@ impl SqliteInsert for EmailVerificationToken {
             .bind(self.expires_at)
             .bind(self.used_at)
             .bind(self.token)
-            .bind(self.valid)
     }
 }
