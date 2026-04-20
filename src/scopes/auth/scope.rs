@@ -457,11 +457,23 @@ async fn render_reset_form(
     session.clear();
     session.insert(support::CSRF_COOKIE, &csrf_token)?;
 
+    let script_nonce = SecureToken::with_size32().generate();
+    let style_nonce = SecureToken::with_size32().generate();
+
     let body = include_str!("templates/update_password.html")
+        .replace("{{STYLE_NONCE}}", &style_nonce)
+        .replace("{{SCRIPT_NONCE}}", &script_nonce)
         .replace("{{TOKEN}}", token)
         .replace("{{CSRF_TOKEN}}", &csrf_token);
     Ok(HttpResponse::Ok()
         .content_type("text/html; charset=utf-8")
+        .insert_header((
+            "Content-Security-Policy",
+            format!(
+                "default-src 'self'; style-src 'nonce-{}'; script-src 'nonce-{}'",
+                &style_nonce, &script_nonce
+            ),
+        ))
         .body(body))
 }
 

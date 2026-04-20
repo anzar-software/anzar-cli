@@ -75,8 +75,7 @@ impl AppConfig {
             .add_source(config::File::from(config_dir.join(environment_path)))
             .add_source(config::File::from(config_dir.join(database_path)))
             .add_source(config::File::from(config_dir.join(cache_path)))
-            .build()
-            .map_err(|e| dbg!(e))?;
+            .build()?;
 
         settings.try_deserialize::<AppConfig>()
     }
