@@ -1,5 +1,5 @@
 use crate::config::{AnzarConfiguration, PasswordConfig};
-use crate::error::{CredentialField, Error, Result};
+use crate::error::{CredentialField, Error, Result, ValidationError};
 use crate::scopes::auth::service::AuthService;
 use crate::scopes::email::model::EmailVerificationToken;
 use crate::scopes::email::service::EmailVerificationTokenServiceTrait;
@@ -92,7 +92,7 @@ impl UserServiceTrait for AuthService {
         let (target_user, target_hash) = self
             .find_by_email_with_password(email, configuration)
             .await?;
-        let password_valid = Password::verify(password, &target_hash);
+        let password_valid = Password::verify(password, &target_hash)?;
 
         // 2. Fetch device cookie
         let raw = session.get::<String>(support::DEVICE_COOKIE).ok().flatten();
@@ -178,8 +178,10 @@ impl UserServiceTrait for AuthService {
         Ok(user)
     }
     async fn create_verification_email(&self, user: &User, expiry: i64) -> Result<String> {
-        let user_id = user.id.as_ref().ok_or(Error::MalformedData {
-            field: CredentialField::ObjectId,
+        let user_id = user.id.as_ref().ok_or_else(|| {
+            Error::Validation(ValidationError::Malformed {
+                field: CredentialField::ObjectId,
+            })
         })?;
 
         let token = SecureToken::with_size32().generate();

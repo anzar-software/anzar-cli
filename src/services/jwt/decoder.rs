@@ -4,7 +4,7 @@ use jsonwebtoken::{Validation, decode};
 use serde::de::DeserializeOwned;
 
 use crate::config::AnzarConfiguration;
-use crate::error::{Error, Reason, Result, TokenErrorType};
+use crate::error::{AuthError, Error, Result, TokenErrorType};
 
 pub struct JwtDecoder {
     token: String,
@@ -33,30 +33,31 @@ impl JwtDecoder {
         decode::<C>(&self.token, &self.decoding_key, &self.validation)
             .map(|token_data| token_data.claims)
             .map_err(|e| match e.kind() {
-                ErrorKind::InvalidSignature => Error::InvalidToken {
+                ErrorKind::InvalidSignature => {
+                    Error::Unauthenticated(AuthError::TokenInvalidSignature {
+                        token_type: TokenErrorType::Token,
+                    })
+                }
+                ErrorKind::ExpiredSignature => Error::Unauthenticated(AuthError::TokenExpired {
                     token_type: TokenErrorType::Token,
-                    reason: Reason::InvalidSignature,
-                },
-                ErrorKind::ExpiredSignature => Error::InvalidToken {
+                    expired_at: chrono::Utc::now(),
+                }),
+                ErrorKind::InvalidAudience => {
+                    Error::Unauthenticated(AuthError::TokenInvalidAudience {
+                        token_type: TokenErrorType::Token,
+                    })
+                }
+                ErrorKind::InvalidIssuer => Error::Unauthenticated(AuthError::TokenInvalidIssuer {
                     token_type: TokenErrorType::Token,
-                    reason: Reason::Expired,
-                },
-                ErrorKind::InvalidAudience => Error::InvalidToken {
+                }),
+                ErrorKind::InvalidAlgorithm | ErrorKind::MissingAlgorithm => {
+                    Error::Unauthenticated(AuthError::TokenInvalidAlgorithm {
+                        token_type: TokenErrorType::Token,
+                    })
+                }
+                _ => Error::Unauthenticated(AuthError::TokenInvalid {
                     token_type: TokenErrorType::Token,
-                    reason: Reason::InvalidAudience,
-                },
-                ErrorKind::InvalidIssuer => Error::InvalidToken {
-                    token_type: TokenErrorType::Token,
-                    reason: Reason::InvalidIssuer,
-                },
-                ErrorKind::InvalidAlgorithm | ErrorKind::MissingAlgorithm => Error::InvalidToken {
-                    token_type: TokenErrorType::Token,
-                    reason: Reason::InvalidAlgorithm,
-                },
-                _ => Error::InvalidToken {
-                    token_type: TokenErrorType::Token,
-                    reason: Reason::Unknown,
-                },
+                }),
             })
     }
 }

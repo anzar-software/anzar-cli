@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use chrono::{Duration, Utc};
 
-use crate::error::{Error, Reason, Result, TokenErrorType};
+use crate::error::{Error, InternalError, Result, TokenErrorType};
 use crate::utils::query::QueryBuilder;
 use crate::utils::{SecureToken, TokenHasher};
 use crate::{adapters::database::DatabaseAdapter, services::session::model::Session};
@@ -22,9 +22,9 @@ impl SessionRepository {
     pub async fn insert(&self, session: Session) -> Result<()> {
         self.adapter.insert(session).await.map_err(|e| {
             tracing::error!("Failed to insert SessionId to database: {:?}", e);
-            Error::TokenCreationFailed {
+            Error::Internal(InternalError::TokenCreation {
                 token_type: TokenErrorType::SessionToken,
-            }
+            })
         })?;
 
         Ok(())
@@ -35,10 +35,11 @@ impl SessionRepository {
 
         match self.adapter.find_one(filter).await {
             Ok(Some(session)) => Ok(session),
-            Ok(None) => Err(Error::InvalidToken {
-                token_type: TokenErrorType::SessionToken,
-                reason: Reason::NotFound,
-            }),
+            Ok(None) => Err(Error::Unauthenticated(
+                crate::error::AuthError::TokenInvalid {
+                    token_type: TokenErrorType::SessionToken,
+                },
+            )),
             Err(err) => Err(err),
         }
     }
@@ -51,9 +52,9 @@ impl SessionRepository {
 
         match self.adapter.find_one_and_update(filter, update).await {
             Ok(Some(session)) => Ok(session),
-            Ok(None) => Err(Error::TokenNotFound {
-                token_id: id.into(),
-            }),
+            Ok(None) => Err(Error::NotFound(crate::error::ResourceKind::Token {
+                token_type: TokenErrorType::SessionToken,
+            })),
             Err(err) => Err(err),
         }
     }
@@ -69,9 +70,7 @@ impl SessionRepository {
 
         self.adapter.delete_many(filter).await.map_err(|e| {
             tracing::error!("Failed to revoke session after security breach: {:?}", e);
-            Error::TokenRevocationFailed {
-                token_id: "".into(),
-            }
+            Error::Internal(InternalError::Hashing)
         })
     }
 }

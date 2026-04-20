@@ -8,7 +8,7 @@ use actix_web::{
 
 use crate::{
     config::{AnzarConfiguration, AppState},
-    error::Reason,
+    error::{ForbiddenReason, InternalError},
     extract_service_response,
 };
 use crate::{
@@ -25,17 +25,20 @@ use crate::{extractors::Claims, services::session::model::Session};
 fn extract_auth_service(req: &ServiceRequest) -> Result<AuthService, AuthError> {
     req.app_data::<web::Data<AppState>>()
         .map(|state| state.auth_service.clone())
-        .ok_or(AuthError::InternalServerError(
-            "extract auth service".into(),
-        ))
+        .ok_or_else(|| {
+            AuthError::Internal(InternalError::MissingAppData(
+                "AppState not registered".into(),
+            ))
+        })
 }
-
 fn extract_configuration_service(req: &ServiceRequest) -> Result<AnzarConfiguration, AuthError> {
     req.app_data::<web::Data<AppState>>()
         .map(|state| state.configuration.clone())
-        .ok_or(AuthError::InternalServerError(
-            "extract configuraiton".into(),
-        ))
+        .ok_or_else(|| {
+            AuthError::Internal(InternalError::MissingAppData(
+                "AppState not registered".into(),
+            ))
+        })
 }
 
 async fn validate_user(req: &ServiceRequest, user_id: &str) -> Result<User, AuthError> {
@@ -45,7 +48,7 @@ async fn validate_user(req: &ServiceRequest, user_id: &str) -> Result<User, Auth
     let account = auth_service.find_account(user_id).await?;
 
     if account.locked {
-        return Err(AuthError::AccountSuspended {});
+        return Err(AuthError::Forbidden(ForbiddenReason::AccountSuspended));
     }
 
     Ok(user)
@@ -60,20 +63,22 @@ fn extract_user_id_from_extensions(req: &ServiceRequest) -> Result<String, AuthE
                 return Ok(session.user_id.clone());
             }
 
-            Err(AuthError::InvalidToken {
-                token_type: TokenErrorType::SessionToken,
-                reason: Reason::NotFound,
-            })
+            Err(AuthError::Unauthenticated(
+                crate::error::AuthError::TokenInvalid {
+                    token_type: TokenErrorType::SessionToken,
+                },
+            ))
         }
         crate::config::AuthStrategy::Jwt => {
             if let Some(claims) = req.extensions().get::<Claims>() {
                 return Ok(claims.sub.clone());
             }
 
-            Err(AuthError::InvalidToken {
-                token_type: TokenErrorType::AccessToken,
-                reason: Reason::NotFound,
-            })
+            Err(AuthError::Unauthenticated(
+                crate::error::AuthError::TokenInvalid {
+                    token_type: TokenErrorType::AccessToken,
+                },
+            ))
         }
     }
 }

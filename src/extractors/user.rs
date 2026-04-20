@@ -1,7 +1,7 @@
 use actix_web::{FromRequest, HttpMessage, HttpRequest, dev::Payload};
 use std::future::{Ready, ready};
 
-use crate::error::Error;
+use crate::error::{AuthError, CredentialField, Error};
 use crate::scopes::user::User;
 
 pub struct AuthenticatedUser(pub User);
@@ -14,10 +14,9 @@ impl FromRequest for AuthenticatedUser {
         tracing::info!("user is not found");
         match req.extensions().get::<User>() {
             Some(user) => ready(Ok(AuthenticatedUser(user.clone()))),
-            None => ready(Err(Error::InvalidCredentials {
-                field: crate::error::CredentialField::Token,
-                reason: crate::error::Reason::NotFound,
-            })),
+            None => ready(Err(Error::Unauthenticated(AuthError::InvalidCredentials {
+                field: CredentialField::Token,
+            }))),
         }
     }
 }

@@ -5,7 +5,7 @@ use mongodb::{Collection, options::ReturnDocument};
 use serde::{Serialize, de::DeserializeOwned};
 
 use super::super::adapter::DatabaseAdapter;
-use crate::error::Error;
+use crate::error::{CredentialField, Error, ValidationError};
 use crate::utils::query::{IntoDbFilter, QueryBuilder};
 
 #[derive(Debug, Clone)]
@@ -33,12 +33,12 @@ where
         //     operation = operation.session(s);
         // }
 
-        let doc = operation
-            .await
-            .map_err(|e| Error::DatabaseError(e.to_string()))?;
+        let doc = operation.await?;
 
-        let id = doc.inserted_id.as_object_id().ok_or(Error::MalformedData {
-            field: crate::error::CredentialField::ObjectId,
+        let id = doc.inserted_id.as_object_id().ok_or_else(|| {
+            Error::Validation(ValidationError::Malformed {
+                field: CredentialField::ObjectId,
+            })
         })?;
 
         Ok(id.to_string())
@@ -47,10 +47,7 @@ where
     async fn find_one(&self, query: QueryBuilder) -> Result<Option<T>, Error> {
         let doc = query.into_mongo_filter();
 
-        self.collection
-            .find_one(doc)
-            .await
-            .map_err(|e| Error::DatabaseError(e.to_string()))
+        self.collection.find_one(doc).await.map_err(Into::into)
     }
 
     async fn find_one_and_update(
@@ -65,40 +62,28 @@ where
             .find_one_and_update(filter, update)
             .return_document(ReturnDocument::Before)
             .await
-            .map_err(|e| Error::DatabaseError(e.to_string()))
+            .map_err(Into::into)
     }
 
     async fn update_many(&self, filter: QueryBuilder, update: QueryBuilder) -> Result<(), Error> {
         let filter = filter.into_mongo_filter();
         let update = update.into_mongo_update();
 
-        self.collection
-            .update_many(filter, update)
-            .await
-            .map_err(|e| Error::DatabaseError(e.to_string()))?;
-
+        self.collection.update_many(filter, update).await?;
         Ok(())
     }
 
     async fn delete_one(&self, query: QueryBuilder) -> Result<(), Error> {
         let filter = query.into_mongo_filter();
 
-        self.collection
-            .delete_one(filter)
-            .await
-            .map_err(|e| Error::DatabaseError(e.to_string()))?;
-
+        self.collection.delete_one(filter).await?;
         Ok(())
     }
 
     async fn delete_many(&self, query: QueryBuilder) -> Result<(), Error> {
         let filter = query.into_mongo_filter();
 
-        self.collection
-            .delete_many(filter)
-            .await
-            .map_err(|e| Error::DatabaseError(e.to_string()))?;
-
+        self.collection.delete_many(filter).await?;
         Ok(())
     }
 }

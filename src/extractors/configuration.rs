@@ -1,6 +1,6 @@
 use crate::{
     config::{AnzarConfiguration, AppState},
-    error::Error,
+    error::{Error, InternalError},
 };
 use actix_web::{FromRequest, HttpRequest, dev::Payload, web::Data};
 use std::future::{Ready, ready};
@@ -16,7 +16,9 @@ impl FromRequest for ConfigurationExtractor {
             .app_data::<Data<AppState>>()
             .map(|state| state.configuration.clone())
             .map(|sm| ConfigurationExtractor(sm.clone()))
-            .ok_or(Error::InternalServerError("ConfigurationExtractor".into()));
+            .ok_or(Error::Internal(InternalError::MissingAppData(
+                "AppState not registered".into(),
+            )));
 
         ready(result)
     }

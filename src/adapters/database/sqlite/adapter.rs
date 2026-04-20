@@ -56,12 +56,7 @@ where
 
         let query = sqlx::query_as::<_, IdResult>(&sql);
 
-        let row: IdResult = data
-            .bind_query(query)
-            .fetch_one(&self.pool)
-            .await
-            .map_err(|e| Error::DatabaseError(e.to_string()))?;
-
+        let row: IdResult = data.bind_query(query).fetch_one(&self.pool).await?;
         Ok(row.id)
     }
 
@@ -74,10 +69,7 @@ where
             query = v.bind_sqlite(query);
         }
 
-        query
-            .fetch_optional(&self.pool)
-            .await
-            .map_err(|e| Error::DatabaseError(e.to_string()))
+        query.fetch_optional(&self.pool).await.map_err(Into::into)
     }
 
     async fn find_one_and_update(
@@ -98,10 +90,7 @@ where
             query = v.bind_sqlite(query);
         }
 
-        query
-            .fetch_optional(&self.pool)
-            .await
-            .map_err(|e| Error::DatabaseError(e.to_string()))
+        query.fetch_optional(&self.pool).await.map_err(Into::into)
     }
 
     async fn update_many(&self, filter: QueryBuilder, update: QueryBuilder) -> Result<(), Error> {
@@ -118,11 +107,7 @@ where
             query = v.bind_sqlite(query);
         }
 
-        query
-            .fetch_optional(&self.pool)
-            .await
-            .map_err(|e| Error::DatabaseError(e.to_string()))?;
-
+        query.fetch_optional(&self.pool).await?;
         Ok(())
     }
 

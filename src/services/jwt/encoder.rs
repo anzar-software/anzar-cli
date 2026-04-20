@@ -2,7 +2,7 @@ use jsonwebtoken::{Header, encode};
 
 use super::model::IssuedTokens;
 use crate::config::AnzarConfiguration;
-use crate::error::{CredentialField, Error, Result};
+use crate::error::{CredentialField, Error, Result, ValidationError};
 use crate::extractors::Claims;
 use crate::scopes::user::User;
 
@@ -27,8 +27,10 @@ impl<'a> JwtEncoder<'a> {
             jsonwebtoken::EncodingKey::from_secret(self.config.security.secret_key.as_bytes());
         let jwt_config = &self.config.auth.jwt;
 
-        let user_id = self.user.id.as_ref().ok_or(Error::MalformedData {
-            field: CredentialField::ObjectId,
+        let user_id = self.user.id.as_ref().ok_or_else(|| {
+            Error::Validation(ValidationError::Malformed {
+                field: CredentialField::ObjectId,
+            })
         })?;
 
         let (access_claims, refresh_claims) = Claims::new(user_id, self.user.role.clone())

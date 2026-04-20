@@ -1,5 +1,5 @@
 use crate::config::AnzarConfiguration;
-use crate::error::{CredentialField, Error, Result};
+use crate::error::{AuthError, CredentialField, Error, Result, TokenErrorType, ValidationError};
 use crate::extractors::{Claims, TokenType};
 use crate::scopes::auth::service::AuthService;
 use crate::scopes::user::User;
@@ -37,13 +37,13 @@ impl JwtServiceTrait for AuthService {
 
         let _ = match self.jwt_repository.find_and_consume(&claims).await {
             Ok(token) => Ok(token.user_id),
-            Err(Error::TokenAlreadyUsed { .. }) => {
+            Err(Error::Unauthenticated { .. }) => {
                 // Potential breach — revoke everything for this user
                 // TODO: Send an email indicating a breach
                 self.jwt_repository.revoke(&claims.sub).await?;
-                Err(Error::TokenAlreadyUsed {
-                    token_id: "".into(),
-                })
+                Err(Error::Unauthenticated(AuthError::TokenReplay {
+                    token_type: TokenErrorType::RefreshToken,
+                }))
             }
             Err(e) => Err(e), // NotFound, Expired bubble up as-is
         };
@@ -55,9 +55,12 @@ impl JwtServiceTrait for AuthService {
         user: &User,
         configuration: &AnzarConfiguration,
     ) -> Result<IssuedTokens> {
-        let user_id = user.id.as_ref().ok_or(Error::MalformedData {
-            field: CredentialField::ObjectId,
-        })?;
+        let user_id = user
+            .id
+            .as_ref()
+            .ok_or(Error::Validation(ValidationError::Malformed {
+                field: CredentialField::ObjectId,
+            }))?;
 
         let tokens: IssuedTokens = JwtEncoder::new(user, configuration).encode()?;
 
@@ -77,10 +80,9 @@ impl JwtServiceTrait for AuthService {
         let claims: Claims = JwtDecoder::new(refresh_token, configuration).decode()?;
 
         if claims.token_type != TokenType::RefreshToken {
-            return Err(Error::InvalidToken {
-                token_type: crate::error::TokenErrorType::RefreshToken,
-                reason: crate::error::Reason::Malformed,
-            });
+            return Err(Error::Unauthenticated(AuthError::TokenInvalid {
+                token_type: TokenErrorType::RefreshToken,
+            }));
         }
 
         self.jwt_repository.invalidate(claims.jti).await?;

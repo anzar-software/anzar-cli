@@ -3,10 +3,11 @@ use std::sync::Arc;
 use chrono::Utc;
 
 use super::RefreshToken;
+use crate::error::{AuthError, InternalError};
 use crate::utils::query::QueryBuilder;
 use crate::{
     adapters::database::DatabaseAdapter,
-    error::{Error, Reason, Result, TokenErrorType},
+    error::{Error, Result, TokenErrorType},
     extractors::Claims,
 };
 
@@ -23,9 +24,9 @@ impl JWTRepository {
     pub async fn insert(&self, refresh_token: RefreshToken) -> Result<()> {
         self.adapter.insert(refresh_token).await.map_err(|e| {
             tracing::error!("Failed to insert refreshToken to database: {:?}", e);
-            Error::TokenCreationFailed {
+            Error::Internal(InternalError::TokenCreation {
                 token_type: TokenErrorType::RefreshToken,
-            }
+            })
         })?;
 
         Ok(())
@@ -41,18 +42,21 @@ impl JWTRepository {
         match self.adapter.find_one_and_update(filter, update).await {
             // Token was already consumed — potential replay attack
             // Consider revoking ALL refresh tokens for this user
-            Ok(Some(token)) if token.used_at.is_some() => Err(Error::TokenAlreadyUsed {
-                token_id: token.id.unwrap_or_default(),
-            }),
-            Ok(Some(token)) if Utc::now() > token.expires_at => Err(Error::TokenExpired {
-                token_type: TokenErrorType::RefreshToken,
-                expired_at: token.expires_at,
-            }),
-
+            Ok(Some(token)) if token.used_at.is_some() => {
+                Err(Error::Unauthenticated(AuthError::TokenReplay {
+                    token_type: TokenErrorType::RefreshToken,
+                }))
+            }
+            Ok(Some(token)) if Utc::now() > token.expires_at => {
+                Err(Error::Unauthenticated(AuthError::TokenExpired {
+                    token_type: TokenErrorType::RefreshToken,
+                    expired_at: token.expires_at,
+                }))
+            }
             Ok(Some(token)) => Ok(token),
-            Ok(None) => Err(Error::TokenNotFound {
-                token_id: "".into(),
-            }),
+            Ok(None) => Err(Error::Unauthenticated(AuthError::TokenInvalid {
+                token_type: TokenErrorType::RefreshToken,
+            })),
             Err(err) => Err(err),
         }
     }
@@ -62,10 +66,9 @@ impl JWTRepository {
 
         match self.adapter.find_one(filter).await {
             Ok(Some(token)) => Ok(token),
-            Ok(None) => Err(Error::InvalidToken {
+            Ok(None) => Err(Error::Unauthenticated(AuthError::TokenInvalid {
                 token_type: TokenErrorType::RefreshToken,
-                reason: Reason::NotFound,
-            }),
+            })),
             Err(err) => Err(err),
         }
     }
@@ -76,10 +79,9 @@ impl JWTRepository {
 
         match self.adapter.find_one_and_update(filter, update).await {
             Ok(Some(refresh_token)) => Ok(refresh_token),
-            Ok(None) => Err(Error::InvalidToken {
+            Ok(None) => Err(Error::Unauthenticated(AuthError::TokenInvalid {
                 token_type: TokenErrorType::RefreshToken,
-                reason: crate::error::Reason::Malformed,
-            }),
+            })),
             Err(err) => Err(err),
         }
     }
@@ -92,9 +94,7 @@ impl JWTRepository {
             .await
             .map_err(|e| {
                 tracing::error!("Failed to revoke tokens after security breach: {:?}", e);
-                Error::TokenRevocationFailed {
-                    token_id: "".into(),
-                }
+                InternalError::Database(e.to_string())
             })?;
 
         Ok(())

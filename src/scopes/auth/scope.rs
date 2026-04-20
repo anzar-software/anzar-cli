@@ -6,12 +6,18 @@ use actix_web::{
 
 use validator::{Validate, ValidateArgs};
 
-use crate::extractors::{AuthServiceExtractor, ConfigurationExtractor, ValidatedQuery};
-use crate::middlewares::{auth_middleware, authorization_middleware, rate_limiting::RATE_LIMITS};
 use crate::{
     config::AuthStrategy,
-    error::{CredentialField, Error, ErrorResponse, Reason, Result},
+    error::{CredentialField, Error, ErrorResponse, Result, ValidationError},
     utils::HmacSigner,
+};
+use crate::{
+    error::AuthError,
+    extractors::{AuthServiceExtractor, ConfigurationExtractor, ValidatedQuery},
+};
+use crate::{
+    error::ForbiddenReason,
+    middlewares::{auth_middleware, authorization_middleware, rate_limiting::RATE_LIMITS},
 };
 
 use crate::services::{
@@ -69,8 +75,7 @@ pub async fn login(
     req: web::Json<LoginRequest>,
     session: actix_session::Session,
 ) -> Result<HttpResponse> {
-    req.validate_with_args(&configuration.auth.password.requirements)
-        .map_err(|e| Error::BadRequest(e.to_string()))?;
+    req.validate_with_args(&configuration.auth.password.requirements)?;
 
     // START TIMING-SAFE EXECUTION BLOCK
     let start = std::time::Instant::now();
@@ -94,9 +99,7 @@ pub async fn login(
     // Now handle responses
     // NOTE this can be removed, if it's not needed
     if configuration.auth.email.verification.required && !user.verified {
-        return Err(Error::AccountNotVerified {
-            field: CredentialField::Email,
-        });
+        return Err(Error::Unauthenticated(AuthError::AccountNotVerified));
     }
 
     match account_status {
@@ -134,13 +137,12 @@ pub async fn login(
         }
         // NOTE fully mask account existence
         // only return InvalidCredentials
-        AccountStatus::Suspended => Err(Error::AccountSuspended {}),
+        AccountStatus::Suspended => Err(Error::Forbidden(ForbiddenReason::AccountSuspended)),
         _ => {
             support::delay(attempts as u32).await;
-            return Err(Error::InvalidCredentials {
+            return Err(Error::Unauthenticated(AuthError::InvalidCredentials {
                 field: CredentialField::EmailOrPassword,
-                reason: Reason::Any,
-            });
+            }));
         }
     }
 }
@@ -184,8 +186,7 @@ pub async fn register(
     req: web::Json<RegisterRequest>,
     session: actix_session::Session,
 ) -> Result<HttpResponse> {
-    req.validate_with_args(&configuration.auth.password.requirements)
-        .map_err(|err| Error::BadRequest(err.to_string()))?;
+    req.validate_with_args(&configuration.auth.password.requirements)?;
 
     // let mut bucket = RATE_LIMITS.entry(email.clone()).or_default();
     // bucket.run()?;
@@ -365,8 +366,7 @@ async fn request_password_reset(
     AuthServiceExtractor(auth_service): AuthServiceExtractor,
     ConfigurationExtractor(configuration): ConfigurationExtractor,
 ) -> Result<HttpResponse> {
-    req.validate()
-        .map_err(|err| Error::BadRequest(err.to_string()))?;
+    req.validate()?;
 
     let start = std::time::Instant::now();
 
@@ -377,8 +377,10 @@ async fn request_password_reset(
 
     let result = async {
         let user = auth_service.find_user_by_email(&email).await?;
-        let user_id = user.id.as_ref().ok_or(Error::MalformedData {
-            field: CredentialField::ObjectId,
+        let user_id = user.id.as_ref().ok_or_else(|| {
+            Error::Validation(ValidationError::Malformed {
+                field: CredentialField::ObjectId,
+            })
         })?;
 
         // 3.
@@ -488,8 +490,7 @@ async fn submit_new_password(
     form: web::Form<ResetPasswordRequest>,
 ) -> Result<HttpResponse> {
     // 0. validat password strength
-    form.validate_with_args(&configuration.auth.password.requirements)
-        .map_err(|err| Error::BadRequest(err.to_string()))?;
+    form.validate_with_args(&configuration.auth.password.requirements)?;
 
     // 0.5 Verify CSRF token
     if let Some(expected) = session.get::<String>(support::CSRF_COOKIE)? {
@@ -505,9 +506,12 @@ async fn submit_new_password(
 
     // 1. ReValidate token
     let reset_token = auth_service.validate_reset_password_token(token).await?;
-    let reset_token_id = reset_token.id.as_ref().ok_or(Error::MalformedData {
-        field: CredentialField::ObjectId,
+    let reset_token_id = reset_token.id.as_ref().ok_or_else(|| {
+        Error::Validation(ValidationError::Malformed {
+            field: CredentialField::ObjectId,
+        })
     })?;
+
     let user_id = reset_token.user_id;
 
     // NOTE → Rate limit per token
@@ -515,14 +519,13 @@ async fn submit_new_password(
     // 2. Ensure password is different then previous
     let account = auth_service.find_account(&user_id).await?;
     if account.locked {
-        return Err(Error::AccountSuspended {});
+        return Err(Error::Forbidden(ForbiddenReason::AccountSuspended));
     }
-    if Password::verify(&form.password, &account.password) {
+    if Password::verify(&form.password, &account.password)? {
         tracing::warn!("Password reuse attempt for user: {}", user_id);
-        return Err(Error::InvalidCredentials {
+        return Err(Error::Unauthenticated(AuthError::InvalidCredentials {
             field: CredentialField::Password,
-            reason: Reason::AlreadyExist,
-        });
+        }));
     }
 
     // 3.

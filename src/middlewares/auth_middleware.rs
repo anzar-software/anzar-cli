@@ -8,9 +8,12 @@ use actix_web::{
     web,
 };
 
-use crate::config::{AnzarConfiguration, AppState};
-use crate::extract_service_response;
 use crate::{config::AuthStrategy, extractors::Claims, scopes::auth::support};
+use crate::{
+    config::{AnzarConfiguration, AppState},
+    error::{CredentialField, ValidationError},
+};
+use crate::{error::InternalError, extract_service_response};
 
 use crate::scopes::auth::service::AuthService;
 use crate::services::session::{model::Session, service::SessionServiceTrait};
@@ -38,16 +41,20 @@ async fn update_session_expiray(req: &ServiceRequest, id: &str) -> Result<Sessio
 fn extract_auth_service(req: &ServiceRequest) -> Result<AuthService, AuthError> {
     req.app_data::<web::Data<AppState>>()
         .map(|state| state.auth_service.clone())
-        .ok_or(AuthError::InternalServerError(
-            "extract auth service".into(),
-        ))
+        .ok_or_else(|| {
+            AuthError::Internal(InternalError::MissingAppData(
+                "AppState not registered".into(),
+            ))
+        })
 }
 fn extract_configuration_service(req: &ServiceRequest) -> Result<AnzarConfiguration, AuthError> {
     req.app_data::<web::Data<AppState>>()
         .map(|state| state.configuration.clone())
-        .ok_or(AuthError::InternalServerError(
-            "extract configuraiton".into(),
-        ))
+        .ok_or_else(|| {
+            AuthError::Internal(InternalError::MissingAppData(
+                "AppState not registered".into(),
+            ))
+        })
 }
 
 async fn validate_token(req: &ServiceRequest) -> Result<(), Error> {
@@ -60,22 +67,28 @@ async fn validate_token(req: &ServiceRequest) -> Result<(), Error> {
 
             if let Some(token) = data {
                 let session = find_session(req, &token).await?;
-                let session_id = session.id.as_ref().ok_or(AuthError::MalformedData {
-                    field: crate::error::CredentialField::Token,
-                })?;
+                let session_id = session.id.as_ref().ok_or(AuthError::Validation(
+                    ValidationError::Malformed {
+                        field: CredentialField::Token,
+                    },
+                ))?;
 
                 if session.used_at.is_some() {
-                    return Err(AuthError::TokenAlreadyUsed {
-                        token_id: session_id.into(),
-                    }
-                    .into());
+                    return Err(
+                        AuthError::Unauthenticated(crate::error::AuthError::TokenReplay {
+                            token_type: TokenErrorType::SessionToken,
+                        })
+                        .into(),
+                    );
                 }
 
                 if chrono::Utc::now() > session.expires_at {
-                    return Err(AuthError::TokenExpired {
-                        token_type: TokenErrorType::SessionToken,
-                        expired_at: session.expires_at,
-                    }
+                    return Err(AuthError::Unauthenticated(
+                        crate::error::AuthError::TokenExpired {
+                            token_type: TokenErrorType::SessionToken,
+                            expired_at: session.expires_at,
+                        },
+                    )
                     .into());
                 }
 

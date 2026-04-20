@@ -1,4 +1,4 @@
-use crate::error::{CredentialField, Error, Result};
+use crate::error::{CredentialField, Error, Result, ValidationError};
 use crate::utils::{SecureToken, TokenHasher};
 use crate::{
     scopes::{auth::service::AuthService, user::User},
@@ -14,8 +14,10 @@ pub trait SessionServiceTrait {
 }
 impl SessionServiceTrait for AuthService {
     async fn issue_session(&self, user: &User) -> Result<String> {
-        let user_id = user.id.as_ref().ok_or(Error::MalformedData {
-            field: CredentialField::ObjectId,
+        let user_id = user.id.as_ref().ok_or_else(|| {
+            Error::Validation(ValidationError::Malformed {
+                field: CredentialField::ObjectId,
+            })
         })?;
 
         self.session_repository.revoke(user_id).await?;

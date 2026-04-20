@@ -1,4 +1,4 @@
-use crate::error::{CredentialField, Error, Result, TokenErrorType};
+use crate::error::{CredentialField, Error, Result, TokenErrorType, ValidationError};
 use crate::scopes::auth::service::AuthService;
 use crate::scopes::email::model::EmailVerificationToken;
 use crate::utils::{SecureToken, TokenHasher};
@@ -28,24 +28,30 @@ impl EmailVerificationTokenServiceTrait for AuthService {
 
         // 2. Checks the database for a matching token
         let verification_token = self.email_verification_token_repository.find(&hash).await?;
-        let verification_token_id = verification_token.id.as_ref().ok_or(Error::MalformedData {
-            field: CredentialField::ObjectId,
+        let verification_token_id = verification_token.id.as_ref().ok_or_else(|| {
+            Error::Validation(ValidationError::Malformed {
+                field: CredentialField::ObjectId,
+            })
         })?;
 
         // 3. Verify token isn't expired or already used
         if verification_token.used_at.is_some() {
-            return Err(Error::TokenAlreadyUsed {
-                token_id: verification_token_id.into(),
-            });
+            return Err(Error::Unauthenticated(
+                crate::error::AuthError::TokenReplay {
+                    token_type: TokenErrorType::EmailVerificationToken,
+                },
+            ));
         }
         if chrono::Utc::now() > verification_token.expires_at {
             self.password_reset_token_repository
                 .invalidate(verification_token_id)
                 .await?;
-            return Err(Error::TokenExpired {
-                token_type: TokenErrorType::EmailVerificationToken,
-                expired_at: verification_token.expires_at,
-            });
+            return Err(Error::Unauthenticated(
+                crate::error::AuthError::TokenExpired {
+                    token_type: TokenErrorType::EmailVerificationToken,
+                    expired_at: verification_token.expires_at,
+                },
+            ));
         }
 
         Ok(verification_token)

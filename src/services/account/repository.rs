@@ -1,7 +1,9 @@
 use std::sync::Arc;
 
 use crate::adapters::database::DatabaseAdapter;
-use crate::error::{Error, Result, TokenErrorType};
+use crate::error::{
+    CredentialField, Error, InternalError, ResourceKind, Result, TokenErrorType, ValidationError,
+};
 use crate::utils::query::QueryBuilder;
 
 use super::model::Account;
@@ -21,9 +23,9 @@ impl AccountRepository {
     pub async fn insert(&self, account: Account) -> Result<()> {
         self.adapter.insert(account).await.map_err(|e| {
             tracing::error!("Failed to insert Account to database: {:?}", e);
-            Error::TokenCreationFailed {
+            Error::Internal(InternalError::TokenCreation {
                 token_type: TokenErrorType::SessionToken,
-            }
+            })
         })?;
 
         Ok(())
@@ -34,10 +36,10 @@ impl AccountRepository {
 
         match self.adapter.find_one(filter).await {
             Ok(Some(session)) => Ok(session),
-            Ok(None) => Err(Error::UserNotFound {
-                user_id: Some(user_id.into()),
+            Ok(None) => Err(Error::NotFound(ResourceKind::User {
+                id: Some(user_id.into()),
                 email: None,
-            }),
+            })),
             Err(err) => Err(err),
         }
     }
@@ -48,7 +50,9 @@ impl AccountRepository {
 
         match self.adapter.find_one_and_update(filter, update).await {
             Ok(Some(account)) => Ok(account),
-            Ok(None) => Err(Error::InvalidRequest),
+            Ok(None) => Err(Error::Validation(ValidationError::Missing {
+                field: CredentialField::Username,
+            })),
             Err(err) => Err(err),
         }
     }
@@ -59,7 +63,9 @@ impl AccountRepository {
 
         match self.adapter.find_one_and_update(filter, update).await {
             Ok(Some(account)) => Ok(account),
-            Ok(None) => Err(Error::InvalidRequest),
+            Ok(None) => Err(Error::Validation(ValidationError::Missing {
+                field: CredentialField::Username,
+            })),
             Err(err) => Err(err),
         }
     }
@@ -69,7 +75,9 @@ impl AccountRepository {
 
         match self.adapter.find_one_and_update(filter, update).await {
             Ok(Some(account)) => Ok(account),
-            Ok(None) => Err(Error::InvalidRequest),
+            Ok(None) => Err(Error::Validation(ValidationError::Missing {
+                field: CredentialField::Username,
+            })),
             Err(err) => Err(err),
         }
     }

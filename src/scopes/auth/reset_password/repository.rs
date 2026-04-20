@@ -1,9 +1,10 @@
 use std::sync::Arc;
 
+use crate::error::{AuthError, InternalError};
 use crate::utils::query::QueryBuilder;
 use crate::{
     adapters::database::DatabaseAdapter,
-    error::{Error, Reason, Result, TokenErrorType},
+    error::{Error, Result, TokenErrorType},
 };
 
 use super::model::PasswordResetToken;
@@ -22,9 +23,9 @@ impl PasswordResetTokenRepository {
     pub async fn insert(&self, otp: PasswordResetToken) -> Result<String> {
         self.adapter.insert(otp).await.map_err(|e| {
             tracing::error!("Failed to insert password reset token to database: {:?}", e);
-            Error::TokenCreationFailed {
-                token_type: crate::error::TokenErrorType::PasswordResetToken,
-            }
+            Error::Internal(InternalError::TokenCreation {
+                token_type: TokenErrorType::PasswordResetToken,
+            })
         })
     }
 
@@ -38,9 +39,7 @@ impl PasswordResetTokenRepository {
             .await
             .map_err(|e| {
                 tracing::error!("Failed to revoke password tokens: {:?}", e);
-                Error::TokenRevocationFailed {
-                    token_id: "".into(),
-                }
+                InternalError::Database(e.to_string())
             })?;
 
         Ok(())
@@ -54,10 +53,9 @@ impl PasswordResetTokenRepository {
 
         match self.adapter.find_one(filter).await {
             Ok(Some(password_reset_token)) => Ok(password_reset_token),
-            Ok(None) => Err(Error::InvalidToken {
+            Ok(None) => Err(Error::Unauthenticated(AuthError::TokenInvalid {
                 token_type: TokenErrorType::PasswordResetToken,
-                reason: Reason::NotFound,
-            }),
+            })),
             Err(err) => Err(err),
         }
     }
@@ -68,10 +66,9 @@ impl PasswordResetTokenRepository {
 
         match self.adapter.find_one_and_update(filter, update).await {
             Ok(Some(password_reset_token)) => Ok(password_reset_token),
-            Ok(None) => Err(Error::InvalidToken {
+            Ok(None) => Err(Error::Unauthenticated(AuthError::TokenInvalid {
                 token_type: TokenErrorType::PasswordResetToken,
-                reason: Reason::NotFound,
-            }),
+            })),
             Err(err) => Err(err),
         }
     }

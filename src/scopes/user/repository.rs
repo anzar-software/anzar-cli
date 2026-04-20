@@ -3,7 +3,7 @@ use std::sync::Arc;
 use super::User;
 use crate::{
     adapters::{cache::CacheAdapter, database::DatabaseAdapter},
-    error::{Error, Result},
+    error::{CredentialField, Error, ResourceKind, Result, ValidationError},
     utils::query::QueryBuilder,
 };
 
@@ -49,13 +49,11 @@ impl UserRepository {
 
     // Database
     pub async fn insert(&self, user: &User) -> Result<String> {
-        self.adapter
-            .insert(user.to_owned())
-            .await
-            .map_err(|_| Error::InvalidCredentials {
-                field: crate::error::CredentialField::Email,
-                reason: crate::error::Reason::AlreadyExist,
+        self.adapter.insert(user.to_owned()).await.map_err(|_| {
+            Error::Unauthenticated(crate::error::AuthError::InvalidCredentials {
+                field: CredentialField::Email,
             })
+        })
     }
 
     pub async fn find(&self, user_id: &str) -> Result<User> {
@@ -65,10 +63,10 @@ impl UserRepository {
             Ok(Some(user)) => Ok(user),
             Ok(None) => {
                 tracing::error!("Failed to find user by id: {}", user_id);
-                Err(Error::UserNotFound {
-                    user_id: Some(user_id.into()),
+                Err(Error::NotFound(ResourceKind::User {
+                    id: Some(user_id.into()),
                     email: None,
-                })
+                }))
             }
             Err(err) => Err(err),
         }
@@ -81,10 +79,10 @@ impl UserRepository {
             Ok(Some(user)) => Ok(user),
             Ok(None) => {
                 tracing::error!("Failed to find user by email");
-                Err(Error::UserNotFound {
-                    user_id: None,
+                Err(Error::NotFound(ResourceKind::User {
+                    id: None,
                     email: Some(email.into()),
-                })
+                }))
             }
             Err(err) => Err(err),
         }
@@ -96,7 +94,9 @@ impl UserRepository {
 
         match self.adapter.find_one_and_update(filter, update).await {
             Ok(Some(user)) => Ok(user),
-            Ok(None) => Err(Error::InvalidRequest),
+            Ok(None) => Err(Error::Validation(ValidationError::Missing {
+                field: CredentialField::ObjectId,
+            })),
             Err(err) => Err(err),
         }
     }

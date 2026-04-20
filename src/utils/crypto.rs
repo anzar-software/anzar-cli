@@ -1,4 +1,4 @@
-use crate::error::{Error, Result};
+use crate::error::{Error, InternalError, Result};
 use argon2::{
     Argon2, PasswordHash, PasswordHasher, PasswordVerifier,
     password_hash::{SaltString, rand_core::OsRng},
@@ -55,7 +55,7 @@ impl TokenHasher for SecureToken {
 
 pub trait CustomPasswordHasher {
     fn hash(password: &str) -> Result<String>;
-    fn verify(password: &str, hash: &str) -> bool;
+    fn verify(password: &str, hash: &str) -> Result<bool>;
 }
 pub struct Password;
 impl CustomPasswordHasher for Password {
@@ -66,24 +66,26 @@ impl CustomPasswordHasher for Password {
             .hash_password(password.as_bytes(), &salt)
             .map_err(|e| {
                 tracing::error!("Failed to hash user password: {:?}", e);
-                Error::HashingFailure
+                Error::Internal(InternalError::Hashing)
             })?;
 
         Ok(hash.to_string())
     }
 
-    fn verify(password: &str, hash: &str) -> bool {
+    fn verify(password: &str, hash: &str) -> Result<bool> {
         static DUMMY_HASH: &str = "$argon2id$v=19$m=65536,t=3,p=4$\
      Lm1Jk9XQ2E1o8XxZMZ1jPQ$\
      8vBxrT9uC1NQb3lQfa2RyEBJxK2Sr6ELrRvsGqIzJxA";
 
         let parsed = PasswordHash::new(hash)
             .or_else(|_| PasswordHash::new(DUMMY_HASH))
-            .unwrap();
+            .map_err(|_| Error::Internal(InternalError::Hashing))?;
 
-        Argon2::default()
+        let isvalid = Argon2::default()
             .verify_password(password.as_bytes(), &parsed)
-            .is_ok()
+            .is_ok();
+
+        Ok(isvalid)
     }
 }
 

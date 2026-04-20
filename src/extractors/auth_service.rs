@@ -2,7 +2,11 @@ use std::future::{Ready, ready};
 
 use actix_web::{FromRequest, HttpRequest, dev::Payload, web::Data};
 
-use crate::{config::AppState, error::Error, scopes::auth::service::AuthService};
+use crate::{
+    config::AppState,
+    error::{Error, InternalError},
+    scopes::auth::service::AuthService,
+};
 
 pub struct AuthServiceExtractor(pub AuthService);
 
@@ -15,7 +19,9 @@ impl FromRequest for AuthServiceExtractor {
             .app_data::<Data<AppState>>()
             .map(|state| state.auth_service.clone())
             .map(|sm| AuthServiceExtractor(sm.clone()))
-            .ok_or(Error::InternalServerError("AuthServiceExtractor".into()));
+            .ok_or(Error::Internal(InternalError::MissingAppData(
+                "AppState not registered".into(),
+            )));
 
         ready(result)
     }
