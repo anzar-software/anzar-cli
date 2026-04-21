@@ -19,10 +19,19 @@ pub async fn run(listener: TcpListener, app_state: AppState) -> Result<Server, s
     let http_server = HttpServer::new(move || {
         // .wrap(TracingLogger::<CustomRootSpanBuilder>::new())
         // .wrap(from_fn(ip_rate_limit_middleware))
-        App::new()
-            .wrap(TracingLogger::default())
+        let app = App::new();
+
+        app.wrap(TracingLogger::default())
             .wrap(server::configure_cors(&app_state.configuration))
-            .wrap(server::configure_session(&app_state.configuration))
+            .wrap(server::configure_cookie_session(&app_state.configuration))
+            // match &app_state.configuration.database.cache.driver {
+            //     CacheDriver::MemCached => {
+            //         app.wrap(server::configure_cookie_session(&app_state.configuration));
+            //     }
+            //     CacheDriver::Redis => {
+            //         app.wrap(server::configure_redis_session(&app_state.configuration).await);
+            //     }
+            // }
             .wrap(from_fn(validate_content_type))
             .wrap(server::build_default_headers(&app_state.configuration))
             .app_data(web::Data::new(app_state_inner.clone()))

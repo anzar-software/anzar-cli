@@ -3,6 +3,12 @@ use serde::{Deserialize, Deserializer, Serialize};
 use sqlx::FromRow;
 use utoipa::ToSchema;
 
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
+pub enum CreateUserOutcome {
+    Created(User),
+    AlreadyExists,
+}
+
 #[derive(Default, Debug, Serialize, Deserialize, Clone, PartialEq, Eq, sqlx::Type, ToSchema)]
 #[schema(example = json!({"role": Role::default()}))]
 #[sqlx(type_name = "role")]

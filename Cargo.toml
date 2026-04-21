@@ -41,7 +41,8 @@ strip = true
 actix-cors = "0.7.0"
 # NOTE maybe use secure_coockie from actiw-web
 actix-web = { version = "4.11.0", features = ["rustls-0_23"] } 
-actix-session = { version = "0.11.0", features = ["cookie-session"] }
+actix-session = { version = "0.11.0", features = ["cookie-session", "redis-session"] }
+
 tokio = "1.48.0"
 
 chrono = { version = "0.4.37", features = ["serde"] }

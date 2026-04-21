@@ -8,7 +8,8 @@ use validator::{Validate, ValidateArgs};
 
 use crate::{
     config::AuthStrategy,
-    error::{CredentialField, Error, ErrorResponse, Result, ValidationError},
+    error::{ConflictReason, CredentialField, Error, ErrorResponse, Result, ValidationError},
+    scopes::user::CreateUserOutcome,
     utils::HmacSigner,
 };
 use crate::{
@@ -187,60 +188,67 @@ pub async fn register(
     session: actix_session::Session,
 ) -> Result<HttpResponse> {
     req.validate_with_args(&configuration.auth.password.requirements)?;
-
-    // let mut bucket = RATE_LIMITS.entry(email.clone()).or_default();
+    // let mut bucket = RATE_LIMITS.entry(req.email.clone()).or_default();
     // bucket.run()?;
 
-    let user = auth_service.create_user(req.into_inner()).await?;
+    // START TIMING-SAFE EXECUTION BLOCK
+    let start = std::time::Instant::now();
 
-    let email_config = &configuration.auth.email;
-    if email_config.verification.required {
-        let email_verification_expiry = email_config.verification.token_expires_in;
+    let result = async {
+        match auth_service
+            .create_user(req.into_inner(), &configuration)
+            .await?
+        {
+            CreateUserOutcome::Created(user) => {
+                let verification = if configuration.auth.email.verification.required {
+                    let email_verification_expiry =
+                        configuration.auth.email.verification.token_expires_in;
 
-        let verification_token = auth_service
-            .create_verification_email(&user, email_verification_expiry)
-            .await?;
-        let link = format!(
-            "{}/email/verify?token={}",
-            &configuration.app.url, &verification_token
-        );
+                    let token = auth_service
+                        .create_verification_email(&user, email_verification_expiry)
+                        .await?;
+                    let link = format!("{}/email/verify?token={}", &configuration.app.url, &token);
+                    Some((link, token))
+                } else {
+                    None
+                };
 
-        return match configuration.auth.strategy {
-            AuthStrategy::Session => auth_service.issue_session(&user).await.map(|token| {
-                session.insert(support::SESSION_COOKIE, token)?;
-                Ok(HttpResponse::Created()
-                    .json(AuthResponse::new(user).with_verification(&link, &verification_token)))
-            })?,
-            AuthStrategy::Jwt => {
-                auth_service
-                    .issue_jwt(&user, &configuration)
-                    .await
-                    .map(|tokens| {
-                        Ok(HttpResponse::Created().json(
-                            AuthResponse::new(user)
-                                .with_jwt(tokens, configuration.auth.jwt.access_token_expires_in)
-                                .with_verification(&link, &verification_token),
-                        ))
-                    })?
+                let mut response = AuthResponse::new(user.clone());
+                if let Some((ref link, ref token)) = verification {
+                    response = response.with_verification(link, token);
+                }
+
+                let http_response = match configuration.auth.strategy {
+                    AuthStrategy::Session => {
+                        let token = auth_service.issue_session(&user).await?;
+
+                        session.clear();
+                        session.renew();
+                        session.insert(support::SESSION_COOKIE, token)?;
+
+                        response
+                    }
+
+                    AuthStrategy::Jwt => {
+                        let tokens = auth_service.issue_jwt(&user, &configuration).await?;
+                        response.with_jwt(tokens, configuration.auth.jwt.access_token_expires_in)
+                    }
+                };
+
+                Ok(HttpResponse::Created().json(http_response))
             }
-        };
+            CreateUserOutcome::AlreadyExists => {
+                Err(Error::Conflict(ConflictReason::AlreadyExists {
+                    field: CredentialField::Email,
+                }))
+            }
+        }
     }
+    .await;
 
-    match configuration.auth.strategy {
-        AuthStrategy::Session => auth_service.issue_session(&user).await.map(|token| {
-            session.insert(support::SESSION_COOKIE, token)?;
-            Ok(HttpResponse::Created().json(AuthResponse::new(user)))
-        })?,
-        AuthStrategy::Jwt => auth_service
-            .issue_jwt(&user, &configuration)
-            .await
-            .map(|tokens| {
-                Ok(HttpResponse::Created().json(
-                    AuthResponse::new(user)
-                        .with_jwt(tokens, configuration.auth.jwt.access_token_expires_in),
-                ))
-            })?,
-    }
+    // ENFORCE CONSTANT-TIME EXECUTION
+    support::throttle_since(start).await;
+    result
 }
 
 #[utoipa::path(

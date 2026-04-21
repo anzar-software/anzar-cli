@@ -12,7 +12,7 @@ pub async fn delay(attempts: u32) {
 }
 
 pub async fn throttle_since(start: std::time::Instant) {
-    const TIMING_DELAY_MS: u64 = 800;
+    const TIMING_DELAY_MS: u64 = 1500;
 
     let jitter = rand::rng().random_range(0..=20); // +/- 20ms
     let elapsed = start.elapsed().as_millis() as u64;
@@ -20,5 +20,11 @@ pub async fn throttle_since(start: std::time::Instant) {
 
     if elapsed < TIMING_DELAY_MS {
         tokio::time::sleep(tokio::time::Duration::from_millis(delay)).await;
+    } else {
+        tracing::warn!(
+            elapsed_ms = elapsed,
+            threshold_ms = TIMING_DELAY_MS,
+            "auth path exceeded timing threshold — constant-time guarantee violated"
+        );
     }
 }

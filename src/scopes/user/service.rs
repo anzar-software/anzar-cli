@@ -3,20 +3,17 @@ use crate::error::{CredentialField, Error, Result, ValidationError};
 use crate::scopes::auth::service::AuthService;
 use crate::scopes::email::model::EmailVerificationToken;
 use crate::scopes::email::service::EmailVerificationTokenServiceTrait;
+
+use crate::scopes::user::models::CreateUserOutcome;
 use crate::services::account::model::{Account, AccountStatus};
-use crate::services::fake::service::FakeUserGenerator;
 use crate::services::lockout::service::LoginAttemptTracker;
 use crate::utils::{CustomPasswordHasher, HmacSigner, Password, SecureToken, TokenHasher};
 
 use super::User;
 use crate::scopes::auth::{RegisterRequest, support};
+use crate::scopes::user::support as user_support;
 
 pub trait UserServiceTrait {
-    fn find_by_email_with_password(
-        &self,
-        email: &str,
-        configuration: &AnzarConfiguration,
-    ) -> impl Future<Output = Result<(User, String)>>;
     fn authenticate_user(
         &self,
         email: &str,
@@ -31,7 +28,11 @@ pub trait UserServiceTrait {
         device_cookie: Option<&str>,
         pass_config: &PasswordConfig,
     ) -> impl Future<Output = Result<u8>>;
-    fn create_user(&self, req: RegisterRequest) -> impl Future<Output = Result<User>>;
+    fn create_user(
+        &self,
+        req: RegisterRequest,
+        configuration: &AnzarConfiguration,
+    ) -> impl Future<Output = Result<CreateUserOutcome>>;
     fn create_verification_email(
         &self,
         user: &User,
@@ -42,44 +43,6 @@ pub trait UserServiceTrait {
     fn validate_account(&self, id: &str) -> impl Future<Output = Result<User>>;
 }
 impl UserServiceTrait for AuthService {
-    async fn find_by_email_with_password(
-        &self,
-        email: &str,
-        configuration: &AnzarConfiguration,
-    ) -> Result<(User, String)> {
-        // FIXME Single query with JOIN
-        // Try to fetch real user
-        let real = self.user_repository.find_by_email(email).await.ok();
-
-        // Extract real password hash or use a fake one
-        let (user, password) = match real {
-            Some(user) => {
-                match self
-                    .account_repository
-                    .find(&user.clone().id.unwrap_or_default())
-                    .await
-                {
-                    Ok(account) => (user, account.password),
-                    Err(_) => {
-                        let fake_gen = FakeUserGenerator::new(&configuration.security.secret_key);
-                        (
-                            fake_gen.generate_fake_user(email),
-                            fake_gen.generate_fake_hash(),
-                        )
-                    }
-                }
-            }
-            None => {
-                let fake_gen = FakeUserGenerator::new(&configuration.security.secret_key);
-                (
-                    fake_gen.generate_fake_user(email),
-                    fake_gen.generate_fake_hash(),
-                )
-            }
-        };
-
-        Ok((user, password))
-    }
     async fn authenticate_user(
         &self,
         email: &str,
@@ -89,9 +52,13 @@ impl UserServiceTrait for AuthService {
         configuration: &AnzarConfiguration,
     ) -> Result<(User, AccountStatus, u8)> {
         // 1. ALWAYS verify password (constant-time even with fake hash)
-        let (target_user, target_hash) = self
-            .find_by_email_with_password(email, configuration)
-            .await?;
+        let (target_user, target_hash) = user_support::resolve_user_with_password(
+            &self.user_repository,
+            &self.account_repository,
+            email,
+            configuration,
+        )
+        .await?;
         let password_valid = Password::verify(password, &target_hash)?;
 
         // 2. Fetch device cookie
@@ -111,23 +78,21 @@ impl UserServiceTrait for AuthService {
         }
 
         // 5.
-        match password_valid {
+        let (account_status, attempts) = match password_valid {
             true => {
                 let _ = self.user_repository.clear_key(&identity).await;
-                Ok((target_user.clone(), AccountStatus::Active, 0))
+                (AccountStatus::Active, 0)
             }
             _ => {
                 let attempts = self
                     .register_failed_attempt(&identity, device_cookie, &configuration.auth.password)
                     .await
                     .unwrap_or(1);
-                Ok((
-                    target_user.clone(),
-                    AccountStatus::InvalidCredentials,
-                    attempts,
-                ))
+                (AccountStatus::InvalidCredentials, attempts)
             }
-        }
+        };
+
+        Ok((target_user.clone(), account_status, attempts))
     }
 
     async fn register_failed_attempt(
@@ -152,14 +117,24 @@ impl UserServiceTrait for AuthService {
         Ok(attempts)
     }
 
-    async fn create_user(&self, req: RegisterRequest) -> Result<User> {
-        /* FIXME Make sure if a failure happen, return an error
-                 sometimes even though transaction have failed, no data is saved
-                 the function return a success 200 code.
-        */
+    async fn create_user(
+        &self,
+        req: RegisterRequest,
+        configuration: &AnzarConfiguration,
+    ) -> Result<CreateUserOutcome> {
         // let mut session = self.transaction_repository.start_transactions().await?;
 
+        // 1. Find if user already exist
+        let (_, user_exist) =
+            user_support::resolve_user(&self.user_repository, &req.email, configuration).await?;
+
+        // 2. Hash user password
         let password = Password::hash(&req.password)?;
+
+        if user_exist {
+            return Ok(CreateUserOutcome::AlreadyExists);
+        }
+
         let mut user = User::new()
             .with_username(&req.username)
             .with_email(&req.email);
@@ -175,7 +150,7 @@ impl UserServiceTrait for AuthService {
         //     .commit_transaction(session)
         //     .await?;
 
-        Ok(user)
+        Ok(CreateUserOutcome::Created(user))
     }
     async fn create_verification_email(&self, user: &User, expiry: i64) -> Result<String> {
         let user_id = user.id.as_ref().ok_or_else(|| {

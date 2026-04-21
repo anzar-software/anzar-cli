@@ -1,15 +1,35 @@
-use actix_session::{SessionMiddleware, storage::CookieSessionStore};
+use actix_session::{
+    SessionMiddleware,
+    storage::{CookieSessionStore, RedisSessionStore},
+};
 use actix_web::cookie::Key;
 
 use crate::config::AnzarConfiguration;
 
-pub fn configure_session(
+pub fn configure_cookie_session(
     configuration: &AnzarConfiguration,
 ) -> SessionMiddleware<CookieSessionStore> {
     let session_config = configuration.auth.session.clone();
-
     let key = Key::from(configuration.security.secret_key.as_bytes());
+
     SessionMiddleware::builder(CookieSessionStore::default(), key)
+        .cookie_secure(session_config.secure)
+        .cookie_same_site(session_config.same_site.clone().into())
+        .cookie_http_only(session_config.http_only)
+        .cookie_name(session_config.name.clone())
+        .build()
+}
+
+pub async fn configure_redis_session(
+    configuration: &AnzarConfiguration,
+) -> SessionMiddleware<RedisSessionStore> {
+    let session_config = configuration.auth.session.clone();
+    let key = Key::from(configuration.security.secret_key.as_bytes());
+
+    let store = RedisSessionStore::new(&configuration.database.cache.url)
+        .await
+        .unwrap();
+    SessionMiddleware::builder(store, key)
         .cookie_secure(session_config.secure)
         .cookie_same_site(session_config.same_site.clone().into())
         .cookie_http_only(session_config.http_only)
