@@ -21,12 +21,13 @@ impl PasswordResetTokenRepository {
     }
 
     pub async fn insert(&self, otp: PasswordResetToken) -> Result<String> {
-        self.adapter.insert(otp).await.map_err(|e| {
-            tracing::error!("Failed to insert password reset token to database: {:?}", e);
-            Error::Internal(InternalError::TokenCreation {
-                token_type: TokenErrorType::PasswordResetToken,
-            })
-        })
+        match self.adapter.insert(otp).await {
+            Ok(id) => Ok(id),
+            Err(err) => {
+                tracing::error!("Failed to insert password reset token to database");
+                Err(err)
+            }
+        }
     }
 
     pub async fn revoke(&self, user_id: &str) -> Result<()> {

@@ -1,9 +1,7 @@
 use std::sync::Arc;
 
 use crate::adapters::database::DatabaseAdapter;
-use crate::error::{
-    CredentialField, Error, InternalError, ResourceKind, Result, TokenErrorType, ValidationError,
-};
+use crate::error::{CredentialField, Error, ResourceKind, Result, ValidationError};
 use crate::utils::query::QueryBuilder;
 
 use super::model::Account;
@@ -21,14 +19,13 @@ impl AccountRepository {
 
 impl AccountRepository {
     pub async fn insert(&self, account: Account) -> Result<()> {
-        self.adapter.insert(account).await.map_err(|e| {
-            tracing::error!("Failed to insert Account to database: {:?}", e);
-            Error::Internal(InternalError::TokenCreation {
-                token_type: TokenErrorType::SessionToken,
-            })
-        })?;
-
-        Ok(())
+        match self.adapter.insert(account).await {
+            Ok(_id) => Ok(()),
+            Err(err) => {
+                tracing::error!("Failed to insert Account to database");
+                Err(err)
+            }
+        }
     }
 
     pub async fn find(&self, user_id: &str) -> Result<Account> {
@@ -51,7 +48,7 @@ impl AccountRepository {
         match self.adapter.find_one_and_update(filter, update).await {
             Ok(Some(account)) => Ok(account),
             Ok(None) => Err(Error::Validation(ValidationError::Missing {
-                field: CredentialField::Username,
+                field: CredentialField::Password,
             })),
             Err(err) => Err(err),
         }

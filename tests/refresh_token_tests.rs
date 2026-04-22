@@ -119,7 +119,7 @@ async fn test_refresh_token_single_use() {
     {
         let refresh_token: &str = &tokens.refresh;
 
-        // refresh access token
+        // refresh token
         let response = test_app
             .client
             .post(format!("{}/auth/refresh-token", test_app.address))
@@ -131,7 +131,7 @@ async fn test_refresh_token_single_use() {
             .expect("Failed to execute request.");
         assert!(response.status().is_success());
 
-        // refresh access token twice should fail
+        // refresh token twice should fail
         let response = test_app
             .client
             .post(format!("{}/auth/refresh-token", test_app.address))
@@ -150,5 +150,38 @@ async fn test_refresh_token_single_use() {
     }
 }
 
-// Check new tokens are diffrenet from old
-// Check new refresh-token hash stored in DB is diffrenet from old one
+#[actix_web::test]
+async fn test_refresh_token_route_using_access_token() {
+    let test_app = Helpers::init_config().await;
+
+    // Create User
+    let response = Helpers::create_user(&test_app).await;
+    assert!(response.status().is_success());
+
+    // Login
+    let response = Helpers::login(&test_app).await;
+    assert!(response.status().is_success());
+
+    let auth_response: AuthResponse = response.json().await.unwrap();
+
+    if test_app.configuration.auth.strategy == AuthStrategy::Jwt
+        && let Some(tokens) = &auth_response.tokens
+    {
+        // refresh token
+        let response = test_app
+            .client
+            .post(format!("{}/auth/refresh-token", test_app.address))
+            .json(&RefreshTokenRequest {
+                refresh_token: tokens.access.clone(),
+            })
+            .send()
+            .await
+            .expect("Failed to execute request.");
+        assert_eq!(
+            401,
+            response.status().as_u16(),
+            "The API did not fail when the payload was: {}",
+            "access-token was used instead of refreshToken"
+        );
+    }
+}

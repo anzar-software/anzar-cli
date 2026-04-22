@@ -61,7 +61,7 @@ where
     }
 
     async fn find_one(&self, query: QueryBuilder) -> Result<Option<T>, Error> {
-        let (where_clause, values) = query.into_postgres_filter(0);
+        let (where_clause, values) = query.into_sqlite_filter();
 
         let sql = format!("SELECT * FROM {} WHERE {}", self.table, where_clause);
         let mut query = sqlx::query_as::<_, T>(&sql);
@@ -77,13 +77,14 @@ where
         filter: QueryBuilder,
         update: QueryBuilder,
     ) -> Result<Option<T>, Error> {
-        let (where_clause, filter_values) = filter.into_postgres_filter(0);
-        let (set_clause, update_values) = update.into_postgres_update();
+        let (where_clause, filter_values) = filter.into_sqlite_filter();
+        let (set_clause, update_values) = update.into_sqlite_update();
 
         let sql = format!(
             "UPDATE {} SET {} WHERE {} RETURNING *",
             self.table, set_clause, where_clause
         );
+        dbg!(&sql);
         let mut query = sqlx::query_as::<_, T>(&sql);
 
         for v in update_values.into_iter().chain(filter_values) {
@@ -94,8 +95,8 @@ where
     }
 
     async fn update_many(&self, filter: QueryBuilder, update: QueryBuilder) -> Result<(), Error> {
-        let (set_clause, update_values) = update.into_postgres_update();
-        let (where_clause, filter_values) = filter.into_postgres_filter(0);
+        let (set_clause, update_values) = update.into_sqlite_update();
+        let (where_clause, filter_values) = filter.into_sqlite_filter();
 
         let sql = format!(
             "UPDATE {} SET {} WHERE {} RETURNING *",

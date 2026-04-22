@@ -34,6 +34,11 @@ impl JwtServiceTrait for AuthService {
         configuration: &AnzarConfiguration,
     ) -> Result<String> {
         let claims: Claims = JwtDecoder::new(refresh_token, configuration).decode()?;
+        if claims.token_type != crate::extractors::TokenType::RefreshToken {
+            return Err(Error::Unauthenticated(AuthError::TokenInvalid {
+                token_type: TokenErrorType::RefreshToken,
+            }));
+        }
 
         let _ = match self.jwt_repository.find_and_consume(&claims).await {
             Ok(token) => Ok(token.user_id),

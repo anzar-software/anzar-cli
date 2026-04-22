@@ -58,9 +58,15 @@ impl AuthService {
         };
 
         let database_adapter = match database.driver {
-            // DatabaseDriver::SQLite => Ok(Self::from_sqlite("/app/test.db".into()).await?),
             DatabaseDriver::SQLite => {
                 let db = SQLite::start(&database.connection_string).await?;
+
+                let path = std::path::Path::new("migrations/sqlite");
+                if path.exists() {
+                    let migrator = sqlx::migrate::Migrator::new(path).await?;
+                    migrator.run(&db).await.expect("migrations to run");
+                }
+
                 DatabaseAdapters::sqlite(&db)
             }
             DatabaseDriver::MongoDB => {

@@ -20,14 +20,13 @@ impl SessionRepository {
 
 impl SessionRepository {
     pub async fn insert(&self, session: Session) -> Result<()> {
-        self.adapter.insert(session).await.map_err(|e| {
-            tracing::error!("Failed to insert SessionId to database: {:?}", e);
-            Error::Internal(InternalError::TokenCreation {
-                token_type: TokenErrorType::SessionToken,
-            })
-        })?;
-
-        Ok(())
+        match self.adapter.insert(session).await {
+            Ok(_id) => Ok(()),
+            Err(err) => {
+                tracing::error!("Failed to insert Session to database");
+                Err(err)
+            }
+        }
     }
 
     pub async fn find(&self, token: &str) -> Result<Session> {

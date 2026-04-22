@@ -10,6 +10,8 @@ pub trait IntoDbFilter {
     fn into_mongo_update(self) -> Document;
     fn into_postgres_filter(self, offset: usize) -> (String, Vec<DbValue>);
     fn into_postgres_update(self) -> (String, Vec<DbValue>);
+    fn into_sqlite_filter(self) -> (String, Vec<DbValue>);
+    fn into_sqlite_update(self) -> (String, Vec<DbValue>);
 }
 
 impl IntoDbFilter for QueryBuilder {
@@ -109,6 +111,43 @@ impl IntoDbFilter for QueryBuilder {
             .map(|(i, f)| match f.op {
                 Op::Set => format!("\"{}\" = ${}", f.field, i + 1),
                 Op::Inc => format!("\"{}\" = \"{}\" + ${}", f.field, f.field, i + 1),
+                Op::Unset => format!("\"{}\" = NULL", f.field),
+                _ => unreachable!("filter ops not valid in update context"),
+            })
+            .collect::<Vec<_>>()
+            .join(" , ");
+
+        let values = self.updates.iter().map(|f| f.value.clone()).collect();
+        (clause, values)
+    }
+
+    // -- Sqlite
+    fn into_sqlite_filter(self) -> (String, Vec<DbValue>) {
+        let clause = self
+            .filters
+            .iter()
+            .enumerate()
+            .map(|(i, f)| match f.op {
+                Op::Eq => format!("\"{}\" = ?", f.field),
+                Op::Ne => format!("\"{}\" != ?", f.field),
+                Op::Gt => format!("\"{}\" > ?", f.field),
+                Op::Lt => format!("\"{}\" < ?", f.field),
+                Op::In => format!("\"{}\" = ANY(?{})", f.field, i + 1),
+                _ => unreachable!("update ops not valid in filter context"),
+            })
+            .collect::<Vec<_>>()
+            .join(" AND ");
+
+        let values = self.filters.iter().map(|f| f.value.clone()).collect();
+        (clause, values)
+    }
+    fn into_sqlite_update(self) -> (String, Vec<DbValue>) {
+        let clause = self
+            .updates
+            .iter()
+            .map(|f| match f.op {
+                Op::Set => format!("\"{}\" = ?", f.field),
+                Op::Inc => format!("\"{}\" = \"{}\" + ?", f.field, f.field),
                 Op::Unset => format!("\"{}\" = NULL", f.field),
                 _ => unreachable!("filter ops not valid in update context"),
             })

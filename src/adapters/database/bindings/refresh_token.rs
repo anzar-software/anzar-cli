@@ -23,15 +23,7 @@ impl PgInsert for RefreshToken {
 
 impl SqliteInsert for RefreshToken {
     fn columns() -> Vec<&'static str> {
-        vec![
-            "userId",
-            "issuedAt",
-            "expiresAt",
-            "usedAt",
-            "jti",
-            "token",
-            "valid",
-        ]
+        vec!["userId", "issuedAt", "expiresAt", "usedAt", "jti"]
     }
 
     fn bind_query<'q>(

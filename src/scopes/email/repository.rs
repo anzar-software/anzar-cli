@@ -20,15 +20,13 @@ impl EmailVerificationTokenRepository {
     }
 
     pub async fn insert(&self, otp: EmailVerificationToken) -> Result<()> {
-        self.adapter.insert(otp).await.map(|_| ()).map_err(|e| {
-            tracing::error!(
-                "Failed to insert email verification token to database: {:?}",
-                e
-            );
-            Error::Internal(crate::error::InternalError::TokenCreation {
-                token_type: TokenErrorType::PasswordResetToken,
-            })
-        })
+        match self.adapter.insert(otp).await {
+            Ok(_id) => Ok(()),
+            Err(err) => {
+                tracing::error!("Failed to insert email verification token to database");
+                Err(err)
+            }
+        }
     }
 
     pub async fn find(&self, hash: &str) -> Result<EmailVerificationToken> {

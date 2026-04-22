@@ -54,6 +54,13 @@ impl UserRepository {
                 field: CredentialField::Email,
             })
         })
+        // match self.adapter.insert(account).await {
+        //     Ok(_id) => Ok(()),
+        //     Err(err) => {
+        //         tracing::error!("Failed to insert Account to database");
+        //         Err(err)
+        //     }
+        // }
     }
 
     pub async fn find(&self, user_id: &str) -> Result<User> {

@@ -102,6 +102,14 @@ async fn validate_token(req: &ServiceRequest) -> Result<(), Error> {
             let access_token = extract_token_from_header(req, header::AUTHORIZATION.to_string());
             if let Some(token) = access_token {
                 let claims: Claims = JwtDecoder::new(token, &configuration).decode()?;
+                if claims.token_type != crate::extractors::TokenType::AccessToken {
+                    return Err(AuthError::Unauthenticated(
+                        crate::error::AuthError::TokenInvalid {
+                            token_type: TokenErrorType::AccessToken,
+                        },
+                    )
+                    .into());
+                }
 
                 req.extensions_mut().insert::<Claims>(claims.clone());
 

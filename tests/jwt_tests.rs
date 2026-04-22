@@ -104,3 +104,35 @@ async fn test_protected_route_with_invalid_jwt() {
         }
     }
 }
+
+#[actix_web::test]
+async fn test_protected_route_with_refresh_token() {
+    let test_app = Helpers::init_config().await;
+
+    // Create User
+    let response = Helpers::create_user(&test_app).await;
+    assert!(response.status().is_success());
+
+    // Login
+    let response = Helpers::login(&test_app).await;
+    assert!(response.status().is_success());
+
+    let auth_response: AuthResponse = response.json().await.unwrap();
+
+    if test_app.configuration.auth.strategy == AuthStrategy::Jwt
+        && let Some(tokens) = &auth_response.tokens
+    {
+        let response = test_app
+            .client
+            .get(format!("{}/user", test_app.address))
+            .bearer_auth(&tokens.refresh)
+            .send()
+            .await
+            .expect("Failed to execute request.");
+        assert_eq!(
+            401,
+            response.status().as_u16(),
+            "The API did not fail when refreshToken was used instead of accessToken",
+        );
+    }
+}

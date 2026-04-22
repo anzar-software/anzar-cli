@@ -22,14 +22,13 @@ impl JWTRepository {
     }
 
     pub async fn insert(&self, refresh_token: RefreshToken) -> Result<()> {
-        self.adapter.insert(refresh_token).await.map_err(|e| {
-            tracing::error!("Failed to insert refreshToken to database: {:?}", e);
-            Error::Internal(InternalError::TokenCreation {
-                token_type: TokenErrorType::RefreshToken,
-            })
-        })?;
-
-        Ok(())
+        match self.adapter.insert(refresh_token).await {
+            Ok(_id) => Ok(()),
+            Err(err) => {
+                tracing::error!("Failed to insert refreshToken to database");
+                Err(err)
+            }
+        }
     }
 
     pub async fn find_and_consume(&self, claims: &Claims) -> Result<RefreshToken> {

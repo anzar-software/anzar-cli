@@ -115,9 +115,9 @@ where
     }
 
     async fn delete_one(&self, _filter: QueryBuilder) -> Result<(), Error> {
-        Ok(())
+        todo!()
     }
     async fn delete_many(&self, _filter: QueryBuilder) -> Result<(), Error> {
-        Ok(())
+        todo!()
     }
 }
