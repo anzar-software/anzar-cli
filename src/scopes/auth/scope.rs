@@ -29,7 +29,7 @@ use crate::services::{
 use crate::utils::{CustomPasswordHasher, Password, SecureToken, TokenHasher};
 
 use super::models::{
-    AuthResponse, EmailRequest, LoginRequest, RefreshTokenRequest, RegisterRequest, ResetLink,
+    AuthResponse, EmailRequest, ExpiringLink, LoginRequest, RefreshTokenRequest, RegisterRequest,
     ResetPasswordRequest, TokenQuery,
 };
 use super::reset_password::{model::PasswordResetToken, service::PasswordResetTokenServiceTrait};
@@ -200,22 +200,16 @@ pub async fn register(
             .await?
         {
             CreateUserOutcome::Created(user) => {
-                let verification = if configuration.auth.email.verification.required {
-                    let email_verification_expiry =
-                        configuration.auth.email.verification.token_expires_in;
+                let mut response = AuthResponse::new(user.clone());
 
+                if configuration.auth.email.verification.required {
+                    let expiry = configuration.auth.email.verification.token_expires_in;
                     let token = auth_service
-                        .create_verification_email(&user, email_verification_expiry)
+                        .create_verification_email(&user, expiry)
                         .await?;
                     let link = format!("{}/email/verify?token={}", &configuration.app.url, &token);
-                    Some((link, token))
-                } else {
-                    None
-                };
 
-                let mut response = AuthResponse::new(user.clone());
-                if let Some((ref link, ref token)) = verification {
-                    response = response.with_verification(link, token);
+                    response = response.with_verification(&link, expiry);
                 }
 
                 let http_response = match configuration.auth.strategy {
@@ -364,7 +358,7 @@ async fn logout(
         description = "Sends a password reset link to the provided email address if an account exists.",
         request_body(description = "Email address to send the reset link to", content = EmailRequest),
         responses(
-            (status = 200, description = "Reset email sent if account exists", body = ResetLink),
+            (status = 200, description = "Reset email sent if account exists", body = ExpiringLink),
             (status = BAD_REQUEST, description = "invalid request", body = ErrorResponse),
         ),
     )]
@@ -418,11 +412,11 @@ async fn request_password_reset(
             "{}/auth/password/reset?token={}",
             &configuration.app.url, &token
         );
-        let reset_link = ResetLink {
+        let expiring_link = ExpiringLink {
             link,
             expires_at: expiry_timestamp,
         };
-        Ok::<ResetLink, Error>(reset_link)
+        Ok::<ExpiringLink, Error>(expiring_link)
     }
     .await;
 

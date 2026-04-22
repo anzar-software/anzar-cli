@@ -181,7 +181,7 @@ impl InvalidTestCases {
                     verified: true,
                 },
                 "duplication emails".into(),
-                401,
+                409,
             ),
         ]
     }

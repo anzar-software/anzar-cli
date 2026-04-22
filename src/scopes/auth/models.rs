@@ -49,9 +49,9 @@ pub struct RefreshTokenRequest {
     pub refresh_token: String,
 }
 
-#[derive(Debug, Serialize, Deserialize, ToSchema)]
+#[derive(Default, Debug, Serialize, Deserialize, ToSchema)]
 #[schema(example = json!({"link": String::default(), "expires_at": "2026-02-19T22:42:23.467Z"}))]
-pub struct ResetLink {
+pub struct ExpiringLink {
     pub link: String,
     pub expires_at: chrono::DateTime<chrono::Utc>,
 }
@@ -74,18 +74,13 @@ pub struct SessionTokens {
     pub token_type: String,
     pub refresh: String,
 }
-#[derive(Default, Debug, Serialize, Deserialize, ToSchema)]
-#[schema(description = "Verification model", example = json!({"token": String::default(), "link": String::default()}))]
-pub struct Verification {
-    token: String,
-    link: String,
-}
+
 #[derive(Debug, Serialize, Deserialize, ToSchema)]
-#[schema(example = json!({"user": User::default(), "tokens": Some(SessionTokens::default()), "verification": Some(Verification::default())}))]
+#[schema(example = json!({"user": User::default(), "tokens": Some(SessionTokens::default()), "verification": Some(ExpiringLink::default())}))]
 pub struct AuthResponse {
     pub user: User,
     pub tokens: Option<SessionTokens>,
-    pub verification: Option<Verification>,
+    pub verification: Option<ExpiringLink>,
 }
 
 impl AuthResponse {
@@ -108,10 +103,12 @@ impl AuthResponse {
         });
         self
     }
-    pub fn with_verification(mut self, link: &str, token: &str) -> Self {
-        let _ = self.verification.insert(Verification {
-            token: token.into(),
+    pub fn with_verification(mut self, link: &str, expires_in: i64) -> Self {
+        let expiry_timestamp = chrono::Utc::now() + chrono::Duration::seconds(expires_in);
+
+        let _ = self.verification.insert(ExpiringLink {
             link: link.into(),
+            expires_at: expiry_timestamp,
         });
         self
     }
