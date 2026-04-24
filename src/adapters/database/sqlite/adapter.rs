@@ -112,10 +112,28 @@ where
         Ok(())
     }
 
-    async fn delete_one(&self, _filter: QueryBuilder) -> Result<(), Error> {
+    async fn delete_one(&self, filter: QueryBuilder) -> Result<(), Error> {
+        let (where_clause, values) = filter.into_sqlite_filter();
+
+        let sql = format!("DELETE FROM {} WHERE {}", self.table, where_clause);
+        let mut query = sqlx::query_as::<_, T>(&sql);
+        for v in values {
+            query = v.bind_sqlite(query);
+        }
+
+        query.fetch_optional(&self.pool).await?;
         Ok(())
     }
-    async fn delete_many(&self, _filter: QueryBuilder) -> Result<(), Error> {
+    async fn delete_many(&self, filter: QueryBuilder) -> Result<(), Error> {
+        let (where_clause, values) = filter.into_sqlite_filter();
+
+        let sql = format!("DELETE FROM {} WHERE {}", self.table, where_clause);
+        let mut query = sqlx::query_as::<_, T>(&sql);
+        for v in values {
+            query = v.bind_sqlite(query);
+        }
+
+        query.fetch_optional(&self.pool).await?;
         Ok(())
     }
 }

@@ -61,8 +61,8 @@ where
         Ok(row.id)
     }
 
-    async fn find_one(&self, query: QueryBuilder) -> Result<Option<T>, Error> {
-        let (where_clause, values) = query.into_postgres_filter(0);
+    async fn find_one(&self, filter: QueryBuilder) -> Result<Option<T>, Error> {
+        let (where_clause, values) = filter.into_postgres_filter(0);
 
         let sql = format!("SELECT * FROM {} WHERE {}", self.table, where_clause);
         let mut query = sqlx::query_as::<_, T>(&sql);
@@ -114,10 +114,28 @@ where
         Ok(())
     }
 
-    async fn delete_one(&self, _filter: QueryBuilder) -> Result<(), Error> {
-        todo!()
+    async fn delete_one(&self, filter: QueryBuilder) -> Result<(), Error> {
+        let (where_clause, values) = filter.into_postgres_filter(0);
+
+        let sql = format!("DELETE FROM {} WHERE {}", self.table, where_clause);
+        let mut query = sqlx::query_as::<_, T>(&sql);
+        for v in values {
+            query = v.bind_pg(query);
+        }
+
+        query.fetch_optional(&self.pool).await?;
+        Ok(())
     }
-    async fn delete_many(&self, _filter: QueryBuilder) -> Result<(), Error> {
-        todo!()
+    async fn delete_many(&self, filter: QueryBuilder) -> Result<(), Error> {
+        let (where_clause, values) = filter.into_postgres_filter(0);
+
+        let sql = format!("DELETE FROM {} WHERE {}", self.table, where_clause);
+        let mut query = sqlx::query_as::<_, T>(&sql);
+        for v in values {
+            query = v.bind_pg(query);
+        }
+
+        query.fetch_optional(&self.pool).await?;
+        Ok(())
     }
 }
