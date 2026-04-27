@@ -1,5 +1,4 @@
-mod shared;
-use shared::{Helpers, InvalidTestCases};
+use super::shared::{Helpers, InvalidTestCases};
 
 use anzar::{config::AuthStrategy, scopes::auth::AuthResponse};
 
@@ -8,11 +7,11 @@ async fn test_jwt_contains_correct_claims() {
     let test_app = Helpers::init_config().await;
 
     // Create User
-    let response = Helpers::create_user(&test_app).await;
+    let response = test_app.register(None).await;
     assert!(response.status().is_success());
 
     // Login
-    let response = Helpers::login(&test_app).await;
+    let response = test_app.login(None).await;
     assert!(response.status().is_success());
 
     let auth_response: AuthResponse = response.json().await.unwrap();
@@ -42,11 +41,11 @@ async fn test_protected_route_with_valid_jwt() {
     let test_app = Helpers::init_config().await;
 
     // Create User
-    let response = Helpers::create_user(&test_app).await;
+    let response = test_app.register(None).await;
     assert!(response.status().is_success());
 
     // Login
-    let response = Helpers::login(&test_app).await;
+    let response = test_app.login(None).await;
     assert!(response.status().is_success());
 
     let auth_response: AuthResponse = response.json().await.unwrap();
@@ -54,15 +53,7 @@ async fn test_protected_route_with_valid_jwt() {
     if test_app.configuration.auth.strategy == AuthStrategy::Jwt
         && let Some(tokens) = &auth_response.tokens
     {
-        let access_token: &str = &tokens.access;
-
-        let response = test_app
-            .client
-            .get(format!("{}/user", test_app.address))
-            .bearer_auth(access_token)
-            .send()
-            .await
-            .expect("Failed to execute request.");
+        let response = test_app.user(&tokens.access).await;
         assert!(response.status().is_success());
     }
 }
@@ -72,11 +63,11 @@ async fn test_protected_route_with_invalid_jwt() {
     let test_app = Helpers::init_config().await;
 
     // Create User
-    let response = Helpers::create_user(&test_app).await;
+    let response = test_app.register(None).await;
     assert!(response.status().is_success());
 
     // Login
-    let response = Helpers::login(&test_app).await;
+    let response = test_app.login(None).await;
     assert!(response.status().is_success());
 
     let auth_response: AuthResponse = response.json().await.unwrap();
@@ -87,13 +78,7 @@ async fn test_protected_route_with_invalid_jwt() {
         let valid_token: &str = &tokens.access;
 
         for (token, err_msg, status_code) in InvalidTestCases::jwt_tokens(valid_token) {
-            let response = test_app
-                .client
-                .get(format!("{}/user", test_app.address))
-                .header("authorization", token)
-                .send()
-                .await
-                .expect("Failed to execute request.");
+            let response = test_app.user(&token).await;
 
             assert_eq!(
                 status_code,
@@ -110,11 +95,11 @@ async fn test_protected_route_with_refresh_token() {
     let test_app = Helpers::init_config().await;
 
     // Create User
-    let response = Helpers::create_user(&test_app).await;
+    let response = test_app.register(None).await;
     assert!(response.status().is_success());
 
     // Login
-    let response = Helpers::login(&test_app).await;
+    let response = test_app.login(None).await;
     assert!(response.status().is_success());
 
     let auth_response: AuthResponse = response.json().await.unwrap();
@@ -122,13 +107,7 @@ async fn test_protected_route_with_refresh_token() {
     if test_app.configuration.auth.strategy == AuthStrategy::Jwt
         && let Some(tokens) = &auth_response.tokens
     {
-        let response = test_app
-            .client
-            .get(format!("{}/user", test_app.address))
-            .bearer_auth(&tokens.refresh)
-            .send()
-            .await
-            .expect("Failed to execute request.");
+        let response = test_app.user(&tokens.refresh).await;
         assert_eq!(
             401,
             response.status().as_u16(),

@@ -1,28 +1,24 @@
-mod shared;
-use shared::Helpers;
-
+use super::shared::{Helpers, RefreshTokenRequest};
 use anzar::{config::AuthStrategy, scopes::auth::AuthResponse};
-
-use crate::shared::RefreshTokenRequest;
 
 #[actix_web::test]
 async fn test_password_not_returned_in_responses() {
     let test_app = Helpers::init_config().await;
 
     // Create User
-    let response = Helpers::create_user(&test_app).await;
+    let response = test_app.register(None).await;
     assert!(response.status().is_success());
     let auth_response = response.json::<AuthResponse>().await;
     assert!(auth_response.is_ok());
 
     // Login
-    let response = Helpers::login(&test_app).await;
+    let response = test_app.login(None).await;
     assert!(response.status().is_success());
     let auth_response = response.json::<AuthResponse>().await;
     assert!(auth_response.is_ok());
 
     // Login
-    let response = Helpers::login(&test_app).await;
+    let response = test_app.login(None).await;
     assert!(response.status().is_success());
 
     let auth_response: AuthResponse = response.json().await.unwrap();
@@ -33,16 +29,10 @@ async fn test_password_not_returned_in_responses() {
         let refresh_token: &str = &tokens.refresh;
 
         // Logout
-        let response = test_app
-            .client
-            .post(format!("{}/auth/logout", test_app.address))
-            .bearer_auth(&tokens.access)
-            .json(&RefreshTokenRequest {
-                refresh_token: refresh_token.to_string(),
-            })
-            .send()
-            .await
-            .expect("Failed to execute request.");
+        let body = RefreshTokenRequest {
+            refresh_token: refresh_token.to_string(),
+        };
+        let response = test_app.logout(&tokens.access, &body).await;
         assert!(response.status().is_success());
 
         let user = response.json::<()>().await;
@@ -55,11 +45,11 @@ async fn test_complete_auth_flow() {
     let test_app = Helpers::init_config().await;
 
     // [1] Create User
-    let response = Helpers::create_user(&test_app).await;
+    let response = test_app.register(None).await;
     assert!(response.status().is_success());
 
     // [2] Login
-    let response = Helpers::login(&test_app).await;
+    let response = test_app.login(None).await;
     assert!(response.status().is_success());
 
     let auth_response: AuthResponse = response.json().await.unwrap();
@@ -72,15 +62,10 @@ async fn test_complete_auth_flow() {
         assert!(!old_refresh_token.is_empty());
 
         // [3] Refresh access token
-        let response = test_app
-            .client
-            .post(format!("{}/auth/refresh-token", test_app.address))
-            .json(&RefreshTokenRequest {
-                refresh_token: old_refresh_token.to_string(),
-            })
-            .send()
-            .await
-            .expect("Failed to execute request.");
+        let body = RefreshTokenRequest {
+            refresh_token: old_refresh_token.to_string(),
+        };
+        let response = test_app.refresh(&body).await;
         assert!(response.status().is_success());
 
         let auth_response: AuthResponse = response.json().await.unwrap();
@@ -109,41 +94,25 @@ async fn test_complete_auth_flow() {
         );
 
         // [5] Access protected route with valid token
-        let response = test_app
-            .client
-            .get(format!("{}/user", test_app.address))
-            .bearer_auth(new_access_token)
-            .send()
-            .await
-            .expect("Failed to execute request.");
+        let response = test_app.user(new_access_token).await;
         assert!(response.status().is_success());
 
         // [6] Logout with invalid refreshToken
-        let response = test_app
-            .client
-            .post(format!("{}/auth/logout", test_app.address))
-            .bearer_auth(old_access_token)
-            .json(&RefreshTokenRequest {
-                refresh_token: old_refresh_token.to_string(),
-            })
-            .send()
-            .await
-            .expect("Failed to execute request.");
+
+        let body = RefreshTokenRequest {
+            refresh_token: old_refresh_token.to_string(),
+        };
+        let response = test_app.logout(old_access_token, &body).await;
+
         // this operation should successed even if refreshToken is invalid
         // logout is a safe operation
         assert!(response.status().is_success());
 
         // [7] Logout with valid refreshToken
-        let response = test_app
-            .client
-            .post(format!("{}/auth/logout", test_app.address))
-            .bearer_auth(new_access_token)
-            .json(&RefreshTokenRequest {
-                refresh_token: new_refresh_token.to_string(),
-            })
-            .send()
-            .await
-            .expect("Failed to execute request.");
+        let body = RefreshTokenRequest {
+            refresh_token: new_refresh_token.to_string(),
+        };
+        let response = test_app.logout(new_access_token, &body).await;
         assert!(response.status().is_success());
     }
 }

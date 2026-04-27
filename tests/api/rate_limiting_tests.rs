@@ -1,16 +1,13 @@
-mod shared;
-use shared::Helpers;
-
+use super::shared::Helpers;
 use crate::shared::EmailRequest;
 
 #[actix_web::test]
 async fn test_passing_rate_limits() {
     // Arrange
     let test_app = Helpers::init_config().await;
-    let client = reqwest::Client::new();
 
     // Create User
-    let response = Helpers::create_user(&test_app).await;
+    let response = test_app.register(None).await;
     assert!(response.status().is_success());
 
     let body = EmailRequest {
@@ -19,21 +16,11 @@ async fn test_passing_rate_limits() {
 
     // Act
     for _ in 0..5 {
-        let response = client
-            .post(format!("{}/auth/password/forgot", test_app.address))
-            .json(&body)
-            .send()
-            .await
-            .expect("Failed to execute request.");
+        let response = test_app.forgot_password(&body).await;
         assert!(response.status().is_success());
     }
 
-    let response = client
-        .post(format!("{}/auth/password/forgot", test_app.address))
-        .json(&body)
-        .send()
-        .await
-        .expect("Failed to execute request.");
+    let response = test_app.forgot_password(&body).await;
     // Assert
     assert_eq!(
         429,

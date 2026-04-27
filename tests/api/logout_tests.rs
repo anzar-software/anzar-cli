@@ -1,6 +1,5 @@
-mod shared;
+use super::shared::Helpers;
 use anzar::{config::AuthStrategy, scopes::auth::AuthResponse};
-use shared::Helpers;
 
 use crate::shared::RefreshTokenRequest;
 
@@ -9,11 +8,11 @@ async fn test_logout_success() {
     let test_app = Helpers::init_config().await;
 
     // Create User
-    let response = Helpers::create_user(&test_app).await;
+    let response = test_app.register(None).await;
     assert!(response.status().is_success());
 
     // Login
-    let response = Helpers::login(&test_app).await;
+    let response = test_app.login(None).await;
     assert!(response.status().is_success());
 
     let auth_response: AuthResponse = response.json().await.unwrap();
@@ -24,16 +23,10 @@ async fn test_logout_success() {
         let refresh_token: &str = &tokens.refresh;
 
         // Logout
-        let response = test_app
-            .client
-            .post(format!("{}/auth/logout", test_app.address))
-            .bearer_auth(&tokens.access)
-            .json(&RefreshTokenRequest {
-                refresh_token: refresh_token.to_string(),
-            })
-            .send()
-            .await
-            .expect("Failed to execute request.");
+        let body = RefreshTokenRequest {
+            refresh_token: refresh_token.to_string(),
+        };
+        let response = test_app.logout(&tokens.access, &body).await;
         assert!(response.status().is_success());
     }
 }
@@ -43,11 +36,11 @@ async fn test_logout_with_invalid_token() {
     let test_app = Helpers::init_config().await;
 
     // Create User
-    let response = Helpers::create_user(&test_app).await;
+    let response = test_app.register(None).await;
     assert!(response.status().is_success());
 
     // Login
-    let response = Helpers::login(&test_app).await;
+    let response = test_app.login(None).await;
     assert!(response.status().is_success());
 
     let auth_response: AuthResponse = response.json().await.unwrap();
@@ -57,16 +50,10 @@ async fn test_logout_with_invalid_token() {
     {
         let access_token: &str = &tokens.access;
 
-        let response = test_app
-            .client
-            .post(format!("{}/auth/logout", test_app.address))
-            .bearer_auth(access_token)
-            .json(&RefreshTokenRequest {
-                refresh_token: access_token.into(),
-            })
-            .send()
-            .await
-            .expect("Failed to execute request.");
+        let body = RefreshTokenRequest {
+            refresh_token: access_token.into(),
+        };
+        let response = test_app.logout(access_token, &body).await;
         assert_eq!(
             401,
             response.status().as_u16(),

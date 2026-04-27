@@ -1,16 +1,15 @@
-mod shared;
-use shared::{Helpers, InvalidTestCases};
+use super::shared::{Helpers, InvalidTestCases};
 
 #[actix_web::test]
 async fn test_login_success() {
     let test_app = Helpers::init_config().await;
 
     // Create User
-    let response = Helpers::create_user(&test_app).await;
+    let response = test_app.register(None).await;
     assert!(response.status().is_success());
 
     // Login
-    let response = Helpers::login(&test_app).await;
+    let response = test_app.login(None).await;
     assert!(response.status().is_success());
 }
 
@@ -21,13 +20,7 @@ async fn test_login_failure() {
 
     for (body, message, code) in InvalidTestCases::login_credentials().into_iter() {
         // Act
-        let response = test_app
-            .client
-            .post(format!("{}/auth/login", test_app.address))
-            .json(&body)
-            .send()
-            .await
-            .expect("Failed to execute request.");
+        let response = test_app.login(Some(body)).await;
 
         // Assert
         assert_eq!(

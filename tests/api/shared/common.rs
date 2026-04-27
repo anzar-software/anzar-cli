@@ -1,21 +1,18 @@
-use std::fs::File;
-use std::io::Write;
+use redis::TypedCommands;
 use std::net::TcpListener;
 use std::sync::LazyLock;
 
-use anzar::adapters::database::sqlite::SQLite;
-use anzar::config::AppConfig;
 use anzar::config::AppState;
-use anzar::scopes::auth::service::AuthService;
+use anzar::config::database::cache_driver::CacheDriver;
 
-use anzar::config::{AnzarConfiguration, AuthStrategy, Authentication, Database};
+use anzar::config::AnzarConfiguration;
 
+use crate::shared::TestApp;
 use anzar::telemetry::{get_subscriber, init_subscriber};
-use reqwest::Response;
 
 pub static TRACING: LazyLock<()> = LazyLock::new(|| {
     let subscriber_name = "test";
-    let default_filter_level = "debug".into();
+    let default_filter_level = "debug";
 
     if std::env::var("TEST_LOG").is_ok() {
         let subscriber = get_subscriber(subscriber_name, default_filter_level, std::io::stdout);
@@ -26,16 +23,22 @@ pub static TRACING: LazyLock<()> = LazyLock::new(|| {
     }
 });
 
-pub struct TestApp {
-    pub address: String,
-    pub client: reqwest::Client,
-    #[allow(dead_code)]
-    pub configuration: AnzarConfiguration,
-}
-
 pub struct Common;
 impl Common {
-    pub async fn spawn_app() -> Result<TestApp, std::io::Error> {
+    fn clean_cache(&self, configuration: &AnzarConfiguration) {
+        match configuration.database.cache.driver {
+            CacheDriver::MemCached => {
+                let client =
+                    memcache::Client::connect(configuration.database.cache.clone().url).unwrap();
+                client.flush().unwrap();
+            }
+            CacheDriver::Redis => {
+                let client = redis::Client::open(configuration.database.cache.clone().url).unwrap();
+                let _ = client.get_connection().unwrap().flushall();
+            }
+        }
+    }
+    pub async fn spawn_app(&self) -> Result<TestApp, std::io::Error> {
         //FIXME remove hardcoded jwt token from tests
         LazyLock::force(&TRACING);
 
@@ -56,6 +59,8 @@ impl Common {
             .expect("Failed to initiate reqwest Client");
 
         actix_web::rt::spawn(server);
+        self.clean_cache(&app_state.configuration);
+
         Ok(TestApp {
             address,
             client,

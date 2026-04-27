@@ -1,5 +1,3 @@
-mod shared;
-
 use crate::shared::Helpers;
 
 #[actix_web::test]

@@ -1,20 +1,16 @@
-mod shared;
-use shared::{Helpers, InvalidTestCases};
-
+use super::shared::{Helpers, InvalidTestCases, RefreshTokenRequest};
 use anzar::{config::AuthStrategy, scopes::auth::AuthResponse};
-
-use crate::shared::RefreshTokenRequest;
 
 #[actix_web::test]
 async fn test_refresh_token_success() {
     let test_app = Helpers::init_config().await;
 
     // Create User
-    let response = Helpers::create_user(&test_app).await;
+    let response = test_app.register(None).await;
     assert!(response.status().is_success());
 
     // Login
-    let response = Helpers::login(&test_app).await;
+    let response = test_app.login(None).await;
     assert!(response.status().is_success());
 
     let auth_response: AuthResponse = response.json().await.unwrap();
@@ -25,15 +21,10 @@ async fn test_refresh_token_success() {
         let refresh_token: &str = &tokens.refresh;
         assert!(!refresh_token.is_empty());
         // refresh access token
-        let response = test_app
-            .client
-            .post(format!("{}/auth/refresh-token", test_app.address))
-            .json(&RefreshTokenRequest {
-                refresh_token: refresh_token.to_string(),
-            })
-            .send()
-            .await
-            .expect("Failed to execute request.");
+        let body = RefreshTokenRequest {
+            refresh_token: refresh_token.to_string(),
+        };
+        let response = test_app.refresh(&body).await;
         assert!(response.status().is_success());
 
         let auth_response: AuthResponse = response.json().await.unwrap();
@@ -65,11 +56,11 @@ async fn test_refresh_with_invalid_token() {
     let test_app = Helpers::init_config().await;
 
     // Create User
-    let response = Helpers::create_user(&test_app).await;
+    let response = test_app.register(None).await;
     assert!(response.status().is_success());
 
     // Login
-    let response = Helpers::login(&test_app).await;
+    let response = test_app.login(None).await;
     assert!(response.status().is_success());
 
     let auth_response: AuthResponse = response.json().await.unwrap();
@@ -80,15 +71,10 @@ async fn test_refresh_with_invalid_token() {
         let valid_token: &str = &tokens.refresh;
 
         for (token, err_msg, status_code) in InvalidTestCases::refresh_tokens(valid_token) {
-            let response = test_app
-                .client
-                .post(format!("{}/auth/refresh-token", test_app.address))
-                .json(&RefreshTokenRequest {
-                    refresh_token: token.to_string(),
-                })
-                .send()
-                .await
-                .expect("Failed to execute request.");
+            let body = RefreshTokenRequest {
+                refresh_token: token.to_string(),
+            };
+            let response = test_app.refresh(&body).await;
 
             assert_eq!(
                 status_code,
@@ -105,11 +91,11 @@ async fn test_refresh_token_single_use() {
     let test_app = Helpers::init_config().await;
 
     // Create User
-    let response = Helpers::create_user(&test_app).await;
+    let response = test_app.register(None).await;
     assert!(response.status().is_success());
 
     // Login
-    let response = Helpers::login(&test_app).await;
+    let response = test_app.login(None).await;
     assert!(response.status().is_success());
 
     let auth_response: AuthResponse = response.json().await.unwrap();
@@ -120,27 +106,14 @@ async fn test_refresh_token_single_use() {
         let refresh_token: &str = &tokens.refresh;
 
         // refresh token
-        let response = test_app
-            .client
-            .post(format!("{}/auth/refresh-token", test_app.address))
-            .json(&RefreshTokenRequest {
-                refresh_token: refresh_token.to_string(),
-            })
-            .send()
-            .await
-            .expect("Failed to execute request.");
+        let body = RefreshTokenRequest {
+            refresh_token: refresh_token.to_string(),
+        };
+        let response = test_app.refresh(&body).await;
         assert!(response.status().is_success());
 
         // refresh token twice should fail
-        let response = test_app
-            .client
-            .post(format!("{}/auth/refresh-token", test_app.address))
-            .json(&RefreshTokenRequest {
-                refresh_token: refresh_token.to_string(),
-            })
-            .send()
-            .await
-            .expect("Failed to execute request.");
+        let response = test_app.refresh(&body).await;
         assert_eq!(
             401,
             response.status().as_u16(),
@@ -155,11 +128,11 @@ async fn test_refresh_token_route_using_access_token() {
     let test_app = Helpers::init_config().await;
 
     // Create User
-    let response = Helpers::create_user(&test_app).await;
+    let response = test_app.register(None).await;
     assert!(response.status().is_success());
 
     // Login
-    let response = Helpers::login(&test_app).await;
+    let response = test_app.login(None).await;
     assert!(response.status().is_success());
 
     let auth_response: AuthResponse = response.json().await.unwrap();
@@ -168,15 +141,10 @@ async fn test_refresh_token_route_using_access_token() {
         && let Some(tokens) = &auth_response.tokens
     {
         // refresh token
-        let response = test_app
-            .client
-            .post(format!("{}/auth/refresh-token", test_app.address))
-            .json(&RefreshTokenRequest {
-                refresh_token: tokens.access.clone(),
-            })
-            .send()
-            .await
-            .expect("Failed to execute request.");
+        let body = RefreshTokenRequest {
+            refresh_token: tokens.access.clone(),
+        };
+        let response = test_app.refresh(&body).await;
         assert_eq!(
             401,
             response.status().as_u16(),
