@@ -8,7 +8,7 @@ use validator::{Validate, ValidateArgs};
 
 use crate::{
     config::AuthStrategy,
-    error::{ConflictReason, CredentialField, Error, ErrorResponse, Result, ValidationError},
+    error::{ConflictReason, CredentialField, Error, ErrorResponse, Result},
     scopes::user::CreateUserOutcome,
     utils::HmacSigner,
 };
@@ -66,9 +66,13 @@ use super::support;
         ),
     )]
 #[tracing::instrument(
-    name = "Login user",
+    name = "auth.login"
     skip(req, auth_service, configuration, session),
-    fields(user_email = %req.email)
+    fields(
+        user.id = tracing::field::Empty,
+        user.email = %req.email,
+        login.attempted = true
+    )
 )]
 pub async fn login(
     AuthServiceExtractor(auth_service): AuthServiceExtractor,
@@ -100,13 +104,17 @@ pub async fn login(
     // Now handle responses
     // NOTE this can be removed, if it's not needed
     if configuration.auth.email.verification.required && !user.verified {
+        tracing::warn!(
+            user_id = %user.id()?,
+            error_code = "AuthError::AccountNotVerified",
+            "Email verification is enabled - Account not verified"
+        );
         return Err(Error::Unauthenticated(AuthError::AccountNotVerified));
     }
 
     match account_status {
         AccountStatus::Active => {
             // Issue new device cookie
-            tracing::info!("user logged in");
             let cookie = hmac_signer.issue(&req.email);
 
             match configuration.auth.strategy {
@@ -379,11 +387,7 @@ async fn request_password_reset(
 
     let result = async {
         let user = auth_service.find_user_by_email(&email).await?;
-        let user_id = user.id.as_ref().ok_or_else(|| {
-            Error::Validation(ValidationError::Malformed {
-                field: CredentialField::ObjectId,
-            })
-        })?;
+        let user_id = user.id()?;
 
         // 3.
         auth_service.revoke_password_reset_token(user_id).await?;
@@ -405,7 +409,7 @@ async fn request_password_reset(
             .await?;
 
         // 6.
-        let mut bucket = RATE_LIMITS.entry(user_id.clone()).or_default();
+        let mut bucket = RATE_LIMITS.entry(user_id.to_string()).or_default();
         bucket.run()?;
 
         let link = format!(
@@ -520,19 +524,19 @@ async fn submit_new_password(
 
     // 1. ReValidate token
     let reset_token = auth_service.validate_reset_password_token(token).await?;
-    let reset_token_id = reset_token.id.as_ref().ok_or_else(|| {
-        Error::Validation(ValidationError::Malformed {
-            field: CredentialField::ObjectId,
-        })
-    })?;
-
-    let user_id = reset_token.user_id;
+    let user_id = &reset_token.user_id;
+    let reset_token_id = reset_token.id()?;
 
     // NOTE → Rate limit per token
 
     // 2. Ensure password is different then previous
-    let account = auth_service.find_account(&user_id).await?;
+    let account = auth_service.find_account(user_id).await?;
     if account.locked {
+        tracing::warn!(
+            user_id = %user_id,
+            error_code = "ForbiddenReason::AccountSuspended",
+            "Account is suspended"
+        );
         return Err(Error::Forbidden(ForbiddenReason::AccountSuspended));
     }
     if Password::verify(&form.password, &account.password)? {
@@ -545,7 +549,7 @@ async fn submit_new_password(
     // 3.
     let hashed_password = Password::hash(&form.password)?;
     auth_service
-        .update_user_password(&user_id, &hashed_password)
+        .update_user_password(user_id, &hashed_password)
         .await?;
     tracing::info!("Password successfully reset for user: {}", user_id);
 
@@ -555,7 +559,7 @@ async fn submit_new_password(
         .await?;
 
     // 6. TODO it may not be neccessary
-    auth_service.logout_all(&user_id).await?;
+    auth_service.logout_all(user_id).await?;
 
     let success_redirect = match configuration.auth.password.reset.success_redirect {
         Some(url) => url,

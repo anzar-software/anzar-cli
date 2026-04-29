@@ -1,9 +1,13 @@
-use crate::error::{CredentialField, Error, Result, TokenErrorType, ValidationError};
+use crate::error::{Error, Result, TokenErrorType};
 use crate::scopes::auth::service::AuthService;
 use crate::scopes::email::model::EmailVerificationToken;
 use crate::utils::{SecureToken, TokenHasher};
 
 pub trait EmailVerificationTokenServiceTrait {
+    fn insert_email_verification_token(
+        &self,
+        otp: EmailVerificationToken,
+    ) -> impl Future<Output = Result<()>>;
     fn validate_email_verification_token(
         &self,
         token: &str,
@@ -14,12 +18,14 @@ pub trait EmailVerificationTokenServiceTrait {
         id: &str,
     ) -> impl Future<Output = Result<EmailVerificationToken>>;
     fn revoke_email_verification_token(&self, user_id: &str) -> impl Future<Output = Result<()>>;
-    fn insert_email_verification_token(
-        &self,
-        otp: EmailVerificationToken,
-    ) -> impl Future<Output = Result<()>>;
 }
 impl EmailVerificationTokenServiceTrait for AuthService {
+    #[tracing::instrument(name = "auth.insert_email_verification_token", skip(self, otp))]
+    async fn insert_email_verification_token(&self, otp: EmailVerificationToken) -> Result<()> {
+        self.email_verification_token_repository.insert(otp).await
+    }
+
+    #[tracing::instrument(name = "auth.validate_email_verification_token", skip(self, token))]
     async fn validate_email_verification_token(
         &self,
         token: &str,
@@ -28,11 +34,7 @@ impl EmailVerificationTokenServiceTrait for AuthService {
 
         // 2. Checks the database for a matching token
         let verification_token = self.email_verification_token_repository.find(&hash).await?;
-        let verification_token_id = verification_token.id.as_ref().ok_or_else(|| {
-            Error::Validation(ValidationError::Malformed {
-                field: CredentialField::ObjectId,
-            })
-        })?;
+        let verification_token_id = verification_token.id()?;
 
         // 3. Verify token isn't expired or already used
         if verification_token.used_at.is_some() {
@@ -57,6 +59,7 @@ impl EmailVerificationTokenServiceTrait for AuthService {
         Ok(verification_token)
     }
 
+    #[tracing::instrument(name = "auth.invalidate_email_verification_token", skip(self, id))]
     async fn invalidate_email_verification_token(
         &self,
         id: &str,
@@ -65,12 +68,11 @@ impl EmailVerificationTokenServiceTrait for AuthService {
             .invalidate(id)
             .await
     }
+
+    #[tracing::instrument(name = "auth.revoke_email_verification_token", skip(self), fields(user.id = user_id))]
     async fn revoke_email_verification_token(&self, user_id: &str) -> Result<()> {
         self.email_verification_token_repository
             .revoke(user_id)
             .await
-    }
-    async fn insert_email_verification_token(&self, otp: EmailVerificationToken) -> Result<()> {
-        self.email_verification_token_repository.insert(otp).await
     }
 }

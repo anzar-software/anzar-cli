@@ -11,7 +11,11 @@ impl MongoDB {
     pub async fn start(connection_string: &str) -> Result<mongodb::Client, Error> {
         let client = mongodb::Client::with_uri_str(&connection_string)
             .await
-            .map_err(|_| {
+            .map_err(|e| {
+                tracing::error!(
+                    error_code = "InternalError::Database",
+                    "Failed to connect to database - {e}"
+                );
                 Error::Internal(InternalError::Database(
                     NO_CLIENT.replace("{}", connection_string),
                 ))
@@ -25,12 +29,22 @@ impl MongoDB {
         mongodb_indexes
             .create_unique_email_index()
             .await
-            .map_err(|e| Error::Internal(InternalError::Database(e.to_string())))?;
+            .inspect_err(|e| {
+                tracing::error!(
+                    error_code = "InternalError::Database",
+                    "Failed to create index for email attribute in users Collection - {e}"
+                );
+            })?;
 
         mongodb_indexes
             .create_token_hash_index()
             .await
-            .map_err(|e| Error::Internal(InternalError::Database(e.to_string())))?;
+            .inspect_err(|e| {
+                tracing::error!(
+                    error_code = "InternalError::Database",
+                    "Failed to create index for email attribute in password_reset_tokens Collection - {e}"
+                );
+            })?;
 
         Ok(client)
     }

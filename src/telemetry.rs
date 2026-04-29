@@ -1,16 +1,16 @@
-use actix_web::{
-    body::MessageBody,
-    dev::{ServiceRequest, ServiceResponse},
-};
-use tracing::{Span, Subscriber, subscriber::set_global_default};
-use tracing_actix_web::{DefaultRootSpanBuilder, RootSpanBuilder};
+use tracing::Subscriber;
 use tracing_bunyan_formatter::{BunyanFormattingLayer, JsonStorageLayer};
-use tracing_log::LogTracer;
 use tracing_subscriber::{EnvFilter, Registry, fmt::MakeWriter, layer::SubscriberExt};
+
+use opentelemetry::global;
+use opentelemetry::trace::TracerProvider as _;
+use opentelemetry_otlp::WithExportConfig;
+use opentelemetry_sdk::Resource;
+use tracing_opentelemetry::OpenTelemetryLayer;
 
 pub fn get_subscriber<Sink>(
     name: &str,
-    env_filter: String,
+    env_filter: &str,
     sink: Sink,
 ) -> impl Subscriber + Send + Sync
 where
@@ -18,39 +18,35 @@ where
 {
     let env_filter =
         EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new(env_filter));
+
     let formatting_layer = BunyanFormattingLayer::new(name.into(), sink);
+
+    // 1. Build the OTLP exporter
+    let otlp_exporter = opentelemetry_otlp::SpanExporter::builder()
+        .with_http()
+        .with_protocol(opentelemetry_otlp::Protocol::HttpBinary)
+        .with_endpoint("http://localhost:4318/v1/traces")
+        .build()
+        .expect("Failed to build OTLP span exporter");
+
+    // 2. Build the tracer provider
+    let tracer_provider = opentelemetry_sdk::trace::SdkTracerProvider::builder()
+        .with_batch_exporter(otlp_exporter)
+        .with_resource(Resource::builder().with_service_name("anzar").build())
+        .build();
+
+    // 3. Register globally and get a tracer
+    global::set_tracer_provider(tracer_provider.clone());
+    let tracer = tracer_provider.tracer("anzar");
+
     Registry::default()
         .with(env_filter)
         .with(JsonStorageLayer)
         .with(formatting_layer)
+        .with(OpenTelemetryLayer::new(tracer))
 }
 
 pub fn init_subscriber(subscriber: impl Subscriber + Send + Sync) {
-    LogTracer::init().expect("Failed to set logger");
-    set_global_default(subscriber).expect("Failed to set subscriber");
-}
-
-pub struct CustomRootSpanBuilder;
-
-impl RootSpanBuilder for CustomRootSpanBuilder {
-    fn on_request_start(request: &ServiceRequest) -> Span {
-        // We rely on the Default builder for the standard HTTP fields
-        let root_span = DefaultRootSpanBuilder::on_request_start(request);
-
-        // We ask tracing to add these fields to the span, but leave them Empty for now.
-        // We will fill them inside our handlers.
-        tracing::info_span!(parent: root_span, "request",
-            user.id = tracing::field::Empty,
-            user.email = tracing::field::Empty,
-            login.attempted = tracing::field::Empty
-        )
-    }
-
-    fn on_request_end<B>(span: Span, outcome: &Result<ServiceResponse<B>, actix_web::Error>)
-    where
-        B: MessageBody,
-    {
-        // Capture the standard HTTP status logic
-        DefaultRootSpanBuilder::on_request_end(span, outcome);
-    }
+    // LogTracer::init().expect("Failed to set logger");
+    tracing::subscriber::set_global_default(subscriber).expect("Failed to set subscriber");
 }

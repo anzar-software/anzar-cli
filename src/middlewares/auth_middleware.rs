@@ -5,22 +5,19 @@ use actix_web::{
     dev::{ServiceRequest, ServiceResponse},
     http::header,
     middleware::Next,
-    web,
 };
 
-use crate::{config::AuthStrategy, extractors::Claims, scopes::auth::support};
-use crate::{
-    config::{AnzarConfiguration, AppState},
-    error::{CredentialField, ValidationError},
-};
-use crate::{error::InternalError, extract_service_response};
+use crate::extract_service_response;
+use crate::{config::AuthStrategy, extractors::Claims};
 
-use crate::scopes::auth::service::AuthService;
+use crate::scopes::auth::support as AuthSupport;
 use crate::services::session::{model::Session, service::SessionServiceTrait};
 use crate::{
     error::{Error as AuthError, TokenErrorType},
     services::jwt::JwtDecoder,
 };
+
+use super::support;
 
 fn extract_token_from_header(req: &ServiceRequest, key: String) -> Option<&str> {
     req.headers()
@@ -30,50 +27,31 @@ fn extract_token_from_header(req: &ServiceRequest, key: String) -> Option<&str> 
 }
 
 async fn find_session(req: &ServiceRequest, token: &str) -> Result<Session, AuthError> {
-    let auth_service = extract_auth_service(req)?;
+    let auth_service = support::extract_auth_service(req)?;
     auth_service.find_session(token).await
 }
 async fn update_session_expiray(req: &ServiceRequest, id: &str) -> Result<Session, AuthError> {
-    let auth_service = extract_auth_service(req)?;
+    let auth_service = support::extract_auth_service(req)?;
     auth_service.extend_timeout(id).await
 }
 
-fn extract_auth_service(req: &ServiceRequest) -> Result<AuthService, AuthError> {
-    req.app_data::<web::Data<AppState>>()
-        .map(|state| state.auth_service.clone())
-        .ok_or_else(|| {
-            AuthError::Internal(InternalError::MissingAppData(
-                "AppState not registered".into(),
-            ))
-        })
-}
-fn extract_configuration_service(req: &ServiceRequest) -> Result<AnzarConfiguration, AuthError> {
-    req.app_data::<web::Data<AppState>>()
-        .map(|state| state.configuration.clone())
-        .ok_or_else(|| {
-            AuthError::Internal(InternalError::MissingAppData(
-                "AppState not registered".into(),
-            ))
-        })
-}
-
 async fn validate_token(req: &ServiceRequest) -> Result<(), Error> {
-    let configuration = extract_configuration_service(req)?;
+    let configuration = support::extract_configuration_service(req)?;
 
     match configuration.auth.strategy {
         AuthStrategy::Session => {
             let req_session = req.get_session();
-            let data = req_session.get::<String>(support::SESSION_COOKIE)?;
+            let data = req_session.get::<String>(AuthSupport::SESSION_COOKIE)?;
 
             if let Some(token) = data {
                 let session = find_session(req, &token).await?;
-                let session_id = session.id.as_ref().ok_or(AuthError::Validation(
-                    ValidationError::Malformed {
-                        field: CredentialField::Token,
-                    },
-                ))?;
+                let session_id = session.id()?;
 
                 if session.used_at.is_some() {
+                    tracing::error!(
+                        error.code = "AuthError::TokenReplay",
+                        "Session token was already used"
+                    );
                     return Err(
                         AuthError::Unauthenticated(crate::error::AuthError::TokenReplay {
                             token_type: TokenErrorType::SessionToken,
@@ -83,6 +61,10 @@ async fn validate_token(req: &ServiceRequest) -> Result<(), Error> {
                 }
 
                 if chrono::Utc::now() > session.expires_at {
+                    tracing::error!(
+                        error.code = "AuthError::TokenExpired",
+                        "Session token is expired"
+                    );
                     return Err(AuthError::Unauthenticated(
                         crate::error::AuthError::TokenExpired {
                             token_type: TokenErrorType::SessionToken,
@@ -103,6 +85,10 @@ async fn validate_token(req: &ServiceRequest) -> Result<(), Error> {
             if let Some(token) = access_token {
                 let claims: Claims = JwtDecoder::new(token, &configuration).decode()?;
                 if claims.token_type != crate::extractors::TokenType::AccessToken {
+                    tracing::error!(
+                        error.code = "AuthError::TokenInvalid",
+                        "Expected an AccessToken, got a RefreshToken"
+                    );
                     return Err(AuthError::Unauthenticated(
                         crate::error::AuthError::TokenInvalid {
                             token_type: TokenErrorType::AccessToken,
@@ -112,10 +98,7 @@ async fn validate_token(req: &ServiceRequest) -> Result<(), Error> {
                 }
 
                 req.extensions_mut().insert::<Claims>(claims.clone());
-
-                let message =
-                    format!("successful authentication with user_id:{}", claims.sub).to_string();
-                tracing::info!(message);
+                tracing::info!(user.id = %claims.sub, "User authenticated successfully");
             }
         }
     };

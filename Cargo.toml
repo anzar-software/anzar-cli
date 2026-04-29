@@ -72,11 +72,15 @@ rustls-pemfile = "2.2.0"
 
 # Tracing
 tracing = { version = "0.1.40", features = ["log"] }
-tracing-log = "0.2.0"
 tracing-bunyan-formatter = "0.3.9"
 tracing-subscriber = { version = "0.3.18", features = ["registry", "env-filter"] }
 tracing-actix-web = "0.7.14"
 thiserror = "2.0.18"
+
+tracing-opentelemetry = "0.32"
+opentelemetry-otlp = { version = "0.31", features = ["tonic"] }
+opentelemetry_sdk = "0.31"
+
 
 rand = "0.9.1"
 validator = { version = "0.20.0", features = ["derive"] }
@@ -87,6 +91,7 @@ secrecy = { version = "0.10.3", features = ["serde"] }
 
 utoipa = { version = "5.4.0", features = ["chrono", "actix_extras", "yaml"] }
 utoipa-swagger-ui = { version = "9.0.2", features = ["actix-web", "vendored"] }
+opentelemetry = "0.31.0"
 
 
 [dev-dependencies]

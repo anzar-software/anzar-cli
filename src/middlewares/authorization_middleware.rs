@@ -3,51 +3,30 @@ use actix_web::{
     body::BoxBody,
     dev::{ServiceRequest, ServiceResponse},
     middleware::Next,
-    web,
 };
 
-use crate::{
-    config::{AnzarConfiguration, AppState},
-    error::{ForbiddenReason, InternalError},
-    extract_service_response,
-};
+use crate::{error::ForbiddenReason, extract_service_response};
 use crate::{
     error::{Error as AuthError, TokenErrorType},
     services::account::service::AccountServiceTrait,
 };
 
-use crate::scopes::{
-    auth::service::AuthService,
-    user::{User, service::UserServiceTrait},
-};
+use super::support;
+use crate::scopes::user::{User, service::UserServiceTrait};
 use crate::{extractors::Claims, services::session::model::Session};
 
-fn extract_auth_service(req: &ServiceRequest) -> Result<AuthService, AuthError> {
-    req.app_data::<web::Data<AppState>>()
-        .map(|state| state.auth_service.clone())
-        .ok_or_else(|| {
-            AuthError::Internal(InternalError::MissingAppData(
-                "AppState not registered".into(),
-            ))
-        })
-}
-fn extract_configuration_service(req: &ServiceRequest) -> Result<AnzarConfiguration, AuthError> {
-    req.app_data::<web::Data<AppState>>()
-        .map(|state| state.configuration.clone())
-        .ok_or_else(|| {
-            AuthError::Internal(InternalError::MissingAppData(
-                "AppState not registered".into(),
-            ))
-        })
-}
-
 async fn validate_user(req: &ServiceRequest, user_id: &str) -> Result<User, AuthError> {
-    let auth_service = extract_auth_service(req)?;
+    let auth_service = support::extract_auth_service(req)?;
 
     let user: User = auth_service.find_user(user_id).await?;
     let account = auth_service.find_account(user_id).await?;
 
     if account.locked {
+        tracing::warn!(
+            user.id = %user_id,
+            error.code = "ForbiddenReason::AccountSuspended",
+            "Account is suspended"
+        );
         return Err(AuthError::Forbidden(ForbiddenReason::AccountSuspended));
     }
 
@@ -55,7 +34,7 @@ async fn validate_user(req: &ServiceRequest, user_id: &str) -> Result<User, Auth
 }
 
 fn extract_user_id_from_extensions(req: &ServiceRequest) -> Result<String, AuthError> {
-    let configuration = extract_configuration_service(req)?;
+    let configuration = support::extract_configuration_service(req)?;
 
     match configuration.auth.strategy {
         crate::config::AuthStrategy::Session => {
@@ -63,6 +42,10 @@ fn extract_user_id_from_extensions(req: &ServiceRequest) -> Result<String, AuthE
                 return Ok(session.user_id.clone());
             }
 
+            tracing::error!(
+                error.code = "AuthError::TokenInvalid",
+                "Session token was not saved in actix extenstion"
+            );
             Err(AuthError::Unauthenticated(
                 crate::error::AuthError::TokenInvalid {
                     token_type: TokenErrorType::SessionToken,
@@ -74,6 +57,10 @@ fn extract_user_id_from_extensions(req: &ServiceRequest) -> Result<String, AuthE
                 return Ok(claims.sub.clone());
             }
 
+            tracing::error!(
+                error.code = "AuthError::TokenInvalid",
+                "Access token (Claims) was not saved in actix extenstion"
+            );
             Err(AuthError::Unauthenticated(
                 crate::error::AuthError::TokenInvalid {
                     token_type: TokenErrorType::AccessToken,

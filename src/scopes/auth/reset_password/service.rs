@@ -1,4 +1,4 @@
-use crate::error::{AuthError, CredentialField, Error, Result, TokenErrorType, ValidationError};
+use crate::error::{AuthError, Error, Result, TokenErrorType};
 use crate::scopes::auth::model::PasswordResetToken;
 use crate::scopes::auth::service::AuthService;
 use crate::utils::{SecureToken, TokenHasher};
@@ -20,17 +20,19 @@ pub trait PasswordResetTokenServiceTrait {
     ) -> impl Future<Output = Result<String>>;
 }
 impl PasswordResetTokenServiceTrait for AuthService {
+    #[tracing::instrument(name = "auth.insert_password_reset_token", skip(self, otp))]
+    async fn insert_password_reset_token(&self, otp: PasswordResetToken) -> Result<String> {
+        self.password_reset_token_repository.insert(otp).await
+    }
+
+    #[tracing::instrument(name = "auth.validate_reset_password_token", skip(self, token))]
     async fn validate_reset_password_token(&self, token: &str) -> Result<PasswordResetToken> {
         let hash = SecureToken::hash(token);
         // FIXME: → Must check hash + expiry + not revoked in one DB transaction.
 
         // 2. Checks the database for a matching token
         let reset_token = self.password_reset_token_repository.find(&hash).await?;
-        let reset_token_id = reset_token.id.as_ref().ok_or_else(|| {
-            Error::Validation(ValidationError::Malformed {
-                field: CredentialField::ObjectId,
-            })
-        })?;
+        let reset_token_id = reset_token.id()?;
 
         // 3. Verify token isn't expired
         if reset_token.used_at.is_some() {
@@ -52,13 +54,15 @@ impl PasswordResetTokenServiceTrait for AuthService {
         Ok(reset_token)
     }
 
+    #[tracing::instrument(name = "auth.invalidate_password_reset_token", skip(self, id))]
     async fn invalidate_password_reset_token(&self, id: &str) -> Result<PasswordResetToken> {
         self.password_reset_token_repository.invalidate(id).await
     }
+
+    #[tracing::instrument(
+        name = "auth.revoke_password_reset_token", skip(self), fields(user.id = user_id)
+    )]
     async fn revoke_password_reset_token(&self, user_id: &str) -> Result<()> {
         self.password_reset_token_repository.revoke(user_id).await
-    }
-    async fn insert_password_reset_token(&self, otp: PasswordResetToken) -> Result<String> {
-        self.password_reset_token_repository.insert(otp).await
     }
 }

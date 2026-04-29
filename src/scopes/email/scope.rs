@@ -4,14 +4,13 @@ use actix_web::{
 };
 
 use crate::{
-    error::{CredentialField, Error, ValidationError},
-    extractors::{AuthServiceExtractor, ValidatedQuery},
-    scopes::auth::TokenQuery,
-};
-use crate::{
     error::{ErrorResponse, Result},
     extractors::ConfigurationExtractor,
     scopes::{email::service::EmailVerificationTokenServiceTrait, user::service::UserServiceTrait},
+};
+use crate::{
+    extractors::{AuthServiceExtractor, ValidatedQuery},
+    scopes::auth::TokenQuery,
 };
 
 #[utoipa::path(
@@ -45,13 +44,7 @@ async fn verify_email(
         .validate_email_verification_token(&token)
         .await?;
 
-    let verification_token_id = email_verificaiton_token
-        .id
-        .as_ref()
-        .ok_or(Error::Validation(ValidationError::Missing {
-            field: CredentialField::ObjectId,
-        }))?;
-
+    let verification_token_id = email_verificaiton_token.id()?;
     auth_service
         .invalidate_email_verification_token(verification_token_id)
         .await?;

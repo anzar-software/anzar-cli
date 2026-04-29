@@ -12,6 +12,7 @@ app/cert/
 app/anzar.yml
 compose.yml
 migrations/
+logs/
 
 entrypoint.sh
 TODO.md

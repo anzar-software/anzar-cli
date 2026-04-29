@@ -3,7 +3,7 @@ use std::sync::Arc;
 use super::User;
 use crate::{
     adapters::{cache::CacheAdapter, database::DatabaseAdapter},
-    error::{CredentialField, Error, ResourceKind, Result, ValidationError},
+    error::{CredentialField, Error, InternalError, ResourceKind, Result, ValidationError},
     utils::query::QueryBuilder,
 };
 
@@ -30,71 +30,70 @@ impl UserRepository {
     }
     pub async fn put_cookie_in_lockout(&self, key: &str, expiration: u64) -> Result<()> {
         self.cache
-            .insert(
-                &format!("lockout:{}", key),
-                "locked".to_string(),
-                expiration,
-            )
+            .insert(&format!("lockout:{}", key), "locked", expiration)
             .await
     }
     pub async fn is_locked(&self, key: &str) -> bool {
         self.cache.find_one(key).await.is_ok_and(|v| v.is_some())
     }
     pub async fn reset_attempts(&self, key: &str) -> Result<()> {
-        self.cache.update(key, "0".to_string(), 1000000).await
+        self.cache.update(key, "0", 1000000).await
     }
     pub async fn clear_key(&self, key: &str) -> Result<()> {
         self.cache.delete_one(key).await
     }
 
     // Database
+    #[tracing::instrument(
+        name = "db.user.insert",
+        skip(self, user),
+        fields(db.table = "users", db.operation = "INSERT")
+    )]
     pub async fn insert(&self, user: &User) -> Result<String> {
-        self.adapter.insert(user.to_owned()).await.map_err(|_| {
-            Error::Unauthenticated(crate::error::AuthError::InvalidCredentials {
-                field: CredentialField::Email,
-            })
-        })
-        // match self.adapter.insert(account).await {
-        //     Ok(_id) => Ok(()),
-        //     Err(err) => {
-        //         tracing::error!("Failed to insert Account to database");
-        //         Err(err)
-        //     }
-        // }
+        match self.adapter.insert(user.to_owned()).await {
+            Ok(id) => Ok(id),
+            Err(e) => {
+                tracing::error!("Failed to insert user to database - {e}");
+                Err(Error::Internal(InternalError::Database(e.to_string())))
+            }
+        }
     }
 
+    #[tracing::instrument(name = "db.user.find", skip(self, user_id))]
     pub async fn find(&self, user_id: &str) -> Result<User> {
         let filter = QueryBuilder::default().eq("id", user_id);
 
         match self.adapter.find_one(filter).await {
             Ok(Some(user)) => Ok(user),
-            Ok(None) => {
-                tracing::error!("Failed to find user by id: {}", user_id);
-                Err(Error::NotFound(ResourceKind::User {
-                    id: Some(user_id.into()),
-                    email: None,
-                }))
+            Ok(None) => Err(Error::NotFound(ResourceKind::User {
+                id: Some(user_id.into()),
+                email: None,
+            })),
+            Err(err) => {
+                tracing::error!(error_code = "InternalError::Database", error = %err, "Database query failed");
+                Err(err)
             }
-            Err(err) => Err(err),
         }
     }
 
+    #[tracing::instrument(name = "db.user.find_by_email", skip(self, email))]
     pub async fn find_by_email(&self, email: &str) -> Result<User> {
         let filter = QueryBuilder::default().eq("email", email);
 
         match self.adapter.find_one(filter).await {
             Ok(Some(user)) => Ok(user),
-            Ok(None) => {
-                tracing::error!("Failed to find user by email");
-                Err(Error::NotFound(ResourceKind::User {
-                    id: None,
-                    email: Some(email.into()),
-                }))
+            Ok(None) => Err(Error::NotFound(ResourceKind::User {
+                id: None,
+                email: Some(email.into()),
+            })),
+            Err(err) => {
+                tracing::error!(error_code = "InternalError::Database", error = %err, "Database query failed");
+                Err(err)
             }
-            Err(err) => Err(err),
         }
     }
 
+    #[tracing::instrument(name = "db.user.validate_account", skip(self, user_id))]
     pub async fn validate_account(&self, user_id: &str) -> Result<User> {
         let filter = QueryBuilder::default().eq("id", user_id);
         let update = QueryBuilder::default().set("verified", true);
@@ -104,7 +103,10 @@ impl UserRepository {
             Ok(None) => Err(Error::Validation(ValidationError::Missing {
                 field: CredentialField::ObjectId,
             })),
-            Err(err) => Err(err),
+            Err(err) => {
+                tracing::error!(error_code = "InternalError::Database", error = %err, "Database query failed");
+                Err(err)
+            }
         }
     }
 }

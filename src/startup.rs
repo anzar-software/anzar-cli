@@ -22,6 +22,7 @@ pub async fn run(listener: TcpListener, app_state: AppState) -> Result<Server, s
         let app = App::new();
 
         app.wrap(TracingLogger::default())
+            // .wrap(TracingLogger::<CustomRootSpanBuilder>::new())
             .wrap(server::configure_cors(&app_state.configuration))
             .wrap(server::configure_cookie_session(&app_state.configuration))
             // match &app_state.configuration.database.cache.driver {
@@ -55,7 +56,7 @@ pub async fn run(listener: TcpListener, app_state: AppState) -> Result<Server, s
 
     let server = match (&https_cfg.cert_path, &https_cfg.key_path) {
         (Some(cert), Some(key)) => {
-            let tls_config = server::configure_tls(cert.into(), key.into())?;
+            let tls_config = server::configure_tls(cert, key)?;
             tracing::info!("HTTPS enabled");
             http_server.listen_rustls_0_23(listener, tls_config)?.run()
         }

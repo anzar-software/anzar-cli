@@ -16,7 +16,7 @@ impl RedisAdapter {
 
 #[async_trait]
 impl CacheAdapter for RedisAdapter {
-    async fn insert(&self, key: &str, value: String, expiration: u64) -> Result<(), Error> {
+    async fn insert(&self, key: &str, value: &str, expiration: u64) -> Result<(), Error> {
         self.connection
             .clone()
             .set_ex(key, value, expiration)
@@ -28,7 +28,7 @@ impl CacheAdapter for RedisAdapter {
         self.connection.clone().get(key).await.map_err(|e| e.into())
     }
 
-    async fn update(&self, key: &str, value: String, expiration: u64) -> Result<(), Error> {
+    async fn update(&self, key: &str, value: &str, expiration: u64) -> Result<(), Error> {
         self.connection
             .clone()
             .set_ex(key, value, expiration)

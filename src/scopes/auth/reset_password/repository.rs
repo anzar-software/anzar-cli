@@ -20,16 +20,20 @@ impl PasswordResetTokenRepository {
         Self { adapter }
     }
 
+    #[tracing::instrument(name = "db.password_reset_token.insert", skip(self, otp))]
     pub async fn insert(&self, otp: PasswordResetToken) -> Result<String> {
         match self.adapter.insert(otp).await {
             Ok(id) => Ok(id),
             Err(err) => {
                 tracing::error!("Failed to insert password reset token to database");
-                Err(err)
+                Err(Error::Internal(InternalError::Database(err.to_string())))
             }
         }
     }
 
+    #[tracing::instrument(
+        name = "db.password_reset_token.revoke", skip(self), fields(user.id = user_id)
+    )]
     pub async fn revoke(&self, user_id: &str) -> Result<()> {
         let filter = QueryBuilder::default().eq("userId", user_id);
         // FIXME delete instead
@@ -38,14 +42,14 @@ impl PasswordResetTokenRepository {
         self.adapter
             .update_many(filter, update)
             .await
-            .map_err(|e| {
-                tracing::error!("Failed to revoke password tokens: {:?}", e);
-                InternalError::Database(e.to_string())
+            .inspect_err(|err| {
+                tracing::error!(error_code = "InternalError::Database", error = %err, "Database query failed");
             })?;
 
         Ok(())
     }
 
+    #[tracing::instrument(name = "db.password_reset_token.find", skip(self, token))]
     pub async fn find(&self, token: &str) -> Result<PasswordResetToken> {
         // "expiresAt": {
         //     "$lt": Utc::now().to_string()
@@ -57,10 +61,14 @@ impl PasswordResetTokenRepository {
             Ok(None) => Err(Error::Unauthenticated(AuthError::TokenInvalid {
                 token_type: TokenErrorType::PasswordResetToken,
             })),
-            Err(err) => Err(err),
+            Err(err) => {
+                tracing::error!(error_code = "InternalError::Database", error = %err, "Database query failed");
+                Err(err)
+            }
         }
     }
 
+    #[tracing::instrument(name = "db.password_reset_token.invalidate", skip(self, id))]
     pub async fn invalidate(&self, id: &str) -> Result<PasswordResetToken> {
         let filter = QueryBuilder::default().eq("id", id);
         let update = QueryBuilder::default().set("usedAt", Utc::now());
@@ -70,7 +78,10 @@ impl PasswordResetTokenRepository {
             Ok(None) => Err(Error::Unauthenticated(AuthError::TokenInvalid {
                 token_type: TokenErrorType::PasswordResetToken,
             })),
-            Err(err) => Err(err),
+            Err(err) => {
+                tracing::error!(error_code = "InternalError::Database", error = %err, "Database query failed");
+                Err(err)
+            }
         }
     }
 }

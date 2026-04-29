@@ -2,6 +2,7 @@ mod auth_middleware;
 mod authorization_middleware;
 mod content_type_middleware;
 mod macros;
+mod support;
 
 pub mod rate_limiting;
 

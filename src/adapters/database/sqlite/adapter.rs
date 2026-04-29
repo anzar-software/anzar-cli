@@ -84,7 +84,6 @@ where
             "UPDATE {} SET {} WHERE {} RETURNING *",
             self.table, set_clause, where_clause
         );
-        dbg!(&sql);
         let mut query = sqlx::query_as::<_, T>(&sql);
 
         for v in update_values.into_iter().chain(filter_values) {

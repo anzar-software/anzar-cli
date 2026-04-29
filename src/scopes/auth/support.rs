@@ -14,7 +14,7 @@ pub async fn delay(attempts: u32) {
 pub async fn throttle_since(start: std::time::Instant) {
     const TIMING_DELAY_MS: u64 = 1500;
 
-    let jitter = rand::rng().random_range(0..=20); // +/- 20ms
+    let jitter = rand::rng().random_range(0..=200); // +/- 200ms
     let elapsed = start.elapsed().as_millis() as u64;
     let delay = TIMING_DELAY_MS.saturating_sub(elapsed) + jitter;
 

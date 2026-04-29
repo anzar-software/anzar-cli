@@ -1,5 +1,6 @@
 use std::sync::Arc;
 
+use crate::error::InternalError;
 use crate::utils::query::QueryBuilder;
 use crate::{
     adapters::database::DatabaseAdapter,
@@ -19,16 +20,18 @@ impl EmailVerificationTokenRepository {
         Self { adapter }
     }
 
+    #[tracing::instrument(name = "db.email.insert", skip(self, otp))]
     pub async fn insert(&self, otp: EmailVerificationToken) -> Result<()> {
         match self.adapter.insert(otp).await {
             Ok(_id) => Ok(()),
-            Err(err) => {
-                tracing::error!("Failed to insert email verification token to database");
-                Err(err)
+            Err(e) => {
+                tracing::error!("Failed to insert user to database - {e}");
+                Err(Error::Internal(InternalError::Database(e.to_string())))
             }
         }
     }
 
+    #[tracing::instrument(name = "db.email.find", skip(self, hash))]
     pub async fn find(&self, hash: &str) -> Result<EmailVerificationToken> {
         let filter = QueryBuilder::default().eq("token", hash);
 
@@ -39,10 +42,14 @@ impl EmailVerificationTokenRepository {
                     token_type: TokenErrorType::EmailVerificationToken,
                 },
             )),
-            Err(err) => Err(err),
+            Err(err) => {
+                tracing::error!(error_code = "InternalError::Database", error = %err, "Database query failed");
+                Err(err)
+            }
         }
     }
 
+    #[tracing::instrument(name = "db.email.invalidate", skip(self, id))]
     pub async fn invalidate(&self, id: &str) -> Result<EmailVerificationToken> {
         let filter = QueryBuilder::default().eq("id", id);
         let update = QueryBuilder::default().set("usedAt", Utc::now());
@@ -54,23 +61,25 @@ impl EmailVerificationTokenRepository {
                     token_type: TokenErrorType::EmailVerificationToken,
                 },
             )),
-            Err(err) => Err(err),
+            Err(err) => {
+                tracing::error!(error_code = "InternalError::Database", error = %err, "Database query failed");
+                Err(err)
+            }
         }
     }
 
+    #[tracing::instrument(name = "db.email.revoke", skip(self), fields(user.id = user_id))]
     pub async fn revoke(&self, user_id: &str) -> Result<()> {
         let filter = QueryBuilder::default().eq("userId", user_id);
         // FIXME delete tokens not update
         let update = QueryBuilder::default().set("usedAt", Utc::now());
 
-        self.adapter
-            .update_many(filter, update)
-            .await
-            .map_err(|e| {
-                tracing::error!("Failed to revoke email verification tokens: {:?}", e);
-                e
-            })?;
-
-        Ok(())
+        match self.adapter.update_many(filter, update).await {
+            Ok(_) => Ok(()),
+            Err(err) => {
+                tracing::error!(error_code = "InternalError::Database", error = %err, "Database query failed");
+                Err(err)
+            }
+        }
     }
 }

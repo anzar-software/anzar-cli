@@ -1,5 +1,5 @@
 use crate::config::AnzarConfiguration;
-use crate::error::{AuthError, CredentialField, Error, Result, TokenErrorType, ValidationError};
+use crate::error::{AuthError, Error, Result, TokenErrorType};
 use crate::extractors::{Claims, TokenType};
 use crate::scopes::auth::service::AuthService;
 use crate::scopes::user::User;
@@ -28,6 +28,10 @@ pub trait JwtServiceTrait {
     fn find_jwt_by_jti(&self, jti: &str) -> impl Future<Output = Result<RefreshToken>>;
 }
 impl JwtServiceTrait for AuthService {
+    #[tracing::instrument(
+        name = "auth.consume_refresh_token",
+        skip(self, refresh_token, configuration)
+    )]
     async fn consume_refresh_token(
         &self,
         refresh_token: &str,
@@ -55,17 +59,16 @@ impl JwtServiceTrait for AuthService {
 
         Ok(claims.sub)
     }
+
+    #[tracing::instrument(
+        name = "auth.issue_jwt", skip(self, user, configuration), fields(user.id = user.id)
+    )]
     async fn issue_jwt(
         &self,
         user: &User,
         configuration: &AnzarConfiguration,
     ) -> Result<IssuedTokens> {
-        let user_id = user
-            .id
-            .as_ref()
-            .ok_or(Error::Validation(ValidationError::Malformed {
-                field: CredentialField::ObjectId,
-            }))?;
+        let user_id = user.id()?;
 
         let tokens: IssuedTokens = JwtEncoder::new(user, configuration).encode()?;
 
@@ -77,6 +80,7 @@ impl JwtServiceTrait for AuthService {
         Ok(tokens)
     }
 
+    #[tracing::instrument(name = "auth.invalidate_jwt", skip(self, refresh_token, configuration))]
     async fn invalidate_jwt(
         &self,
         refresh_token: &str,
@@ -99,12 +103,14 @@ impl JwtServiceTrait for AuthService {
     //     self.session_service.revoke(&payload.user_id).await?;
     //     Ok(())
     // }
+    #[tracing::instrument(name = "auth.logout_all", skip(self), fields(user.id = user_id))]
     async fn logout_all(&self, user_id: &str) -> Result<()> {
         self.jwt_repository.revoke(user_id).await?;
         self.session_repository.revoke(user_id).await?;
         Ok(())
     }
 
+    #[tracing::instrument(name = "auth.find_jwt_by_jti", skip(self, jti))]
     async fn find_jwt_by_jti(&self, jti: &str) -> Result<RefreshToken> {
         self.jwt_repository.find_by_jti(jti).await
     }

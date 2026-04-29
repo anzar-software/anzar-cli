@@ -1,4 +1,4 @@
-use crate::error::{CredentialField, Error, Result, ValidationError};
+use crate::error::Result;
 use crate::utils::{SecureToken, TokenHasher};
 use crate::{
     scopes::{auth::service::AuthService, user::User},
@@ -13,12 +13,11 @@ pub trait SessionServiceTrait {
     fn extend_timeout(&self, session_id: &str) -> impl Future<Output = Result<Session>>;
 }
 impl SessionServiceTrait for AuthService {
+    #[tracing::instrument(
+        name = "auth.issue_session", skip(self), fields(user.id = user.id)
+    )]
     async fn issue_session(&self, user: &User) -> Result<String> {
-        let user_id = user.id.as_ref().ok_or_else(|| {
-            Error::Validation(ValidationError::Malformed {
-                field: CredentialField::ObjectId,
-            })
-        })?;
+        let user_id = user.id()?;
 
         self.session_repository.revoke(user_id).await?;
 
@@ -32,14 +31,19 @@ impl SessionServiceTrait for AuthService {
 
         Ok(token)
     }
+
+    #[tracing::instrument(name = "auth.find_session", skip(self, token))]
     async fn find_session(&self, token: &str) -> Result<Session> {
         self.session_repository.find(token).await
     }
 
+    #[tracing::instrument(name = "auth.invalidate_session", skip(self, token))]
     async fn invalidate_session(&self, token: &str) -> Result<()> {
         self.session_repository.invalidate(token).await?;
         Ok(())
     }
+
+    #[tracing::instrument(name = "auth.extend_timeout", skip(self, session_id))]
     async fn extend_timeout(&self, session_id: &str) -> Result<Session> {
         self.session_repository.extend_timeout(session_id).await
     }

@@ -8,7 +8,13 @@ impl PostgreSQL {
         let pool = PgPoolOptions::new()
             .max_connections(5)
             .connect(conn)
-            .await?;
+            .await
+            .inspect_err(|e| {
+                tracing::error!(
+                    error_code = "InternalError::Database",
+                    "Failed to connect to database - {e}"
+                );
+            })?;
 
         Ok(pool)
     }

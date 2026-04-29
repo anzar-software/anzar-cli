@@ -15,7 +15,7 @@ impl MemCacheAdapter {
 
 #[async_trait]
 impl CacheAdapter for MemCacheAdapter {
-    async fn insert(&self, key: &str, value: String, expiration: u64) -> Result<(), Error> {
+    async fn insert(&self, key: &str, value: &str, expiration: u64) -> Result<(), Error> {
         self.client
             .add(key, value, expiration as u32)
             .map_err(|e| e.into())
@@ -25,7 +25,7 @@ impl CacheAdapter for MemCacheAdapter {
         self.client.get::<String>(key).map_err(|e| e.into())
     }
 
-    async fn update(&self, key: &str, value: String, expiration: u64) -> Result<(), Error> {
+    async fn update(&self, key: &str, value: &str, expiration: u64) -> Result<(), Error> {
         self.client
             .replace(key, value, expiration as u32)
             .map_err(|e| e.into())

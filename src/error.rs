@@ -142,7 +142,7 @@ impl From<validator::ValidationError> for Error {
 
 #[derive(thiserror::Error, Debug)]
 pub enum InternalError {
-    #[error("database error: {0}")]
+    #[error("{0}")]
     Database(String),
 
     #[error("hashing failure")]

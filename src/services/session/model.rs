@@ -68,6 +68,19 @@ impl Session {
         self
     }
 }
+impl Session {
+    pub fn id(&self) -> Result<&str, crate::error::Error> {
+        self.id.as_deref().ok_or_else(|| {
+            tracing::error!(
+                error_code = "ValidationError::Malformed",
+                "Unexpected null/missing data"
+            );
+            crate::error::Error::Validation(crate::error::ValidationError::Malformed {
+                field: crate::error::CredentialField::ObjectId,
+            })
+        })
+    }
+}
 
 impl FromRequest for Session {
     type Error = Error;
