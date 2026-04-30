@@ -2,6 +2,7 @@ use actix_web::{
     HttpResponse, Scope,
     web::{self},
 };
+use secrecy::ExposeSecret;
 
 use crate::{
     error::{ErrorResponse, Result},
@@ -41,7 +42,7 @@ async fn verify_email(
     let token = query.token;
 
     let email_verificaiton_token = auth_service
-        .validate_email_verification_token(&token)
+        .validate_email_verification_token(token.expose_secret())
         .await?;
 
     let verification_token_id = email_verificaiton_token.id()?;

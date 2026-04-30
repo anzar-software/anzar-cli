@@ -4,6 +4,7 @@ use actix_web::{
     web::{self},
 };
 
+use secrecy::ExposeSecret;
 use validator::{Validate, ValidateArgs};
 
 use crate::{
@@ -299,10 +300,8 @@ pub async fn refresh_token(
     AuthServiceExtractor(auth_service): AuthServiceExtractor,
     ConfigurationExtractor(configuration): ConfigurationExtractor,
 ) -> Result<HttpResponse> {
-    tracing::info!("user is refreshing token");
-
     let user_id = auth_service
-        .consume_refresh_token(&req.0.refresh_token, &configuration)
+        .consume_refresh_token(req.0.refresh_token.expose_secret(), &configuration)
         .await?;
 
     let user: User = auth_service.find_user(&user_id).await?;
@@ -349,7 +348,7 @@ async fn logout(
         AuthStrategy::Session => auth_service.invalidate_session(&session.token).await,
         AuthStrategy::Jwt => {
             auth_service
-                .invalidate_jwt(&req.0.refresh_token, &configuration)
+                .invalidate_jwt(req.0.refresh_token.expose_secret(), &configuration)
                 .await
         }
     };
@@ -456,7 +455,7 @@ async fn render_reset_form(
     ValidatedQuery(query): ValidatedQuery<TokenQuery>,
     session: actix_session::Session,
 ) -> Result<HttpResponse> {
-    let token: &str = &query.token;
+    let token: &str = query.token.expose_secret();
     auth_service.validate_reset_password_token(token).await?;
 
     let csrf_token = SecureToken::with_size64().generate();
@@ -512,15 +511,15 @@ async fn submit_new_password(
 
     // 0.5 Verify CSRF token
     if let Some(expected) = session.get::<String>(support::CSRF_COOKIE)? {
-        if !SecureToken::verify(&expected, &form.csrf_token) {
+        if !SecureToken::verify(&expected, form.csrf_token.expose_secret()) {
             return Ok(HttpResponse::Forbidden().body("Invalid CSRF token"));
         }
     } else {
         return Ok(HttpResponse::Forbidden().body("Missing CSRF token"));
     }
-    session.remove("csrf_token");
+    session.remove(support::CSRF_COOKIE);
 
-    let token: &str = &form.token;
+    let token: &str = form.token.expose_secret();
 
     // 1. ReValidate token
     let reset_token = auth_service.validate_reset_password_token(token).await?;
@@ -532,11 +531,6 @@ async fn submit_new_password(
     // 2. Ensure password is different then previous
     let account = auth_service.find_account(user_id).await?;
     if account.locked {
-        tracing::warn!(
-            user_id = %user_id,
-            error_code = "ForbiddenReason::AccountSuspended",
-            "Account is suspended"
-        );
         return Err(Error::Forbidden(ForbiddenReason::AccountSuspended));
     }
     if Password::verify(&form.password, &account.password)? {
@@ -551,7 +545,6 @@ async fn submit_new_password(
     auth_service
         .update_user_password(user_id, &hashed_password)
         .await?;
-    tracing::info!("Password successfully reset for user: {}", user_id);
 
     // 4.
     auth_service

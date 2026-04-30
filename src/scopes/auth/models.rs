@@ -33,7 +33,8 @@ pub struct RegisterRequest {
 #[schema(example = json!({"token": "edc365fa5e13751XXXXXXX"}))]
 pub struct TokenQuery {
     // #[validate(custom(function = "validate_token"))]
-    pub token: String,
+    #[schema(value_type = String, format = Password)]
+    pub token: secrecy::SecretString,
 }
 
 #[derive(Debug, Validate, Deserialize, ToSchema)]
@@ -46,7 +47,8 @@ pub struct EmailRequest {
 #[derive(Debug, Validate, Deserialize, ToSchema)]
 #[schema(example = json!({"refresh_token": "edc365fa5e13751XXXXXXX"}))]
 pub struct RefreshTokenRequest {
-    pub refresh_token: String,
+    #[schema(value_type = String, format = Password)]
+    pub refresh_token: secrecy::SecretString,
 }
 
 #[derive(Default, Debug, Serialize, Deserialize, ToSchema)]
@@ -60,8 +62,12 @@ pub struct ExpiringLink {
 #[validate(context = "PasswordRequirements")]
 #[schema(example = json!({"token": String::default(), "csrf_token": String::default(), "password": String::default()}))]
 pub struct ResetPasswordRequest {
-    pub token: String,
-    pub csrf_token: String,
+    #[schema(value_type = String, format = Password)]
+    pub token: secrecy::SecretString,
+
+    #[schema(value_type = String, format = Password)]
+    pub csrf_token: secrecy::SecretString,
+
     #[validate(custom(function = "validate_password", use_context))]
     pub password: String,
 }
