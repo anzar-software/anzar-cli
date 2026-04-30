@@ -30,15 +30,18 @@ impl AnzarConfiguration {
             },
             server: Server::default(),
             auth: Authentication::default(),
-            security: super::Security {
-                secret_key: "f8afd6dc9f2352e2dfff4b789e3458448a000aa4fb7010d379b998bec89679cd"
-                    .into(),
+            security: Security {
+                secret_key: String::default(),
                 headers: vec![],
             },
         }
     }
     pub fn with_appurl(mut self, url: &str) -> Self {
         self.app.url = url.to_string();
+        self
+    }
+    pub fn with_secret(mut self, key: &str) -> Self {
+        self.security.secret_key = key.to_string();
         self
     }
 }

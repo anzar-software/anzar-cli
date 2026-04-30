@@ -21,26 +21,32 @@ impl UserRepository {
 
 impl UserRepository {
     // Cache
+    #[tracing::instrument(name = "cache.user.increment", skip(self))]
     pub async fn increment(&self, key: &str) -> u8 {
         self.cache.increment(key, 1).await.unwrap_or(1) as u8
     }
+    #[tracing::instrument(name = "cache.user.get_increment", skip(self))]
     pub async fn get_attempts(&self, key: &str) -> u8 {
         if let Ok(Some(val)) = self.cache.find_one(key).await {
             return val.parse::<u8>().unwrap_or(0);
         }
         0
     }
+    #[tracing::instrument(name = "cache.user.insert", skip(self))]
     pub async fn put_cookie_in_lockout(&self, key: &str, expiration: u64) -> Result<()> {
         self.cache
             .insert(&format!("lockout:{}", key), "locked", expiration)
             .await
     }
+    #[tracing::instrument(name = "cache.user.islocked", skip(self))]
     pub async fn is_locked(&self, key: &str) -> bool {
         self.cache.find_one(key).await.is_ok_and(|v| v.is_some())
     }
+    #[tracing::instrument(name = "cache.user.reset", skip(self))]
     pub async fn reset_attempts(&self, key: &str) -> Result<()> {
         self.cache.update(key, "0", 1000000).await
     }
+    #[tracing::instrument(name = "cache.user.clear", skip(self))]
     pub async fn clear_key(&self, key: &str) -> Result<()> {
         self.cache.delete_one(key).await
     }

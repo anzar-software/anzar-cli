@@ -1,17 +1,17 @@
 use std::fs;
-
 use uuid::Uuid;
 
-use crate::adapters::cache::CacheAdapters;
-use crate::adapters::cache::in_memory::InMemoryAdapter;
-use crate::adapters::cache::memcache::MemCache;
-use crate::adapters::cache::redis::Redis;
-use crate::adapters::database::postgres::PostgreSQL;
-use crate::adapters::database::{DatabaseAdapters, mongodb::MongoDB, sqlite::SQLite};
+use crate::adapters::cache::{
+    CacheAdapters, in_memory::InMemoryAdapter, memcache::MemCache, redis::Redis,
+};
+use crate::adapters::database::{
+    DatabaseAdapters, mongodb::MongoDB, postgres::PostgreSQL, sqlite::SQLite,
+};
 use crate::config::database::cache_driver::CacheDriver;
 use crate::config::{AnzarConfiguration, AppConfig, Database, DatabaseDriver};
 use crate::error::Result;
 use crate::scopes::auth::service::AuthService;
+use crate::utils::{SecureToken, TokenHasher};
 
 #[derive(Clone)]
 pub struct AppState {
@@ -59,7 +59,10 @@ impl AppState {
             }
         };
 
-        Ok(AnzarConfiguration::new(app_config).with_appurl(address))
+        let secret = SecureToken::with_size64().generate();
+        Ok(AnzarConfiguration::new(app_config)
+            .with_appurl(address)
+            .with_secret(&secret))
     }
 
     async fn build_authservice(database: &Database) -> Result<AuthService> {
