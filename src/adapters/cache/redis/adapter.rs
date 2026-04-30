@@ -53,4 +53,13 @@ impl CacheAdapter for RedisAdapter {
             .map(|_| ())
             .map_err(|e| e.into())
     }
+
+    async fn flush_all(&self) -> Result<(), Error> {
+        self.connection
+            .clone()
+            .flushall()
+            .await
+            .map(|_| ())
+            .map_err(|e| e.into())
+    }
 }

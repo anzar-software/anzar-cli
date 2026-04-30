@@ -16,9 +16,9 @@ pub struct SQLiteAdapter<T: Send + Sync> {
 }
 
 impl<T: Send + Sync> SQLiteAdapter<T> {
-    pub fn new(db: &Pool<Sqlite>, table: &str) -> Self {
+    pub fn new(pool: &Pool<Sqlite>, table: &str) -> Self {
         SQLiteAdapter {
-            pool: db.clone(),
+            pool: pool.clone(),
             table: table.into(),
             _phantom: PhantomData,
         }

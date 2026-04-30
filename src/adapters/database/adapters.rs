@@ -34,42 +34,42 @@ pub struct DatabaseAdapters {
 }
 
 impl DatabaseAdapters {
-    pub fn mongodb(client: &mongodb::Client, cnn_string: &str) -> Self {
+    pub fn mongodb(client: &mongodb::Client, conn_string: &str) -> Self {
         Self {
-            user_adapter: Arc::new(MongodbAdapter::<User>::new(client, cnn_string, USER)),
-            account_adapter: Arc::new(MongodbAdapter::<Account>::new(client, cnn_string, ACCOUNT)),
+            user_adapter: Arc::new(MongodbAdapter::<User>::new(client, conn_string, USER)),
+            account_adapter: Arc::new(MongodbAdapter::<Account>::new(client, conn_string, ACCOUNT)),
             jwt_adapter: Arc::new(MongodbAdapter::<RefreshToken>::new(
                 client,
-                cnn_string,
+                conn_string,
                 REFRESH_TOKEN,
             )),
-            session_adapter: Arc::new(MongodbAdapter::<Session>::new(client, cnn_string, SESSION)),
+            session_adapter: Arc::new(MongodbAdapter::<Session>::new(client, conn_string, SESSION)),
             reset_token_adapter: Arc::new(MongodbAdapter::<PasswordResetToken>::new(
                 client,
-                cnn_string,
+                conn_string,
                 PASSWORD_RESET_TOKEN,
             )),
             email_verification_token: Arc::new(MongodbAdapter::<EmailVerificationToken>::new(
                 client,
-                cnn_string,
+                conn_string,
                 EMAIL_VERIFICATION_TOKEN,
             )),
             // transaction_adapter: MongodbTransaction::new(client),
         }
     }
 
-    pub fn sqlite(db: &Pool<Sqlite>) -> Self {
+    pub fn sqlite(pool: &Pool<Sqlite>) -> Self {
         Self {
-            user_adapter: Arc::new(SQLiteAdapter::<User>::new(db, USER)),
-            account_adapter: Arc::new(SQLiteAdapter::<Account>::new(db, ACCOUNT)),
-            jwt_adapter: Arc::new(SQLiteAdapter::<RefreshToken>::new(db, REFRESH_TOKEN)),
-            session_adapter: Arc::new(SQLiteAdapter::<Session>::new(db, SESSION)),
+            user_adapter: Arc::new(SQLiteAdapter::<User>::new(pool, USER)),
+            account_adapter: Arc::new(SQLiteAdapter::<Account>::new(pool, ACCOUNT)),
+            jwt_adapter: Arc::new(SQLiteAdapter::<RefreshToken>::new(pool, REFRESH_TOKEN)),
+            session_adapter: Arc::new(SQLiteAdapter::<Session>::new(pool, SESSION)),
             reset_token_adapter: Arc::new(SQLiteAdapter::<PasswordResetToken>::new(
-                db,
+                pool,
                 PASSWORD_RESET_TOKEN,
             )),
             email_verification_token: Arc::new(SQLiteAdapter::<EmailVerificationToken>::new(
-                db,
+                pool,
                 EMAIL_VERIFICATION_TOKEN,
             )),
             // transaction_adapter: todo!(),

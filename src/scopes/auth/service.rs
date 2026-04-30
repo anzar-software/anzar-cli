@@ -1,3 +1,4 @@
+use crate::adapters::cache::in_memory::InMemoryAdapter;
 use crate::adapters::cache::redis::Redis;
 use crate::adapters::cache::{CacheAdapters, memcache::MemCache};
 use crate::adapters::database::postgres::PostgreSQL;
@@ -55,19 +56,18 @@ impl AuthService {
                 let connection = Redis::start(&database.cache.url).await?;
                 CacheAdapters::redis(connection)
             }
+            CacheDriver::InMemory => {
+                let store = InMemoryAdapter::default();
+                CacheAdapters::in_memory(store)
+            }
         };
 
         let database_adapter = match database.driver {
             DatabaseDriver::SQLite => {
-                let db = SQLite::start(&database.connection_string).await?;
+                let sqlite = SQLite::start(&database.connection_string).await?;
+                sqlite.run_migrations().await?;
 
-                let path = std::path::Path::new("migrations/sqlite");
-                if path.exists() {
-                    let migrator = sqlx::migrate::Migrator::new(path).await?;
-                    migrator.run(&db).await.expect("migrations to run");
-                }
-
-                DatabaseAdapters::sqlite(&db)
+                DatabaseAdapters::sqlite(&sqlite.pool)
             }
             DatabaseDriver::MongoDB => {
                 let client = MongoDB::start(&database.connection_string).await?;
@@ -75,8 +75,8 @@ impl AuthService {
                 DatabaseAdapters::mongodb(&client, db_name)
             }
             DatabaseDriver::PostgreSQL => {
-                let pool = PostgreSQL::start(&database.connection_string).await?;
-                DatabaseAdapters::postgres(&pool)
+                let postgresql = PostgreSQL::start(&database.connection_string).await?;
+                DatabaseAdapters::postgres(&postgresql.pool)
             }
         };
 

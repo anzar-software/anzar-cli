@@ -1,11 +1,13 @@
-use redis::TypedCommands;
 use std::net::TcpListener;
 use std::sync::LazyLock;
 
-use anzar::config::AppState;
-use anzar::config::database::cache_driver::CacheDriver;
-
-use anzar::config::AnzarConfiguration;
+use anzar::adapters::cache::{
+    CacheAdapter,
+    in_memory::InMemoryAdapter,
+    memcache::{MemCache, MemCacheAdapter},
+    redis::{Redis, RedisAdapter},
+};
+use anzar::config::{AnzarConfiguration, AppState, database::cache_driver::CacheDriver};
 
 use crate::shared::TestApp;
 use anzar::telemetry::{get_subscriber, init_subscriber};
@@ -25,16 +27,23 @@ pub static TRACING: LazyLock<()> = LazyLock::new(|| {
 
 pub struct Common;
 impl Common {
-    fn clean_cache(&self, configuration: &AnzarConfiguration) {
+    async fn clean_cache(&self, configuration: &AnzarConfiguration) {
         match configuration.database.cache.driver {
             CacheDriver::MemCached => {
-                let client =
-                    memcache::Client::connect(configuration.database.cache.clone().url).unwrap();
-                client.flush().unwrap();
+                let client = MemCache::start(&configuration.database.cache.url)
+                    .await
+                    .unwrap();
+                let _ = MemCacheAdapter::new(client).flush_all().await;
             }
             CacheDriver::Redis => {
-                let client = redis::Client::open(configuration.database.cache.clone().url).unwrap();
-                let _ = client.get_connection().unwrap().flushall();
+                let connection = Redis::start(&configuration.database.cache.url)
+                    .await
+                    .unwrap();
+                let _ = RedisAdapter::new(connection).flush_all().await;
+            }
+            CacheDriver::InMemory => {
+                let in_memory = InMemoryAdapter::default();
+                let _ = in_memory.flush_all().await;
             }
         }
     }
@@ -59,7 +68,7 @@ impl Common {
             .expect("Failed to initiate reqwest Client");
 
         actix_web::rt::spawn(server);
-        self.clean_cache(&app_state.configuration);
+        self.clean_cache(&app_state.configuration).await;
 
         Ok(TestApp {
             address,

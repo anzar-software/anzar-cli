@@ -7,6 +7,7 @@ pub enum CacheDriver {
     #[default]
     MemCached,
     Redis,
+    InMemory,
 }
 
 impl CacheDriver {
@@ -14,6 +15,7 @@ impl CacheDriver {
         match self {
             CacheDriver::MemCached => "memcached",
             CacheDriver::Redis => "redis",
+            CacheDriver::InMemory => "in_memory",
         }
     }
 }
@@ -29,8 +31,9 @@ impl TryFrom<String> for CacheDriver {
         match s.to_lowercase().as_str() {
             "memcached" => Ok(Self::MemCached),
             "redis" => Ok(Self::Redis),
+            "in_memory" => Ok(Self::InMemory),
             other => Err(format!(
-                "{} is not supported database. Use either `memcached`, `redis`",
+                "{} is not supported database. Use either `memcached`, `redis` or `in_memory`",
                 other
             )),
         }

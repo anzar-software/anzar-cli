@@ -41,7 +41,7 @@ impl AppConfig {
     }
     fn cache() -> CacheDriver {
         std::env::var("CACHE")
-            .unwrap_or_else(|_| CacheDriver::Redis.as_str().into())
+            .unwrap_or_else(|_| CacheDriver::InMemory.as_str().into())
             .try_into()
             .expect("Failed to parse CACHE")
     }

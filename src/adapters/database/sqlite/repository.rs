@@ -1,10 +1,12 @@
 use sqlx::{Executor, Pool, Sqlite, SqlitePool};
 
-use crate::error::Error;
+use crate::error::Result;
 
-pub struct SQLite {}
+pub struct SQLite {
+    pub pool: Pool<Sqlite>,
+}
 impl SQLite {
-    pub async fn start(conn: &str) -> Result<Pool<Sqlite>, Error> {
+    pub async fn start(conn: &str) -> Result<Self> {
         let pool = SqlitePool::connect(conn).await.inspect_err(|e| {
             tracing::error!(
                 error_code = "InternalError::Database",
@@ -13,6 +15,17 @@ impl SQLite {
         })?;
 
         pool.execute("PRAGMA foreign_keys = ON;").await?;
-        Ok(pool)
+
+        Ok(Self { pool })
+    }
+
+    pub async fn run_migrations(&self) -> Result<()> {
+        let path = std::path::Path::new("migrations/sqlite");
+        if path.exists() {
+            let migrator = sqlx::migrate::Migrator::new(path).await?;
+            migrator.run(&self.pool).await.expect("migrations to run");
+        }
+
+        Ok(())
     }
 }

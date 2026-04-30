@@ -11,9 +11,36 @@ pub struct AnzarConfiguration {
     #[serde(default)]
     pub auth: Authentication, // [Optional] Uses Default
     pub security: Security, // Required
-                            //
-                            // TODO
-                            // pub logging: Logging, // [Optional]
+}
+
+impl AnzarConfiguration {
+    pub fn new(app_config: super::AppConfig) -> Self {
+        Self {
+            app: App {
+                environment: "dev".into(),
+                url: "localhost:3000".to_string(),
+            },
+            database: Database {
+                driver: app_config.database.driver,
+                connection_string: app_config.database.connection_string(),
+                cache: Cache {
+                    driver: app_config.cache.driver,
+                    url: app_config.cache.url,
+                },
+            },
+            server: Server::default(),
+            auth: Authentication::default(),
+            security: super::Security {
+                secret_key: "f8afd6dc9f2352e2dfff4b789e3458448a000aa4fb7010d379b998bec89679cd"
+                    .into(),
+                headers: vec![],
+            },
+        }
+    }
+    pub fn with_appurl(mut self, url: &str) -> Self {
+        self.app.url = url.to_string();
+        self
+    }
 }
 
 // =============================================================================

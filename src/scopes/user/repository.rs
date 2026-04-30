@@ -17,7 +17,9 @@ impl UserRepository {
     pub fn new(adapter: Arc<dyn DatabaseAdapter<User>>, cache: Arc<dyn CacheAdapter>) -> Self {
         Self { adapter, cache }
     }
+}
 
+impl UserRepository {
     // Cache
     pub async fn increment(&self, key: &str) -> u8 {
         self.cache.increment(key, 1).await.unwrap_or(1) as u8

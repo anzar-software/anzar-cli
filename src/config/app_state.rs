@@ -3,14 +3,13 @@ use std::fs;
 use uuid::Uuid;
 
 use crate::adapters::cache::CacheAdapters;
+use crate::adapters::cache::in_memory::InMemoryAdapter;
 use crate::adapters::cache::memcache::MemCache;
 use crate::adapters::cache::redis::Redis;
 use crate::adapters::database::postgres::PostgreSQL;
 use crate::adapters::database::{DatabaseAdapters, mongodb::MongoDB, sqlite::SQLite};
 use crate::config::database::cache_driver::CacheDriver;
-use crate::config::{
-    AnzarConfiguration, App, AppConfig, Authentication, Cache, Database, DatabaseDriver, Server,
-};
+use crate::config::{AnzarConfiguration, AppConfig, Database, DatabaseDriver};
 use crate::error::Result;
 use crate::scopes::auth::service::AuthService;
 
@@ -45,50 +44,26 @@ impl AppState {
     async fn build_config(address: &str) -> Result<AnzarConfiguration> {
         let mut app_config = AppConfig::load().expect("Failed to read configuration");
 
-        if app_config.database.driver == DatabaseDriver::MongoDB {
-            let db_name = Uuid::new_v4().to_string();
-            app_config.database.name = db_name;
-        }
-        if app_config.database.driver == DatabaseDriver::PostgreSQL {
-            let db_name = Uuid::new_v4().to_string();
+        app_config.database.name = match app_config.database.driver {
+            DatabaseDriver::SQLite => app_config.database.name,
+            DatabaseDriver::MongoDB => Uuid::new_v4().to_string(),
+            DatabaseDriver::PostgreSQL => {
+                let name = Uuid::new_v4().to_string();
 
-            let admin_pool = PostgreSQL::start(&app_config.database.connection_string()).await?;
-            sqlx::query(&format!("CREATE DATABASE \"{}\"", db_name))
-                .execute(&admin_pool)
-                .await
-                .unwrap();
-            admin_pool.close().await;
+                PostgreSQL::start(&app_config.database.connection_string())
+                    .await?
+                    .create_database(&name)
+                    .await?;
 
-            app_config.database.name = db_name;
-        }
-
-        let configuration = AnzarConfiguration {
-            app: App {
-                environment: "dev".into(),
-                url: address.into(),
-            },
-            database: Database {
-                driver: app_config.database.driver,
-                connection_string: app_config.database.connection_string(),
-                cache: Cache {
-                    driver: app_config.cache.driver,
-                    url: app_config.cache.url,
-                },
-            },
-            server: Server::default(),
-            auth: Authentication::default(),
-            security: super::Security {
-                secret_key: "f8afd6dc9f2352e2dfff4b789e3458448a000aa4fb7010d379b998bec89679cd"
-                    .into(),
-                headers: vec![],
-            },
+                name
+            }
         };
 
-        Ok(configuration)
+        Ok(AnzarConfiguration::new(app_config).with_appurl(address))
     }
 
     async fn build_authservice(database: &Database) -> Result<AuthService> {
-        let cache_adapter = match database.cache.driver {
+        let cache_adapters = match database.cache.driver {
             CacheDriver::MemCached => {
                 let client = MemCache::start(&database.cache.url).await?;
                 CacheAdapters::memcached(client)
@@ -97,38 +72,32 @@ impl AppState {
                 let connection = Redis::start(&database.cache.url).await?;
                 CacheAdapters::redis(connection)
             }
+            CacheDriver::InMemory => {
+                let store = InMemoryAdapter::default();
+                CacheAdapters::in_memory(store)
+            }
         };
 
-        let database_adapter = match database.driver {
+        let database_adapters = match database.driver {
             DatabaseDriver::SQLite => {
-                let db = SQLite::start(&database.connection_string).await?;
+                let sqlite = SQLite::start(&database.connection_string).await?;
+                sqlite.run_migrations().await?;
 
-                let path = std::path::Path::new("migrations/sqlite");
-                if path.exists() {
-                    let migrator = sqlx::migrate::Migrator::new(path).await?;
-                    migrator.run(&db).await.expect("migrations to run");
-                }
-
-                DatabaseAdapters::sqlite(&db)
+                DatabaseAdapters::sqlite(&sqlite.pool)
             }
             DatabaseDriver::MongoDB => {
                 let client = MongoDB::start(&database.connection_string).await?;
-                let db_name = database.name().unwrap_or_default();
-                DatabaseAdapters::mongodb(&client, db_name)
+                let conn_string = database.name().unwrap_or_default();
+                DatabaseAdapters::mongodb(&client, conn_string)
             }
             DatabaseDriver::PostgreSQL => {
-                let pool = PostgreSQL::start(&database.connection_string).await?;
+                let postgresql = PostgreSQL::start(&database.connection_string).await?;
+                postgresql.run_migrations().await?;
 
-                let path = std::path::Path::new("migrations/postgres");
-                if path.exists() {
-                    let migrator = sqlx::migrate::Migrator::new(path).await?;
-                    migrator.run(&pool).await.expect("migrations to run");
-                }
-
-                DatabaseAdapters::postgres(&pool)
+                DatabaseAdapters::postgres(&postgresql.pool)
             }
         };
 
-        Ok(AuthService::new(database_adapter, cache_adapter))
+        Ok(AuthService::new(database_adapters, cache_adapters))
     }
 }

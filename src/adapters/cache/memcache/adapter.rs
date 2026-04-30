@@ -41,4 +41,8 @@ impl CacheAdapter for MemCacheAdapter {
     async fn delete_one(&self, key: &str) -> Result<(), Error> {
         self.client.delete(key).map(|_| ()).map_err(|e| e.into())
     }
+
+    async fn flush_all(&self) -> Result<(), Error> {
+        self.client.flush().map(|_| ()).map_err(|e| e.into())
+    }
 }
