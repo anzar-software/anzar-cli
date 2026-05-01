@@ -11,7 +11,7 @@ use crate::config::database::cache_driver::CacheDriver;
 use crate::config::{AnzarConfiguration, AppConfig, Database, DatabaseDriver};
 use crate::error::Result;
 use crate::scopes::auth::service::AuthService;
-use crate::utils::{SecureToken, TokenHasher};
+use crate::utils::{Credential, SecureToken};
 
 #[derive(Clone)]
 pub struct AppState {
@@ -59,7 +59,7 @@ impl AppState {
             }
         };
 
-        let secret = SecureToken::with_size64().generate();
+        let secret = SecureToken::with_size64().generate()?;
         Ok(AnzarConfiguration::new(app_config)
             .with_appurl(address)
             .with_secret(&secret))

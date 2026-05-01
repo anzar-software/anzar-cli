@@ -5,20 +5,19 @@ use actix_web::{FromRequest, HttpRequest, dev::Payload, web::Data};
 use crate::{
     config::AppState,
     error::{Error, InternalError},
-    scopes::auth::service::AuthService,
 };
 
-pub struct AuthServiceExtractor(pub AuthService);
+pub struct AppStateExtractor(pub AppState);
 
-impl FromRequest for AuthServiceExtractor {
+impl FromRequest for AppStateExtractor {
     type Error = Error;
     type Future = Ready<Result<Self, Self::Error>>;
 
     fn from_request(req: &HttpRequest, _: &mut Payload) -> Self::Future {
         let result = req
             .app_data::<Data<AppState>>()
-            .map(|state| state.auth_service.clone())
-            .map(|sm| AuthServiceExtractor(sm.clone()))
+            .map(|state| state.get_ref())
+            .map(|sm| AppStateExtractor(sm.clone()))
             .ok_or(Error::Internal(InternalError::MissingAppData(
                 "AppState not registered".into(),
             )));

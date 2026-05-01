@@ -1,27 +1,13 @@
 use actix_web::{dev::ServiceRequest, web};
 
 use crate::{
-    config::{AnzarConfiguration, AppState},
+    config::AppState,
     error::{Error, InternalError},
-    scopes::auth::service::AuthService,
 };
 
-pub fn extract_auth_service(req: &ServiceRequest) -> Result<AuthService, Error> {
+pub fn extract_app_state(req: &ServiceRequest) -> Result<AppState, Error> {
     req.app_data::<web::Data<AppState>>()
-        .map(|state| state.auth_service.clone())
-        .ok_or_else(|| {
-            tracing::error!(
-                error.code = "InternalError::MissingAppData",
-                "Failed to extract auth_service from app_data"
-            );
-            Error::Internal(InternalError::MissingAppData(
-                "AppState not registered".into(),
-            ))
-        })
-}
-pub fn extract_configuration_service(req: &ServiceRequest) -> Result<AnzarConfiguration, Error> {
-    req.app_data::<web::Data<AppState>>()
-        .map(|state| state.configuration.clone())
+        .map(|state| state.get_ref().clone())
         .ok_or_else(|| {
             tracing::error!(
                 error.code = "InternalError::MissingAppData",

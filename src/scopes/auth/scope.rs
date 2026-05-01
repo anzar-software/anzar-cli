@@ -7,36 +7,27 @@ use actix_web::{
 use secrecy::ExposeSecret;
 use validator::{Validate, ValidateArgs};
 
-use crate::{
-    config::AuthStrategy,
-    error::{ConflictReason, CredentialField, Error, ErrorResponse, Result},
-    scopes::user::CreateUserOutcome,
-    utils::HmacSigner,
+use crate::error::{
+    AuthError, ConflictReason, CredentialField, Error, ErrorResponse, ForbiddenReason, Result,
 };
-use crate::{
-    error::AuthError,
-    extractors::{AuthServiceExtractor, ConfigurationExtractor, ValidatedQuery},
-};
-use crate::{
-    error::ForbiddenReason,
-    middlewares::{auth_middleware, authorization_middleware, rate_limiting::RATE_LIMITS},
-};
+use crate::extractors::{AppStateExtractor, ValidatedQuery};
+use crate::middlewares::{auth_middleware, authorization_middleware, rate_limiting::RATE_LIMITS};
+use crate::{config::AuthStrategy, scopes::user::CreateUserOutcome};
 
 use crate::services::{
     account::{model::AccountStatus, service::AccountServiceTrait},
     jwt::service::JwtServiceTrait,
     session::{model::Session, service::SessionServiceTrait},
 };
-use crate::utils::{CustomPasswordHasher, Password, SecureToken, TokenHasher};
+use crate::utils::{Credential, HmacSigner, Password, SecureToken};
 
 use super::models::{
     AuthResponse, EmailRequest, ExpiringLink, LoginRequest, RefreshTokenRequest, RegisterRequest,
     ResetPasswordRequest, TokenQuery,
 };
 use super::reset_password::{model::PasswordResetToken, service::PasswordResetTokenServiceTrait};
-use super::user::{User, service::UserServiceTrait};
-
 use super::support;
+use super::user::{User, service::UserServiceTrait};
 
 #[utoipa::path(
         post,
@@ -68,7 +59,7 @@ use super::support;
     )]
 #[tracing::instrument(
     name = "auth.login"
-    skip(req, auth_service, configuration, session),
+    skip(req, app_state, session),
     fields(
         user.id = tracing::field::Empty,
         user.email = %req.email,
@@ -76,27 +67,21 @@ use super::support;
     )
 )]
 pub async fn login(
-    AuthServiceExtractor(auth_service): AuthServiceExtractor,
-    ConfigurationExtractor(configuration): ConfigurationExtractor,
+    AppStateExtractor(app_state): AppStateExtractor,
     req: web::Json<LoginRequest>,
     session: actix_session::Session,
 ) -> Result<HttpResponse> {
-    req.validate_with_args(&configuration.auth.password.requirements)?;
+    let auth_config = &app_state.configuration.auth;
+    req.validate_with_args(&auth_config.password.requirements)?;
 
     // START TIMING-SAFE EXECUTION BLOCK
     let start = std::time::Instant::now();
 
-    let mut hmac_signer = HmacSigner::new(&configuration.security.secret_key);
+    let mut hmac_signer = HmacSigner::new(&app_state.configuration.security.secret_key);
 
     // ALWAYS execute the same operations regardless of user existence
-    let (user, account_status, attempts) = auth_service
-        .authenticate_user(
-            &req.email,
-            &req.password,
-            &hmac_signer,
-            &session,
-            &configuration,
-        )
+    let (user, account_status, attempts) = app_state
+        .authenticate_user(&req, &hmac_signer, &session)
         .await?;
 
     // ENFORCE CONSTANT-TIME EXECUTION
@@ -104,7 +89,7 @@ pub async fn login(
 
     // Now handle responses
     // NOTE this can be removed, if it's not needed
-    if configuration.auth.email.verification.required && !user.verified {
+    if auth_config.email.verification.required && !user.verified {
         tracing::warn!(
             user_id = %user.id()?,
             error_code = "AuthError::AccountNotVerified",
@@ -116,33 +101,26 @@ pub async fn login(
     match account_status {
         AccountStatus::Active => {
             // Issue new device cookie
-            let cookie = hmac_signer.issue(&req.email);
+            let cookie = hmac_signer.issue(&req.email)?;
 
-            match configuration.auth.strategy {
-                AuthStrategy::Session => auth_service.issue_session(&user).await.map(|token| {
+            match app_state.configuration.auth.strategy {
+                AuthStrategy::Session => app_state.issue_session(&user).await.map(|token| {
                     session.clear();
                     session.renew();
                     session.insert(support::DEVICE_COOKIE, &cookie)?;
                     session.insert(support::SESSION_COOKIE, token)?;
                     Ok(HttpResponse::Ok().json(AuthResponse::new(user)))
                 })?,
-                AuthStrategy::Jwt => {
-                    auth_service
-                        .issue_jwt(&user, &configuration)
-                        .await
-                        .map(|tokens| {
-                            session.clear();
-                            session.renew();
-                            session.insert(support::DEVICE_COOKIE, &cookie)?;
+                AuthStrategy::Jwt => app_state.issue_jwt(&user).await.map(|tokens| {
+                    session.clear();
+                    session.renew();
+                    session.insert(support::DEVICE_COOKIE, &cookie)?;
 
-                            Ok(HttpResponse::Ok().json(
-                                AuthResponse::new(user).with_jwt(
-                                    tokens,
-                                    configuration.auth.jwt.access_token_expires_in,
-                                ),
-                            ))
-                        })?
-                }
+                    Ok(HttpResponse::Ok().json(
+                        AuthResponse::new(user)
+                            .with_jwt(tokens, auth_config.jwt.access_token_expires_in),
+                    ))
+                })?,
             }
         }
         // NOTE fully mask account existence
@@ -187,16 +165,15 @@ pub async fn login(
     )]
 #[tracing::instrument(
     name = "Register user",
-    skip(req, auth_service, configuration, session),
+    skip(req, app_state, session),
     fields(user_email = %req.email, user_name = %req.username)
 )]
 pub async fn register(
-    AuthServiceExtractor(auth_service): AuthServiceExtractor,
-    ConfigurationExtractor(configuration): ConfigurationExtractor,
+    AppStateExtractor(app_state): AppStateExtractor,
     req: web::Json<RegisterRequest>,
     session: actix_session::Session,
 ) -> Result<HttpResponse> {
-    req.validate_with_args(&configuration.auth.password.requirements)?;
+    req.validate_with_args(&app_state.configuration.auth.password.requirements)?;
     // let mut bucket = RATE_LIMITS.entry(req.email.clone()).or_default();
     // bucket.run()?;
 
@@ -204,26 +181,24 @@ pub async fn register(
     let start = std::time::Instant::now();
 
     let result = async {
-        match auth_service
-            .create_user(req.into_inner(), &configuration)
-            .await?
-        {
+        match app_state.create_user(req.into_inner()).await? {
             CreateUserOutcome::Created(user) => {
                 let mut response = AuthResponse::new(user.clone());
+                let email_config = &app_state.configuration.auth.email.verification;
 
-                if configuration.auth.email.verification.required {
-                    let expiry = configuration.auth.email.verification.token_expires_in;
-                    let token = auth_service
-                        .create_verification_email(&user, expiry)
-                        .await?;
-                    let link = format!("{}/email/verify?token={}", &configuration.app.url, &token);
+                if email_config.required {
+                    let token = app_state.create_verification_email(&user).await?;
+                    let link = format!(
+                        "{}/email/verify?token={}",
+                        &app_state.configuration.app.url, &token
+                    );
 
-                    response = response.with_verification(&link, expiry);
+                    response = response.with_verification(&link, email_config.token_expires_in);
                 }
 
-                let http_response = match configuration.auth.strategy {
+                let http_response = match app_state.configuration.auth.strategy {
                     AuthStrategy::Session => {
-                        let token = auth_service.issue_session(&user).await?;
+                        let token = app_state.issue_session(&user).await?;
 
                         session.clear();
                         session.renew();
@@ -233,8 +208,9 @@ pub async fn register(
                     }
 
                     AuthStrategy::Jwt => {
-                        let tokens = auth_service.issue_jwt(&user, &configuration).await?;
-                        response.with_jwt(tokens, configuration.auth.jwt.access_token_expires_in)
+                        let tokens = app_state.issue_jwt(&user).await?;
+                        let expiry = app_state.configuration.auth.jwt.access_token_expires_in;
+                        response.with_jwt(tokens, expiry)
                     }
                 };
 
@@ -291,30 +267,21 @@ pub async fn get_session(session: Session) -> Result<HttpResponse> {
             (status = BAD_REQUEST, description = "invalid request", body = ErrorResponse),
         ),
     )]
-#[tracing::instrument(
-    name = "Refresh user accessToken",
-    skip(req, auth_service, configuration)
-)]
+#[tracing::instrument(name = "Refresh user accessToken", skip(req, app_state))]
 pub async fn refresh_token(
     req: web::Json<RefreshTokenRequest>,
-    AuthServiceExtractor(auth_service): AuthServiceExtractor,
-    ConfigurationExtractor(configuration): ConfigurationExtractor,
+    AppStateExtractor(app_state): AppStateExtractor,
 ) -> Result<HttpResponse> {
-    let user_id = auth_service
-        .consume_refresh_token(req.0.refresh_token.expose_secret(), &configuration)
+    let user_id = app_state
+        .consume_refresh_token(req.0.refresh_token.expose_secret())
         .await?;
 
-    let user: User = auth_service.find_user(&user_id).await?;
+    let user: User = app_state.find_user(&user_id).await?;
 
-    auth_service
-        .issue_jwt(&user, &configuration)
-        .await
-        .map(|tokens| {
-            Ok(HttpResponse::Ok().json(
-                AuthResponse::new(user)
-                    .with_jwt(tokens, configuration.auth.jwt.access_token_expires_in),
-            ))
-        })?
+    app_state.issue_jwt(&user).await.map(|tokens| {
+        let expiry = app_state.configuration.auth.jwt.access_token_expires_in;
+        Ok(HttpResponse::Ok().json(AuthResponse::new(user).with_jwt(tokens, expiry)))
+    })?
 }
 
 #[utoipa::path(
@@ -333,22 +300,18 @@ pub async fn refresh_token(
             (status = BAD_REQUEST, description = "invalid request", body = ErrorResponse),
         ),
     )]
-#[tracing::instrument(
-    name = "Logout user",
-    skip(req, auth_service, session, session_manager)
-)]
+#[tracing::instrument(name = "Logout user", skip(req, app_state, session, session_manager))]
 async fn logout(
-    AuthServiceExtractor(auth_service): AuthServiceExtractor,
-    ConfigurationExtractor(configuration): ConfigurationExtractor,
+    AppStateExtractor(app_state): AppStateExtractor,
     req: web::Json<RefreshTokenRequest>,
     session: Session,
     session_manager: actix_session::Session,
 ) -> Result<HttpResponse> {
-    let result = match configuration.auth.strategy {
-        AuthStrategy::Session => auth_service.invalidate_session(&session.token).await,
+    let result = match app_state.configuration.auth.strategy {
+        AuthStrategy::Session => app_state.invalidate_session(&session.token).await,
         AuthStrategy::Jwt => {
-            auth_service
-                .invalidate_jwt(req.0.refresh_token.expose_secret(), &configuration)
+            app_state
+                .invalidate_jwt(req.0.refresh_token.expose_secret())
                 .await
         }
     };
@@ -369,11 +332,10 @@ async fn logout(
             (status = BAD_REQUEST, description = "invalid request", body = ErrorResponse),
         ),
     )]
-#[tracing::instrument(name = "Forgot password", skip(auth_service, configuration))]
+#[tracing::instrument(name = "Forgot password", skip(app_state))]
 async fn request_password_reset(
     req: web::Json<EmailRequest>,
-    AuthServiceExtractor(auth_service): AuthServiceExtractor,
-    ConfigurationExtractor(configuration): ConfigurationExtractor,
+    AppStateExtractor(app_state): AppStateExtractor,
 ) -> Result<HttpResponse> {
     req.validate()?;
 
@@ -385,25 +347,27 @@ async fn request_password_reset(
     bucket.run()?;
 
     let result = async {
-        let user = auth_service.find_user_by_email(&email).await?;
+        let user = app_state.find_user_by_email(&email).await?;
         let user_id = user.id()?;
 
         // 3.
-        auth_service.revoke_password_reset_token(user_id).await?;
+        app_state.revoke_password_reset_token(user_id).await?;
 
         // 4.
-        let token = SecureToken::with_size64().generate();
-        let hashed_token = SecureToken::hash(&token);
+        let token = SecureToken::with_size64().generate()?;
+        let hashed_token = SecureToken::hash(&token)?;
 
         // 5.
         let expiry_timestamp = chrono::Utc::now()
-            + chrono::Duration::seconds(configuration.auth.password.reset.token_expires_in);
+            + chrono::Duration::seconds(
+                app_state.configuration.auth.password.reset.token_expires_in,
+            );
 
         let password_reset_token = PasswordResetToken::default()
             .with_user_id(user_id)
             .with_token_hash(&hashed_token)
             .with_expiray(&expiry_timestamp);
-        auth_service
+        app_state
             .insert_password_reset_token(password_reset_token)
             .await?;
 
@@ -413,7 +377,7 @@ async fn request_password_reset(
 
         let link = format!(
             "{}/auth/password/reset?token={}",
-            &configuration.app.url, &token
+            &app_state.configuration.app.url, &token
         );
         let expiring_link = ExpiringLink {
             link,
@@ -450,20 +414,21 @@ async fn request_password_reset(
             (status = BAD_REQUEST, description = "invalid request", body = ErrorResponse),
         ),
     )]
+#[tracing::instrument(name = "Render Reset Form", skip(app_state, session))]
 async fn render_reset_form(
-    AuthServiceExtractor(auth_service): AuthServiceExtractor,
+    AppStateExtractor(app_state): AppStateExtractor,
     ValidatedQuery(query): ValidatedQuery<TokenQuery>,
     session: actix_session::Session,
 ) -> Result<HttpResponse> {
     let token: &str = query.token.expose_secret();
-    auth_service.validate_reset_password_token(token).await?;
+    app_state.validate_reset_password_token(token).await?;
 
-    let csrf_token = SecureToken::with_size64().generate();
+    let csrf_token = SecureToken::with_size64().generate()?;
     session.clear();
     session.insert(support::CSRF_COOKIE, &csrf_token)?;
 
-    let script_nonce = SecureToken::with_size32().generate();
-    let style_nonce = SecureToken::with_size32().generate();
+    let script_nonce = SecureToken::with_size32().generate()?;
+    let style_nonce = SecureToken::with_size32().generate()?;
 
     let body = include_str!("templates/update_password.html")
         .replace("{{STYLE_NONCE}}", &style_nonce)
@@ -500,18 +465,18 @@ async fn render_reset_form(
             (status = BAD_REQUEST, description = "invalid request", body = ErrorResponse),
         ),
 )]
+#[tracing::instrument(name = "Update Password", skip(app_state, session, form))]
 async fn submit_new_password(
-    AuthServiceExtractor(auth_service): AuthServiceExtractor,
-    ConfigurationExtractor(configuration): ConfigurationExtractor,
+    AppStateExtractor(app_state): AppStateExtractor,
     session: actix_session::Session,
     form: web::Form<ResetPasswordRequest>,
 ) -> Result<HttpResponse> {
     // 0. validat password strength
-    form.validate_with_args(&configuration.auth.password.requirements)?;
+    form.validate_with_args(&app_state.configuration.auth.password.requirements)?;
 
     // 0.5 Verify CSRF token
     if let Some(expected) = session.get::<String>(support::CSRF_COOKIE)? {
-        if !SecureToken::verify(&expected, form.csrf_token.expose_secret()) {
+        if !SecureToken::verify(&expected, form.csrf_token.expose_secret())? {
             return Ok(HttpResponse::Forbidden().body("Invalid CSRF token"));
         }
     } else {
@@ -522,14 +487,14 @@ async fn submit_new_password(
     let token: &str = form.token.expose_secret();
 
     // 1. ReValidate token
-    let reset_token = auth_service.validate_reset_password_token(token).await?;
+    let reset_token = app_state.validate_reset_password_token(token).await?;
     let user_id = &reset_token.user_id;
     let reset_token_id = reset_token.id()?;
 
     // NOTE → Rate limit per token
 
     // 2. Ensure password is different then previous
-    let account = auth_service.find_account(user_id).await?;
+    let account = app_state.find_account(user_id).await?;
     if account.locked {
         return Err(Error::Forbidden(ForbiddenReason::AccountSuspended));
     }
@@ -542,21 +507,21 @@ async fn submit_new_password(
 
     // 3.
     let hashed_password = Password::hash(&form.password)?;
-    auth_service
+    app_state
         .update_user_password(user_id, &hashed_password)
         .await?;
 
     // 4.
-    auth_service
+    app_state
         .invalidate_password_reset_token(reset_token_id)
         .await?;
 
     // 6. TODO it may not be neccessary
-    auth_service.logout_all(user_id).await?;
+    app_state.logout_all(user_id).await?;
 
-    let success_redirect = match configuration.auth.password.reset.success_redirect {
+    let success_redirect = match app_state.configuration.auth.password.reset.success_redirect {
         Some(url) => url,
-        None => configuration.app.url,
+        None => app_state.configuration.app.url,
     };
     Ok(HttpResponse::Found()
         .insert_header((actix_web::http::header::LOCATION, success_redirect))

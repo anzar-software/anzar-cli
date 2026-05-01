@@ -16,10 +16,10 @@ use crate::scopes::user::{User, service::UserServiceTrait};
 use crate::{extractors::Claims, services::session::model::Session};
 
 async fn validate_user(req: &ServiceRequest, user_id: &str) -> Result<User, AuthError> {
-    let auth_service = support::extract_auth_service(req)?;
+    let app_state = support::extract_app_state(req)?;
 
-    let user: User = auth_service.find_user(user_id).await?;
-    let account = auth_service.find_account(user_id).await?;
+    let user: User = app_state.find_user(user_id).await?;
+    let account = app_state.find_account(user_id).await?;
 
     if account.locked {
         tracing::warn!(
@@ -34,9 +34,9 @@ async fn validate_user(req: &ServiceRequest, user_id: &str) -> Result<User, Auth
 }
 
 fn extract_user_id_from_extensions(req: &ServiceRequest) -> Result<String, AuthError> {
-    let configuration = support::extract_configuration_service(req)?;
+    let app_state = support::extract_app_state(req)?;
 
-    match configuration.auth.strategy {
+    match app_state.configuration.auth.strategy {
         crate::config::AuthStrategy::Session => {
             if let Some(session) = req.extensions().get::<Session>() {
                 return Ok(session.user_id.clone());

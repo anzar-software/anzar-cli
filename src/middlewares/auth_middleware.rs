@@ -26,26 +26,15 @@ fn extract_token_from_header(req: &ServiceRequest, key: String) -> Option<&str> 
         .and_then(|v| v.strip_prefix("Bearer "))
 }
 
-async fn find_session(req: &ServiceRequest, token: &str) -> Result<Session, AuthError> {
-    let auth_service = support::extract_auth_service(req)?;
-    auth_service.find_session(token).await
-}
-async fn update_session_expiray(req: &ServiceRequest, id: &str) -> Result<Session, AuthError> {
-    let auth_service = support::extract_auth_service(req)?;
-    auth_service.extend_timeout(id).await
-}
-
 async fn validate_token(req: &ServiceRequest) -> Result<(), Error> {
-    let configuration = support::extract_configuration_service(req)?;
+    let app_state = support::extract_app_state(req)?;
 
-    match configuration.auth.strategy {
+    match app_state.configuration.auth.strategy {
         AuthStrategy::Session => {
-            let req_session = req.get_session();
-            let data = req_session.get::<String>(AuthSupport::SESSION_COOKIE)?;
+            let data: Option<String> = req.get_session().get(AuthSupport::SESSION_COOKIE)?;
 
-            if let Some(token) = data {
-                let session = find_session(req, &token).await?;
-                let session_id = session.id()?;
+            if let Some(session_id) = data {
+                let session = app_state.find_session(&session_id).await?;
 
                 if session.used_at.is_some() {
                     tracing::error!(
@@ -75,15 +64,17 @@ async fn validate_token(req: &ServiceRequest) -> Result<(), Error> {
                 }
 
                 // NOTE Only expires after true inactivity period
-                update_session_expiray(req, session_id).await?;
+                app_state.extend_timeout(session.id()?).await?;
 
                 req.extensions_mut().insert::<Session>(session);
             }
         }
         AuthStrategy::Jwt => {
             let access_token = extract_token_from_header(req, header::AUTHORIZATION.to_string());
+
             if let Some(token) = access_token {
-                let claims: Claims = JwtDecoder::new(token, &configuration).decode()?;
+                let claims: Claims = JwtDecoder::new(token, &app_state.configuration).decode()?;
+
                 if claims.token_type != crate::extractors::TokenType::AccessToken {
                     tracing::error!(
                         error.code = "AuthError::TokenInvalid",

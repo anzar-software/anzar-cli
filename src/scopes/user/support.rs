@@ -1,22 +1,22 @@
 use crate::error::Result;
+use crate::scopes::auth::service::AuthService;
 use crate::scopes::user::{User, UserRepository};
-use crate::services::account::AccountRepository;
 use crate::{config::AnzarConfiguration, services::fake::service::FakeUserGenerator};
 
 pub async fn resolve_user_with_password(
-    user_repository: &UserRepository,
-    account_repository: &AccountRepository,
+    auth_service: &AuthService,
     email: &str,
     configuration: &AnzarConfiguration,
 ) -> Result<(User, String)> {
     // FIXME Single query with JOIN
     // Try to fetch real user
-    let real = user_repository.find_by_email(email).await.ok();
+    let real = auth_service.user_repository.find_by_email(email).await.ok();
 
     // Extract real password hash or use a fake one
     let (user, password) = match real {
         Some(user) => {
-            match account_repository
+            match auth_service
+                .account_repository
                 .find(&user.clone().id.unwrap_or_default())
                 .await
             {

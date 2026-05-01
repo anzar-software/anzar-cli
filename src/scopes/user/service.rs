@@ -1,70 +1,58 @@
-use crate::config::{AnzarConfiguration, PasswordConfig};
+use crate::config::AppState;
 use crate::error::Result;
-use crate::scopes::auth::service::AuthService;
 use crate::scopes::email::model::EmailVerificationToken;
-use crate::scopes::email::service::EmailVerificationTokenServiceTrait;
 
+use crate::scopes::email::service::EmailVerificationTokenServiceTrait;
 use crate::scopes::user::models::CreateUserOutcome;
 use crate::services::account::model::{Account, AccountStatus};
 use crate::services::lockout::service::LoginAttemptTracker;
-use crate::utils::{CustomPasswordHasher, HmacSigner, Password, SecureToken, TokenHasher};
+use crate::utils::{Credential, HmacSigner, Password, SecureToken};
 
 use super::User;
-use crate::scopes::auth::{RegisterRequest, support};
+use crate::scopes::auth::{LoginRequest, RegisterRequest, support};
 use crate::scopes::user::support as user_support;
 
 pub trait UserServiceTrait {
     fn authenticate_user(
         &self,
-        email: &str,
-        password: &str,
+        body: &LoginRequest,
         device_cookie: &HmacSigner,
         session: &actix_session::Session,
-        configuration: &AnzarConfiguration,
     ) -> impl Future<Output = Result<(User, AccountStatus, u8)>>;
     fn register_failed_attempt(
         &self,
         user: &str,
         device_cookie: Option<&str>,
-        pass_config: &PasswordConfig,
     ) -> impl Future<Output = Result<u8>>;
-    fn create_user(
-        &self,
-        req: RegisterRequest,
-        configuration: &AnzarConfiguration,
-    ) -> impl Future<Output = Result<CreateUserOutcome>>;
-    fn create_verification_email(
-        &self,
-        user: &User,
-        expiray: i64,
-    ) -> impl Future<Output = Result<String>>;
+    fn create_user(&self, body: RegisterRequest)
+    -> impl Future<Output = Result<CreateUserOutcome>>;
+    fn create_verification_email(&self, user: &User) -> impl Future<Output = Result<String>>;
     fn find_user_by_email(&self, email: &str) -> impl Future<Output = Result<User>>;
     fn find_user(&self, id: &str) -> impl Future<Output = Result<User>>;
     fn validate_account(&self, id: &str) -> impl Future<Output = Result<User>>;
 }
-impl UserServiceTrait for AuthService {
+impl UserServiceTrait for AppState {
     #[tracing::instrument(
         name = "auth.authenticate_user",
-        skip(self, email, password, hmac_signer, session, configuration),
+        skip(self, body, hmac_signer, session),
         fields(user.id = tracing::field::Empty)
     )]
     async fn authenticate_user(
         &self,
-        email: &str,
-        password: &str,
+        body: &LoginRequest,
         hmac_signer: &HmacSigner,
         session: &actix_session::Session,
-        configuration: &AnzarConfiguration,
     ) -> Result<(User, AccountStatus, u8)> {
+        let user_repo = &self.auth_service.user_repository;
+
         // 1. ALWAYS verify password (constant-time even with fake hash)
         let (target_user, target_hash) = user_support::resolve_user_with_password(
-            &self.user_repository,
-            &self.account_repository,
-            email,
-            configuration,
+            &self.auth_service,
+            &body.email,
+            &self.configuration,
         )
         .await?;
-        let password_valid = Password::verify(password, &target_hash)?;
+        let password_valid = Password::verify(&body.password, &target_hash)?;
         let user_id = target_user.id()?;
 
         // 2. Fetch device cookie
@@ -73,13 +61,13 @@ impl UserServiceTrait for AuthService {
 
         // 3.
         let tracker = LoginAttemptTracker::new(hmac_signer);
-        let identity = tracker.resolve_identity(device_cookie, email);
-        let lockout_key = tracker.resolve_lockout_key(device_cookie, email);
+        let identity = tracker.resolve_identity(device_cookie, &body.email);
+        let lockout_key = tracker.resolve_lockout_key(device_cookie, &body.email);
 
         // FIXME
         // 4. Use cache_service instead of user_service (more readable)
-        if self.user_repository.is_locked(&lockout_key).await {
-            let _ = self.user_repository.reset_attempts(&identity).await;
+        if user_repo.is_locked(&lockout_key).await {
+            let _ = user_repo.reset_attempts(&identity).await;
 
             tracing::warn!(
                 user.id = %user_id,
@@ -93,18 +81,19 @@ impl UserServiceTrait for AuthService {
         tracing::Span::current().record("user.id", user_id);
         let (account_status, attempts) = match password_valid {
             true => {
-                let _ = self.user_repository.clear_key(&identity).await;
+                let _ = user_repo.clear_key(&identity).await;
                 (AccountStatus::Active, 0)
             }
             _ => {
                 let attempts = self
-                    .register_failed_attempt(&identity, device_cookie, &configuration.auth.password)
+                    .register_failed_attempt(&identity, device_cookie)
                     .await
                     .unwrap_or(1);
 
+                let password_config = &self.configuration.auth.password;
                 tracing::Span::current().record(
                     "attempts.remaining",
-                    configuration.auth.password.security.max_failed_attempts - attempts,
+                    password_config.security.max_failed_attempts - attempts,
                 );
                 (AccountStatus::InvalidCredentials, attempts)
             }
@@ -117,17 +106,18 @@ impl UserServiceTrait for AuthService {
         &self,
         identity: &str,
         device_cookie: Option<&str>,
-        pass_config: &PasswordConfig,
     ) -> Result<u8> {
-        let attempts = self.user_repository.increment(identity).await;
+        let user_repo = &self.auth_service.user_repository;
+        let attempts = user_repo.increment(identity).await;
 
+        let pass_config = &self.configuration.auth.password;
         // max_failed_attempts of authentication within for this specific cookie
         let max_failed_attempts = match device_cookie {
             Some(_) => pass_config.security.max_failed_attempts * 2,
             None => pass_config.security.max_failed_attempts,
         };
         if attempts >= max_failed_attempts {
-            self.user_repository
+            user_repo
                 .put_cookie_in_lockout(identity, pass_config.security.lockout_duration as u64)
                 .await?;
             tracing::warn!("Authentication Failed — update lockout countdown");
@@ -138,26 +128,26 @@ impl UserServiceTrait for AuthService {
 
     #[tracing::instrument(
         name = "auth.create_user",
-        skip(self, req, configuration),
+        skip(self, body),
         fields(user.id = tracing::field::Empty)
     )]
-    async fn create_user(
-        &self,
-        req: RegisterRequest,
-        configuration: &AnzarConfiguration,
-    ) -> Result<CreateUserOutcome> {
+    async fn create_user(&self, body: RegisterRequest) -> Result<CreateUserOutcome> {
         // let mut session = self.transaction_repository.start_transactions().await?;
 
         // 1. Find if user already exist
-        let (_, user_exist) =
-            user_support::resolve_user(&self.user_repository, &req.email, configuration).await?;
+        let (_, user_exist) = user_support::resolve_user(
+            &self.auth_service.user_repository,
+            &body.email,
+            &self.configuration,
+        )
+        .await?;
 
         // 2. Hash user password
-        let password = Password::hash(&req.password)?;
+        let password = Password::hash(&body.password)?;
 
         if user_exist {
             tracing::warn!(
-                email = %req.email,
+                email = %body.email,
                 error.code = "ConflictReason::AlreadyExists",
                 "Registeration failed — user already exists"
             );
@@ -165,15 +155,15 @@ impl UserServiceTrait for AuthService {
         }
 
         let mut user = User::new()
-            .with_username(&req.username)
-            .with_email(&req.email);
+            .with_username(&body.username)
+            .with_email(&body.email);
 
         // let user_id: String = self.user_service.insert(&user, Some(&mut session)).await?;
-        let user_id: String = self.user_repository.insert(&user).await?;
+        let user_id: String = self.auth_service.user_repository.insert(&user).await?;
         user.with_id(&user_id);
 
         let account = Account::user(&user_id).with_password(&password);
-        self.account_repository.insert(account).await?;
+        self.auth_service.account_repository.insert(account).await?;
 
         // self.transaction_repository
         //     .commit_transaction(session)
@@ -185,15 +175,16 @@ impl UserServiceTrait for AuthService {
 
     #[tracing::instrument(
         name = "auth.create_verification_email",
-        skip(self, user, expiry),
+        skip(self, user),
         fields(user.id = user.id, user.email = user.email)
     )]
-    async fn create_verification_email(&self, user: &User, expiry: i64) -> Result<String> {
+    async fn create_verification_email(&self, user: &User) -> Result<String> {
         let user_id = user.id()?;
 
-        let token = SecureToken::with_size32().generate();
-        let hashed_token = SecureToken::hash(&token);
+        let token = SecureToken::with_size32().generate()?;
+        let hashed_token = SecureToken::hash(&token)?;
 
+        let expiry = self.configuration.auth.email.verification.token_expires_in;
         let otp = EmailVerificationToken::default()
             .with_user_id(user_id)
             .with_token_hash(&hashed_token)
@@ -209,7 +200,7 @@ impl UserServiceTrait for AuthService {
         fields(user.email = email)
     )]
     async fn find_user_by_email(&self, email: &str) -> Result<User> {
-        self.user_repository.find_by_email(email).await
+        self.auth_service.user_repository.find_by_email(email).await
     }
 
     #[tracing::instrument(
@@ -218,7 +209,7 @@ impl UserServiceTrait for AuthService {
         fields(user.id = id)
     )]
     async fn find_user(&self, id: &str) -> Result<User> {
-        self.user_repository.find(id).await
+        self.auth_service.user_repository.find(id).await
     }
 
     #[tracing::instrument(
@@ -227,6 +218,6 @@ impl UserServiceTrait for AuthService {
         fields(user.id = id)
     )]
     async fn validate_account(&self, id: &str) -> Result<User> {
-        self.user_repository.validate_account(id).await
+        self.auth_service.user_repository.validate_account(id).await
     }
 }

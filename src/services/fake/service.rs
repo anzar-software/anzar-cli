@@ -4,7 +4,7 @@ use rand::TryRngCore;
 
 use crate::{
     scopes::user::User,
-    utils::{CustomPasswordHasher, Password},
+    utils::{Credential, Password},
 };
 
 pub struct FakeUserGenerator {

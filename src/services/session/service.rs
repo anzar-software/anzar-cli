@@ -1,9 +1,7 @@
+use crate::config::AppState;
 use crate::error::Result;
-use crate::utils::{SecureToken, TokenHasher};
-use crate::{
-    scopes::{auth::service::AuthService, user::User},
-    services::session::model::Session,
-};
+use crate::utils::{Credential, SecureToken};
+use crate::{scopes::user::User, services::session::model::Session};
 
 // [ SessionTrait ]
 pub trait SessionServiceTrait {
@@ -12,39 +10,45 @@ pub trait SessionServiceTrait {
     fn invalidate_session(&self, session_id: &str) -> impl Future<Output = Result<()>>;
     fn extend_timeout(&self, session_id: &str) -> impl Future<Output = Result<Session>>;
 }
-impl SessionServiceTrait for AuthService {
+impl SessionServiceTrait for AppState {
     #[tracing::instrument(
         name = "auth.issue_session", skip(self), fields(user.id = user.id)
     )]
     async fn issue_session(&self, user: &User) -> Result<String> {
         let user_id = user.id()?;
 
-        self.session_repository.revoke(user_id).await?;
+        self.auth_service.session_repository.revoke(user_id).await?;
 
-        let token = SecureToken::with_size32().generate();
-        let hashed_token = SecureToken::hash(&token);
+        let token = SecureToken::with_size32().generate()?;
+        let hashed_token = SecureToken::hash(&token)?;
 
         let session = Session::default()
             .with_user_id(user_id)
             .with_token(&hashed_token);
-        self.session_repository.insert(session).await?;
+        self.auth_service.session_repository.insert(session).await?;
 
         Ok(token)
     }
 
     #[tracing::instrument(name = "auth.find_session", skip(self, token))]
     async fn find_session(&self, token: &str) -> Result<Session> {
-        self.session_repository.find(token).await
+        self.auth_service.session_repository.find(token).await
     }
 
     #[tracing::instrument(name = "auth.invalidate_session", skip(self, token))]
     async fn invalidate_session(&self, token: &str) -> Result<()> {
-        self.session_repository.invalidate(token).await?;
+        self.auth_service
+            .session_repository
+            .invalidate(token)
+            .await?;
         Ok(())
     }
 
     #[tracing::instrument(name = "auth.extend_timeout", skip(self, session_id))]
     async fn extend_timeout(&self, session_id: &str) -> Result<Session> {
-        self.session_repository.extend_timeout(session_id).await
+        self.auth_service
+            .session_repository
+            .extend_timeout(session_id)
+            .await
     }
 }
