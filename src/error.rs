@@ -176,7 +176,7 @@ pub enum InternalError {
     JWT(#[from] jsonwebtoken::errors::Error),
 
     #[error("missing app data: {0}")]
-    MissingAppData(String),
+    MissingConfiguration(String),
 }
 
 // Categories Errors

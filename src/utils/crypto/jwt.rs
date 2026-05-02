@@ -1,36 +1,45 @@
-use jsonwebtoken::DecodingKey;
 use jsonwebtoken::errors::ErrorKind;
-use jsonwebtoken::{Validation, decode};
 use serde::de::DeserializeOwned;
 
 use crate::config::AnzarConfiguration;
 use crate::error::{AuthError, Error, Result, TokenErrorType};
+use crate::extractors::Claims;
 
-pub struct JwtDecoder {
-    token: String,
-    decoding_key: DecodingKey,
-    validation: Validation,
+#[derive(Clone)]
+pub struct JwtSigner {
+    configuration: AnzarConfiguration,
 }
-impl JwtDecoder {
-    pub fn new(token: impl Into<String>, configuration: &AnzarConfiguration) -> Self {
-        let mut validation =
-            jsonwebtoken::Validation::new(configuration.auth.jwt.algorithm.clone().into());
-        validation.set_audience(&[configuration.auth.jwt.clone().audience]);
-        validation.set_issuer(&[configuration.auth.jwt.clone().issuer]);
 
-        Self {
-            token: token.into(),
-            decoding_key: jsonwebtoken::DecodingKey::from_secret(
-                configuration.security.secret_key.as_bytes(),
-            ),
-            validation,
-        }
+impl JwtSigner {
+    pub fn new(configuration: AnzarConfiguration) -> Self {
+        Self { configuration }
     }
 }
 
-impl JwtDecoder {
-    pub fn decode<C: DeserializeOwned>(&self) -> Result<C> {
-        decode::<C>(&self.token, &self.decoding_key, &self.validation)
+impl JwtSigner {
+    pub fn encode(&self, claims: Claims) -> Result<String> {
+        let header =
+            jsonwebtoken::Header::new(self.configuration.auth.jwt.algorithm.clone().into());
+        let encoding_secret = jsonwebtoken::EncodingKey::from_secret(
+            self.configuration.security.secret_key.as_bytes(),
+        );
+
+        let token = jsonwebtoken::encode(&header, &claims, &encoding_secret)?;
+        Ok(token)
+    }
+
+    pub fn decode<C: DeserializeOwned>(&self, token: &str) -> Result<C> {
+        let jwt_config = &self.configuration.auth.jwt;
+
+        let mut validation = jsonwebtoken::Validation::new(jwt_config.algorithm.clone().into());
+        validation.set_audience(&[jwt_config.clone().audience]);
+        validation.set_issuer(&[jwt_config.clone().issuer]);
+
+        let decoding_key = jsonwebtoken::DecodingKey::from_secret(
+            self.configuration.security.secret_key.as_bytes(),
+        );
+
+        jsonwebtoken::decode::<C>(&token, &decoding_key, &validation)
             .map(|token_data| token_data.claims)
             .map_err(|e| match e.kind() {
                 ErrorKind::InvalidSignature => {

@@ -18,7 +18,7 @@ impl FromRequest for AppStateExtractor {
             .app_data::<Data<AppState>>()
             .map(|state| state.get_ref())
             .map(|sm| AppStateExtractor(sm.clone()))
-            .ok_or(Error::Internal(InternalError::MissingAppData(
+            .ok_or(Error::Internal(InternalError::MissingConfiguration(
                 "AppState not registered".into(),
             )));
 

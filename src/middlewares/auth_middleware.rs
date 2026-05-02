@@ -10,12 +10,9 @@ use actix_web::{
 use crate::extract_service_response;
 use crate::{config::AuthStrategy, extractors::Claims};
 
+use crate::error::{Error as AuthError, TokenErrorType};
 use crate::scopes::auth::support as AuthSupport;
 use crate::services::session::{model::Session, service::SessionServiceTrait};
-use crate::{
-    error::{Error as AuthError, TokenErrorType},
-    services::jwt::JwtDecoder,
-};
 
 use super::support;
 
@@ -73,7 +70,7 @@ async fn validate_token(req: &ServiceRequest) -> Result<(), Error> {
             let access_token = extract_token_from_header(req, header::AUTHORIZATION.to_string());
 
             if let Some(token) = access_token {
-                let claims: Claims = JwtDecoder::new(token, &app_state.configuration).decode()?;
+                let claims: Claims = app_state.crypto.jwt()?.decode(token)?;
 
                 if claims.token_type != crate::extractors::TokenType::AccessToken {
                     tracing::error!(

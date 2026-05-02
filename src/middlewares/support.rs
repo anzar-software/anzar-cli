@@ -13,7 +13,7 @@ pub fn extract_app_state(req: &ServiceRequest) -> Result<AppState, Error> {
                 error.code = "InternalError::MissingAppData",
                 "Failed to extract configuration from app_data"
             );
-            Error::Internal(InternalError::MissingAppData(
+            Error::Internal(InternalError::MissingConfiguration(
                 "AppState not registered".into(),
             ))
         })

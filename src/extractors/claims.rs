@@ -66,6 +66,7 @@ impl Claims {
             .clone()
             .with_expiry(jwt_config.access_token_expires_in)
             .with_token_type(TokenType::AccessToken);
+
         let refresh = self
             .with_expiry(jwt_config.refresh_token_expires_in)
             .with_token_type(TokenType::RefreshToken);

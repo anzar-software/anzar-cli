@@ -25,7 +25,7 @@ where
         Box::pin(async move {
             let json = fut
                 .await
-                .map_err(|e| Error::Internal(InternalError::MissingAppData(e.to_string())))?;
+                .map_err(|e| Error::Internal(InternalError::MissingConfiguration(e.to_string())))?;
 
             json.validate()?;
             Ok(ValidatedPayload(json.into_inner()))
@@ -49,7 +49,7 @@ where
         Box::pin(async move {
             let json = fut
                 .await
-                .map_err(|e| Error::Internal(InternalError::MissingAppData(e.to_string())))?;
+                .map_err(|e| Error::Internal(InternalError::MissingConfiguration(e.to_string())))?;
 
             json.validate()?;
             Ok(ValidatedQuery(json.into_inner()))

@@ -8,7 +8,7 @@ use sha2::Sha256;
 
 #[derive(Clone, Default)]
 pub struct HmacSigner {
-    secret_key: String,
+    pub secret_key: String,
 }
 
 impl HmacSigner {

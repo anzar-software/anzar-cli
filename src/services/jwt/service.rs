@@ -2,9 +2,8 @@ use crate::config::AppState;
 use crate::error::{AuthError, Error, Result, TokenErrorType};
 use crate::extractors::{Claims, TokenType};
 use crate::scopes::user::User;
-use crate::services::jwt::JwtDecoder;
 
-use super::{IssuedTokens, JwtEncoder, RefreshToken};
+use super::{IssuedTokens, RefreshToken};
 
 pub trait JwtServiceTrait {
     fn consume_refresh_token(&self, refresh_token: &str) -> impl Future<Output = Result<String>>;
@@ -17,7 +16,8 @@ pub trait JwtServiceTrait {
 impl JwtServiceTrait for AppState {
     #[tracing::instrument(name = "auth.consume_refresh_token", skip(self, refresh_token))]
     async fn consume_refresh_token(&self, refresh_token: &str) -> Result<String> {
-        let claims: Claims = JwtDecoder::new(refresh_token, &self.configuration).decode()?;
+        let claims: Claims = self.crypto.jwt()?.decode(refresh_token)?;
+
         if claims.token_type != crate::extractors::TokenType::RefreshToken {
             return Err(Error::Unauthenticated(AuthError::TokenInvalid {
                 token_type: TokenErrorType::RefreshToken,
@@ -49,13 +49,27 @@ impl JwtServiceTrait for AppState {
         name = "auth.issue_jwt", skip(self, user), fields(user.id = user.id)
     )]
     async fn issue_jwt(&self, user: &User) -> Result<IssuedTokens> {
-        let user_id = user.id()?;
+        let jwt_config = &self.configuration.auth.jwt;
+        let jwt = self.crypto.jwt()?;
 
-        let tokens: IssuedTokens = JwtEncoder::new(user, &self.configuration).encode()?;
+        let user_id = user.id()?;
+        let (access_claims, refresh_claims) = Claims::new(user_id, user.role.clone())
+            .with_issuer(&jwt_config.issuer)
+            .with_audience(&jwt_config.audience)
+            .into_token_pair(jwt_config);
+
+        let jti = refresh_claims.jti;
+        let access = jwt.encode(access_claims)?;
+        let refresh = jwt.encode(refresh_claims)?;
+
+        let tokens = IssuedTokens::default()
+            .with_access_token(&access)
+            .with_refresh_token(&refresh)
+            .with_jti(jti);
 
         let refresh_token = RefreshToken::new(&tokens)
             .with_user_id(user_id)
-            .with_expire_at(self.configuration.auth.jwt.refresh_token_expires_in);
+            .with_expire_at(jwt_config.refresh_token_expires_in);
 
         self.auth_service
             .jwt_repository
@@ -66,7 +80,7 @@ impl JwtServiceTrait for AppState {
 
     #[tracing::instrument(name = "auth.invalidate_jwt", skip(self, refresh_token))]
     async fn invalidate_jwt(&self, refresh_token: &str) -> Result<()> {
-        let claims: Claims = JwtDecoder::new(refresh_token, &self.configuration).decode()?;
+        let claims: Claims = self.crypto.jwt()?.decode(refresh_token)?;
 
         if claims.token_type != TokenType::RefreshToken {
             return Err(Error::Unauthenticated(AuthError::TokenInvalid {

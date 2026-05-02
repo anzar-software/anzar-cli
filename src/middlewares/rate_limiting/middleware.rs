@@ -26,7 +26,7 @@ pub async fn ip_rate_limit_middleware(
     next: Next<impl MessageBody>,
 ) -> Result<ServiceResponse<impl MessageBody>, Error> {
     let ipadd = extract_ipadd(&req).ok_or_else(|| {
-        AuthError::Internal(InternalError::MissingAppData(
+        AuthError::Internal(InternalError::MissingConfiguration(
             "Ip Header not registered".into(),
         ))
     })?;
