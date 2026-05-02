@@ -19,7 +19,6 @@ use crate::services::{
     jwt::service::JwtServiceTrait,
     session::{model::Session, service::SessionServiceTrait},
 };
-use crate::utils::{Credential, HmacSigner, Password, SecureToken};
 
 use super::models::{
     AuthResponse, EmailRequest, ExpiringLink, LoginRequest, RefreshTokenRequest, RegisterRequest,
@@ -77,12 +76,8 @@ pub async fn login(
     // START TIMING-SAFE EXECUTION BLOCK
     let start = std::time::Instant::now();
 
-    let mut hmac_signer = HmacSigner::new(&app_state.configuration.security.secret_key);
-
     // ALWAYS execute the same operations regardless of user existence
-    let (user, account_status, attempts) = app_state
-        .authenticate_user(&req, &hmac_signer, &session)
-        .await?;
+    let (user, account_status, attempts) = app_state.authenticate_user(&req, &session).await?;
 
     // ENFORCE CONSTANT-TIME EXECUTION
     support::throttle_since(start).await;
@@ -101,7 +96,8 @@ pub async fn login(
     match account_status {
         AccountStatus::Active => {
             // Issue new device cookie
-            let cookie = hmac_signer.issue(&req.email)?;
+
+            let cookie = app_state.crypto.hmac.issue(&req.email)?;
 
             match app_state.configuration.auth.strategy {
                 AuthStrategy::Session => app_state.issue_session(&user).await.map(|token| {
@@ -354,8 +350,8 @@ async fn request_password_reset(
         app_state.revoke_password_reset_token(user_id).await?;
 
         // 4.
-        let token = SecureToken::with_size64().generate()?;
-        let hashed_token = SecureToken::hash(&token)?;
+        let token = app_state.crypto.token.generate()?;
+        let hashed_token = app_state.crypto.token.hash(&token);
 
         // 5.
         let expiry_timestamp = chrono::Utc::now()
@@ -423,12 +419,12 @@ async fn render_reset_form(
     let token: &str = query.token.expose_secret();
     app_state.validate_reset_password_token(token).await?;
 
-    let csrf_token = SecureToken::with_size64().generate()?;
+    let csrf_token = app_state.crypto.token.generate()?;
     session.clear();
     session.insert(support::CSRF_COOKIE, &csrf_token)?;
 
-    let script_nonce = SecureToken::with_size32().generate()?;
-    let style_nonce = SecureToken::with_size32().generate()?;
+    let script_nonce = app_state.crypto.token.generate()?;
+    let style_nonce = app_state.crypto.token.generate()?;
 
     let body = include_str!("templates/update_password.html")
         .replace("{{STYLE_NONCE}}", &style_nonce)
@@ -476,7 +472,11 @@ async fn submit_new_password(
 
     // 0.5 Verify CSRF token
     if let Some(expected) = session.get::<String>(support::CSRF_COOKIE)? {
-        if !SecureToken::verify(&expected, form.csrf_token.expose_secret())? {
+        if !app_state
+            .crypto
+            .token
+            .verify(&expected, form.csrf_token.expose_secret())
+        {
             return Ok(HttpResponse::Forbidden().body("Invalid CSRF token"));
         }
     } else {
@@ -498,7 +498,11 @@ async fn submit_new_password(
     if account.locked {
         return Err(Error::Forbidden(ForbiddenReason::AccountSuspended));
     }
-    if Password::verify(&form.password, &account.password)? {
+    if app_state
+        .crypto
+        .password_hasher
+        .verify(&form.password, &account.password)?
+    {
         tracing::warn!("Password reuse attempt for user: {}", user_id);
         return Err(Error::Unauthenticated(AuthError::InvalidCredentials {
             field: CredentialField::Password,
@@ -506,7 +510,7 @@ async fn submit_new_password(
     }
 
     // 3.
-    let hashed_password = Password::hash(&form.password)?;
+    let hashed_password = app_state.crypto.password_hasher.hash(&form.password)?;
     app_state
         .update_user_password(user_id, &hashed_password)
         .await?;

@@ -1,7 +1,6 @@
 use crate::config::AppState;
 use crate::error::{Error, Result, TokenErrorType};
 use crate::scopes::email::model::EmailVerificationToken;
-use crate::utils::{Credential, SecureToken};
 
 pub trait EmailVerificationTokenServiceTrait {
     fn insert_email_verification_token(
@@ -33,7 +32,7 @@ impl EmailVerificationTokenServiceTrait for AppState {
         &self,
         token: &str,
     ) -> Result<EmailVerificationToken> {
-        let hash = SecureToken::hash(token)?;
+        let hash = self.crypto.token.hash(token);
 
         // 2. Checks the database for a matching token
         let verification_token = self

@@ -1,22 +1,22 @@
 use crate::config::AppState;
 use crate::error::Result;
-use crate::scopes::email::model::EmailVerificationToken;
 
-use crate::scopes::email::service::EmailVerificationTokenServiceTrait;
+use crate::scopes::auth::{LoginRequest, RegisterRequest, support};
+use crate::scopes::email::{
+    model::EmailVerificationToken, service::EmailVerificationTokenServiceTrait,
+};
 use crate::scopes::user::models::CreateUserOutcome;
+
 use crate::services::account::model::{Account, AccountStatus};
 use crate::services::lockout::service::LoginAttemptTracker;
-use crate::utils::{Credential, HmacSigner, Password, SecureToken};
 
 use super::User;
-use crate::scopes::auth::{LoginRequest, RegisterRequest, support};
-use crate::scopes::user::support as user_support;
+use super::support as user_support;
 
 pub trait UserServiceTrait {
     fn authenticate_user(
         &self,
         body: &LoginRequest,
-        device_cookie: &HmacSigner,
         session: &actix_session::Session,
     ) -> impl Future<Output = Result<(User, AccountStatus, u8)>>;
     fn register_failed_attempt(
@@ -34,25 +34,24 @@ pub trait UserServiceTrait {
 impl UserServiceTrait for AppState {
     #[tracing::instrument(
         name = "auth.authenticate_user",
-        skip(self, body, hmac_signer, session),
+        skip(self, body, session),
         fields(user.id = tracing::field::Empty)
     )]
     async fn authenticate_user(
         &self,
         body: &LoginRequest,
-        hmac_signer: &HmacSigner,
         session: &actix_session::Session,
     ) -> Result<(User, AccountStatus, u8)> {
         let user_repo = &self.auth_service.user_repository;
 
         // 1. ALWAYS verify password (constant-time even with fake hash)
-        let (target_user, target_hash) = user_support::resolve_user_with_password(
-            &self.auth_service,
-            &body.email,
-            &self.configuration,
-        )
-        .await?;
-        let password_valid = Password::verify(&body.password, &target_hash)?;
+        let app_state = self;
+        let (target_user, target_hash) =
+            user_support::resolve_user_with_password(&body.email, app_state).await?;
+        let password_valid = self
+            .crypto
+            .password_hasher
+            .verify(&body.password, &target_hash)?;
         let user_id = target_user.id()?;
 
         // 2. Fetch device cookie
@@ -60,7 +59,7 @@ impl UserServiceTrait for AppState {
         let device_cookie = raw.as_deref();
 
         // 3.
-        let tracker = LoginAttemptTracker::new(hmac_signer);
+        let tracker = LoginAttemptTracker::new(&self.crypto);
         let identity = tracker.resolve_identity(device_cookie, &body.email);
         let lockout_key = tracker.resolve_lockout_key(device_cookie, &body.email);
 
@@ -135,15 +134,11 @@ impl UserServiceTrait for AppState {
         // let mut session = self.transaction_repository.start_transactions().await?;
 
         // 1. Find if user already exist
-        let (_, user_exist) = user_support::resolve_user(
-            &self.auth_service.user_repository,
-            &body.email,
-            &self.configuration,
-        )
-        .await?;
+        let app_state = self;
+        let (_, user_exist) = user_support::resolve_user(&body.email, app_state).await?;
 
         // 2. Hash user password
-        let password = Password::hash(&body.password)?;
+        let password = self.crypto.password_hasher.hash(&body.password)?;
 
         if user_exist {
             tracing::warn!(
@@ -181,8 +176,8 @@ impl UserServiceTrait for AppState {
     async fn create_verification_email(&self, user: &User) -> Result<String> {
         let user_id = user.id()?;
 
-        let token = SecureToken::with_size32().generate()?;
-        let hashed_token = SecureToken::hash(&token)?;
+        let token = self.crypto.token.generate()?;
+        let hashed_token = self.crypto.token.hash(&token);
 
         let expiry = self.configuration.auth.email.verification.token_expires_in;
         let otp = EmailVerificationToken::default()

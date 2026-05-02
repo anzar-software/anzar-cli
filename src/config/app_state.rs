@@ -11,10 +11,11 @@ use crate::config::database::cache_driver::CacheDriver;
 use crate::config::{AnzarConfiguration, AppConfig, Database, DatabaseDriver};
 use crate::error::Result;
 use crate::scopes::auth::service::AuthService;
-use crate::utils::{Credential, SecureToken};
+use crate::utils::crypto::{Crypto, SecureToken};
 
 #[derive(Clone)]
 pub struct AppState {
+    pub crypto: Crypto,
     pub auth_service: AuthService,
     pub configuration: AnzarConfiguration,
 }
@@ -26,16 +27,22 @@ impl AppState {
         let auth_service = AuthService::from_database(&configuration.database).await?;
 
         Ok(Self {
+            crypto: Crypto::with_argon()
+                .with_hmac_secret(&configuration.security.secret_key)
+                .with_token_size64(),
             auth_service,
             configuration,
         })
     }
 
     pub async fn testing(address: &str) -> Result<Self> {
-        let configuration = Self::build_config(address).await.expect("booo");
+        let configuration = Self::build_config(address).await?;
         let auth_service = Self::build_authservice(&configuration.database).await?;
 
         Ok(Self {
+            crypto: Crypto::with_argon()
+                .with_hmac_secret(&configuration.security.secret_key)
+                .with_token_size64(),
             auth_service,
             configuration,
         })

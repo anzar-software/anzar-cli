@@ -1,7 +1,6 @@
 use crate::config::AppState;
 use crate::error::{AuthError, Error, Result, TokenErrorType};
 use crate::scopes::auth::model::PasswordResetToken;
-use crate::utils::{Credential, SecureToken};
 
 // [ PasswordResetTokenServiceTrait ]
 pub trait PasswordResetTokenServiceTrait {
@@ -30,7 +29,7 @@ impl PasswordResetTokenServiceTrait for AppState {
 
     #[tracing::instrument(name = "auth.validate_reset_password_token", skip(self, token))]
     async fn validate_reset_password_token(&self, token: &str) -> Result<PasswordResetToken> {
-        let hash = SecureToken::hash(token)?;
+        let hash = self.crypto.token.hash(token);
         // FIXME: → Must check hash + expiry + not revoked in one DB transaction.
 
         // 2. Checks the database for a matching token

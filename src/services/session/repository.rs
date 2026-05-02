@@ -4,7 +4,6 @@ use chrono::{Duration, Utc};
 
 use crate::error::{Error, InternalError, Result, TokenErrorType};
 use crate::utils::query::QueryBuilder;
-use crate::utils::{Credential, SecureToken};
 use crate::{adapters::database::DatabaseAdapter, services::session::model::Session};
 
 #[derive(Clone)]
@@ -32,7 +31,7 @@ impl SessionRepository {
 
     #[tracing::instrument(name = "db.account.find", skip(self, token))]
     pub async fn find(&self, token: &str) -> Result<Session> {
-        let filter = QueryBuilder::default().eq("token", SecureToken::hash(token)?);
+        let filter = QueryBuilder::default().eq("token", token);
 
         match self.adapter.find_one(filter).await {
             Ok(Some(session)) => Ok(session),

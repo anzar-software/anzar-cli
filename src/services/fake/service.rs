@@ -1,11 +1,10 @@
+use std::sync::Arc;
+
 use base64::{Engine, prelude::BASE64_URL_SAFE_NO_PAD};
 use hmac::Mac;
 use rand::TryRngCore;
 
-use crate::{
-    scopes::user::User,
-    utils::{Credential, Password},
-};
+use crate::{scopes::user::User, utils::crypto::Hashable};
 
 pub struct FakeUserGenerator {
     secret_key: String,
@@ -41,7 +40,7 @@ impl FakeUserGenerator {
         }
     }
 
-    pub fn generate_fake_hash(&self) -> String {
+    pub fn generate_fake_hash(&self, password_hasher: &Arc<dyn Hashable>) -> String {
         // Generate different fake hash for each email
         let fake_password = {
             let mut bytes = [0u8; 32];
@@ -49,6 +48,6 @@ impl FakeUserGenerator {
             BASE64_URL_SAFE_NO_PAD.encode(bytes)
         };
 
-        Password::hash(&fake_password).unwrap_or_default()
+        password_hasher.hash(&fake_password).unwrap_or_default()
     }
 }

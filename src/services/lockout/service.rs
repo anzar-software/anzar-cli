@@ -1,12 +1,12 @@
-use crate::utils::HmacSigner;
+use crate::utils::crypto::Crypto;
 
 pub struct LoginAttemptTracker<'a> {
-    signer: &'a HmacSigner,
+    crypto: &'a Crypto,
 }
 
 impl<'a> LoginAttemptTracker<'a> {
-    pub fn new(signer: &'a HmacSigner) -> Self {
-        Self { signer }
+    pub fn new(crypto: &'a Crypto) -> Self {
+        Self { crypto }
     }
 
     pub fn resolve_identity(&self, cookie: Option<&str>, email: &str) -> String {
@@ -19,7 +19,7 @@ impl<'a> LoginAttemptTracker<'a> {
 
     pub fn resolve_lockout_key(&self, cookie: Option<&str>, email: &str) -> String {
         // "what gets locked out" — verified device vs user account
-        match cookie.and_then(|c| self.signer.validate(c)) {
+        match cookie.and_then(|c| self.crypto.hmac.validate(c)) {
             Some(true) => format!("lockout:device:{}", cookie.unwrap_or_default()),
             Some(false) | None => format!("lockout:user:{}", email),
         }

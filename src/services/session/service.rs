@@ -1,6 +1,5 @@
 use crate::config::AppState;
 use crate::error::Result;
-use crate::utils::{Credential, SecureToken};
 use crate::{scopes::user::User, services::session::model::Session};
 
 // [ SessionTrait ]
@@ -19,8 +18,8 @@ impl SessionServiceTrait for AppState {
 
         self.auth_service.session_repository.revoke(user_id).await?;
 
-        let token = SecureToken::with_size32().generate()?;
-        let hashed_token = SecureToken::hash(&token)?;
+        let token = self.crypto.token.generate()?;
+        let hashed_token = self.crypto.token.hash(&token);
 
         let session = Session::default()
             .with_user_id(user_id)
@@ -32,7 +31,8 @@ impl SessionServiceTrait for AppState {
 
     #[tracing::instrument(name = "auth.find_session", skip(self, token))]
     async fn find_session(&self, token: &str) -> Result<Session> {
-        self.auth_service.session_repository.find(token).await
+        let hash = self.crypto.token.hash(token);
+        self.auth_service.session_repository.find(&hash).await
     }
 
     #[tracing::instrument(name = "auth.invalidate_session", skip(self, token))]
