@@ -21,7 +21,7 @@ pub struct AnzarConfiguration {
 }
 
 impl AnzarConfiguration {
-    pub fn validate(&self) -> Result<(), Vec<Error>> {
+    pub fn validate(&self) -> Result<(), Error> {
         let mut errors = vec![];
 
         if let Err(e) = self.auth.validate() {
@@ -34,7 +34,7 @@ impl AnzarConfiguration {
         if errors.is_empty() {
             Ok(())
         } else {
-            Err(errors)
+            Err(Error::Internal(InternalError::InvalidConfig(errors)))
         }
     }
 }
@@ -190,7 +190,7 @@ impl Authentication {
         match &self.strategy {
             AuthStrategy::Jwt(config) => Ok(config),
             _ => Err(Error::Internal(InternalError::MissingConfiguration(
-                "auth.strategy is not Jwt".into(),
+                "JWT strategy is required, but auth.strategy was not configured correctly".into(),
             ))),
         }
     }
@@ -198,7 +198,8 @@ impl Authentication {
         match &self.strategy {
             AuthStrategy::Session(config) => Ok(config),
             _ => Err(Error::Internal(InternalError::MissingConfiguration(
-                "auth.strategy is not Session".into(),
+                "Session strategy is required, but auth.strategy was not configured correctly"
+                    .into(),
             ))),
         }
     }
@@ -436,6 +437,7 @@ pub struct Security {
     pub secret_key: String,
     #[serde(default = "default_headers")]
     pub headers: Vec<(String, String)>,
+    // pub headers: std::collections::HashMap<String, String>,
 }
 
 fn default_headers() -> Vec<(String, String)> {

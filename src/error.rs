@@ -180,6 +180,9 @@ pub enum InternalError {
 
     #[error("missing configuration field: {field} - {reason}")]
     MissingField { field: String, reason: String },
+
+    #[error("Validation failed")]
+    InvalidConfig(Vec<Error>),
 }
 
 // Categories Errors

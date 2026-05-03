@@ -1,14 +1,12 @@
 use std::fs;
 use uuid::Uuid;
 
-use crate::adapters::cache::{
-    CacheAdapters, in_memory::InMemoryAdapter, memcache::MemCache, redis::Redis,
-};
-use crate::adapters::database::{
-    DatabaseAdapters, mongodb::MongoDB, postgres::PostgreSQL, sqlite::SQLite,
+use crate::adapters::{
+    cache::{CacheAdapters, in_memory::InMemoryAdapter, memcache::MemCache, redis::Redis},
+    database::{DatabaseAdapters, mongodb::MongoDB, postgres::PostgreSQL, sqlite::SQLite},
 };
 use crate::config::database::cache_driver::CacheDriver;
-use crate::config::{AnzarConfiguration, AppConfig, AuthStrategy, Database, DatabaseDriver};
+use crate::config::{AnzarConfiguration, AppConfig, Database, DatabaseDriver};
 use crate::error::Result;
 use crate::scopes::auth::service::AuthService;
 use crate::utils::crypto::{Crypto, SecureToken};
@@ -26,17 +24,8 @@ impl AppState {
         let configuration: AnzarConfiguration = serde_yaml::from_str(content.as_str())?;
         let auth_service = AuthService::from_database(&configuration.database).await?;
 
-        let crypto = {
-            let base = Crypto::with_argon()
-                .with_hmac_secret(&configuration.security.secret_key)
-                .with_token_size64();
-
-            match configuration.auth.strategy {
-                AuthStrategy::Jwt(..) => base.with_jwt(configuration.clone()),
-                _ => base,
-            }
-        };
-        crypto.validate()?;
+        configuration.validate()?;
+        let crypto = Crypto::from_configuration(&configuration)?;
 
         Ok(Self {
             crypto,
@@ -49,18 +38,9 @@ impl AppState {
         let configuration = Self::build_config(address).await?;
         let auth_service = Self::build_authservice(&configuration.database).await?;
 
-        let crypto = {
-            let base = Crypto::with_argon()
-                .with_hmac_secret(&configuration.security.secret_key)
-                .with_token_size64();
+        configuration.validate()?;
+        let crypto = Crypto::from_configuration(&configuration)?;
 
-            match configuration.auth.strategy {
-                AuthStrategy::Jwt(..) => base.with_jwt(configuration.clone()),
-                _ => base,
-            }
-        };
-
-        crypto.validate()?;
         Ok(Self {
             crypto,
             auth_service,

@@ -12,7 +12,10 @@ pub use jwt::JwtSigner;
 pub use password_hasher::{Argon2Password, BcryptPassword, Hashable};
 pub use secure_token::SecureToken;
 
-use crate::error::{Error, InternalError, Result};
+use crate::{
+    config::{AnzarConfiguration, AuthStrategy, HashingAlgorithm},
+    error::{Error, InternalError, Result},
+};
 
 #[derive(Clone)]
 pub struct Crypto {
@@ -71,18 +74,28 @@ impl Crypto {
 }
 
 impl Crypto {
-    pub fn validate(&self) -> Result<()> {
-        if self.jwt.is_none() {
+    pub fn validate(self, strategy: &AuthStrategy) -> Result<Self> {
+        if matches!(strategy, AuthStrategy::Jwt(..)) && self.jwt.is_none() {
             return Err(Error::Internal(InternalError::MissingConfiguration(
-                "JwtSigner".into(),
+                "JWT strategy requires a JWT signer, but none was configured".into(),
             )));
         }
-        if self.hmac.secret_key.is_empty() {
-            return Err(Error::Internal(InternalError::MissingConfiguration(
-                "HmacSigner".into(),
-            )));
+
+        match self.hmac.secret_key.len() {
+            0 => {
+                return Err(Error::Internal(InternalError::MissingConfiguration(
+                    "HMAC secret key is missing".into(),
+                )));
+            }
+            n if n < 32 => {
+                return Err(Error::Internal(InternalError::MissingConfiguration(
+                    format!("HMAC secret key is too short ({n} bytes), minimum is 32 bytes"),
+                )));
+            }
+            _ => {}
         }
-        Ok(())
+
+        Ok(self)
     }
 
     pub fn jwt(&self) -> Result<&JwtSigner> {
@@ -91,5 +104,45 @@ impl Crypto {
             .ok_or(Error::Internal(InternalError::MissingConfiguration(
                 "JwtSigner".to_string(),
             )))
+    }
+}
+
+impl Crypto {
+    pub fn from_configuration(configuration: &AnzarConfiguration) -> Result<Self> {
+        let base = match configuration.auth.password.algorithm {
+            HashingAlgorithm::Argon2 { .. } => Crypto::with_argon(),
+            HashingAlgorithm::Bcrypt { .. } => Crypto::with_bcrypt(),
+        }
+        .with_hmac_secret(&configuration.security.secret_key)
+        .with_token_size64();
+
+        match configuration.auth.strategy {
+            AuthStrategy::Jwt(..) => base.with_jwt(configuration.clone()),
+            _ => base,
+        }
+        .validate(&configuration.auth.strategy)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn base_crypto() -> Crypto {
+        Crypto::with_argon()
+            .with_hmac_secret(&"a".repeat(32))
+            .with_token_size64()
+    }
+
+    #[test]
+    fn test_valid_session_strategy() {
+        let crypto = base_crypto();
+        assert!(
+            crypto
+                .validate(&AuthStrategy::Session(crate::config::SessionConfig {
+                    ..Default::default()
+                }))
+                .is_ok()
+        );
     }
 }

@@ -78,7 +78,7 @@ impl Validate for SessionConfig {
         if self.name.is_empty() {
             errors.push(Error::Internal(InternalError::MissingField {
                 field: "auth.session.name".into(),
-                reason: "must be greater than 0".into(),
+                reason: "must not be empty".into(),
             }));
         }
         if self.max_age == 0 {
