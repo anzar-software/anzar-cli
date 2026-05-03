@@ -1,3 +1,5 @@
+use std::str::FromStr;
+
 use argon2::{
     Argon2, PasswordHash, PasswordHasher, PasswordVerifier,
     password_hash::{SaltString, rand_core::OsRng},
@@ -59,11 +61,27 @@ impl Hashable for Argon2Password {
 pub struct BcryptPassword;
 
 impl Hashable for BcryptPassword {
-    fn hash(&self, _value: &str) -> Result<String> {
-        unimplemented!()
+    fn hash(&self, value: &str) -> Result<String> {
+        let hash = bcrypt::hash(value, bcrypt::DEFAULT_COST).map_err(|e| {
+            tracing::error!("Failed to hash user password: {:?}", e);
+            Error::Internal(InternalError::Hashing)
+        })?;
+
+        Ok(hash.to_string())
     }
 
-    fn verify(&self, _a: &str, _b: &str) -> Result<bool> {
-        unimplemented!()
+    fn verify(&self, password: &str, hash: &str) -> Result<bool> {
+        static DUMMY_HASH: &str = "$2b$12$kgQ2Rl.I22hVIJVklF9OceDIv8EBoMXtlw6U15pVLlmleTLfRUMRe";
+
+        let hash_to_verify = if bcrypt::HashParts::from_str(hash).is_ok() {
+            hash.to_string()
+        } else {
+            DUMMY_HASH.to_string()
+        };
+
+        let is_valid = bcrypt::verify(password, &hash_to_verify)
+            .map_err(|_| Error::Internal(InternalError::Hashing))?;
+
+        Ok(is_valid)
     }
 }

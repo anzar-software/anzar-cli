@@ -49,7 +49,7 @@ impl JwtServiceTrait for AppState {
         name = "auth.issue_jwt", skip(self, user), fields(user.id = user.id)
     )]
     async fn issue_jwt(&self, user: &User) -> Result<IssuedTokens> {
-        let jwt_config = &self.configuration.auth.jwt;
+        let jwt_config = self.configuration.auth.jwt()?;
         let jwt = self.crypto.jwt()?;
 
         let user_id = user.id()?;

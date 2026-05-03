@@ -99,22 +99,21 @@ pub async fn login(
 
             let cookie = app_state.crypto.hmac.issue(&req.email)?;
 
-            match app_state.configuration.auth.strategy {
-                AuthStrategy::Session => app_state.issue_session(&user).await.map(|token| {
+            match &app_state.configuration.auth.strategy {
+                AuthStrategy::Session(..) => app_state.issue_session(&user).await.map(|token| {
                     session.clear();
                     session.renew();
                     session.insert(support::DEVICE_COOKIE, &cookie)?;
                     session.insert(support::SESSION_COOKIE, token)?;
                     Ok(HttpResponse::Ok().json(AuthResponse::new(user)))
                 })?,
-                AuthStrategy::Jwt => app_state.issue_jwt(&user).await.map(|tokens| {
+                AuthStrategy::Jwt(jwt) => app_state.issue_jwt(&user).await.map(|tokens| {
                     session.clear();
                     session.renew();
                     session.insert(support::DEVICE_COOKIE, &cookie)?;
 
                     Ok(HttpResponse::Ok().json(
-                        AuthResponse::new(user)
-                            .with_jwt(tokens, auth_config.jwt.access_token_expires_in),
+                        AuthResponse::new(user).with_jwt(tokens, jwt.access_token_expires_in),
                     ))
                 })?,
             }
@@ -192,8 +191,8 @@ pub async fn register(
                     response = response.with_verification(&link, email_config.token_expires_in);
                 }
 
-                let http_response = match app_state.configuration.auth.strategy {
-                    AuthStrategy::Session => {
+                let http_response = match &app_state.configuration.auth.strategy {
+                    AuthStrategy::Session(..) => {
                         let token = app_state.issue_session(&user).await?;
 
                         session.clear();
@@ -203,10 +202,9 @@ pub async fn register(
                         response
                     }
 
-                    AuthStrategy::Jwt => {
+                    AuthStrategy::Jwt(jwt) => {
                         let tokens = app_state.issue_jwt(&user).await?;
-                        let expiry = app_state.configuration.auth.jwt.access_token_expires_in;
-                        response.with_jwt(tokens, expiry)
+                        response.with_jwt(tokens, jwt.access_token_expires_in)
                     }
                 };
 
@@ -268,6 +266,8 @@ pub async fn refresh_token(
     req: web::Json<RefreshTokenRequest>,
     AppStateExtractor(app_state): AppStateExtractor,
 ) -> Result<HttpResponse> {
+    let jwt = app_state.configuration.auth.jwt()?;
+
     let user_id = app_state
         .consume_refresh_token(req.0.refresh_token.expose_secret())
         .await?;
@@ -275,7 +275,7 @@ pub async fn refresh_token(
     let user: User = app_state.find_user(&user_id).await?;
 
     app_state.issue_jwt(&user).await.map(|tokens| {
-        let expiry = app_state.configuration.auth.jwt.access_token_expires_in;
+        let expiry = jwt.access_token_expires_in;
         Ok(HttpResponse::Ok().json(AuthResponse::new(user).with_jwt(tokens, expiry)))
     })?
 }
@@ -304,8 +304,8 @@ async fn logout(
     session_manager: actix_session::Session,
 ) -> Result<HttpResponse> {
     let result = match app_state.configuration.auth.strategy {
-        AuthStrategy::Session => app_state.invalidate_session(&session.token).await,
-        AuthStrategy::Jwt => {
+        AuthStrategy::Session(..) => app_state.invalidate_session(&session.token).await,
+        AuthStrategy::Jwt(..) => {
             app_state
                 .invalidate_jwt(req.0.refresh_token.expose_secret())
                 .await

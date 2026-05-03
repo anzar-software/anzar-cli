@@ -37,7 +37,7 @@ fn extract_user_id_from_extensions(req: &ServiceRequest) -> Result<String, AuthE
     let app_state = support::extract_app_state(req)?;
 
     match app_state.configuration.auth.strategy {
-        crate::config::AuthStrategy::Session => {
+        crate::config::AuthStrategy::Session(..) => {
             if let Some(session) = req.extensions().get::<Session>() {
                 return Ok(session.user_id.clone());
             }
@@ -52,7 +52,7 @@ fn extract_user_id_from_extensions(req: &ServiceRequest) -> Result<String, AuthE
                 },
             ))
         }
-        crate::config::AuthStrategy::Jwt => {
+        crate::config::AuthStrategy::Jwt(..) => {
             if let Some(claims) = req.extensions().get::<Claims>() {
                 return Ok(claims.sub.clone());
             }

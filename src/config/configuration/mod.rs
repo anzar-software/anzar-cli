@@ -1,6 +1,13 @@
+pub mod validate;
+
 use super::database::{cache_driver::CacheDriver, driver::DatabaseDriver};
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
+
+use crate::{
+    config::validate::Validate,
+    error::{Error, InternalError},
+};
 
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize, ToSchema)]
 pub struct AnzarConfiguration {
@@ -11,6 +18,25 @@ pub struct AnzarConfiguration {
     #[serde(default)]
     pub auth: Authentication, // [Optional] Uses Default
     pub security: Security, // Required
+}
+
+impl AnzarConfiguration {
+    pub fn validate(&self) -> Result<(), Vec<Error>> {
+        let mut errors = vec![];
+
+        if let Err(e) = self.auth.validate() {
+            errors.extend(e);
+        }
+        if let Err(e) = self.security.validate() {
+            errors.extend(e);
+        }
+
+        if errors.is_empty() {
+            Ok(())
+        } else {
+            Err(errors)
+        }
+    }
 }
 
 impl AnzarConfiguration {
@@ -29,7 +55,10 @@ impl AnzarConfiguration {
                 },
             },
             server: Server::default(),
-            auth: Authentication::default(),
+            auth: Authentication {
+                strategy: AuthStrategy::Jwt(JwtConfig::default()),
+                ..Default::default()
+            },
             security: Security {
                 secret_key: String::default(),
                 headers: vec![],
@@ -119,7 +148,7 @@ pub struct CorsConfig {
     pub allowed_methods: Vec<String>,
     pub allowed_headers: Vec<String>,
     pub allow_credentials: bool,
-    pub max_age: usize,
+    pub max_age: u64,
 }
 impl Default for CorsConfig {
     fn default() -> Self {
@@ -153,18 +182,39 @@ impl Default for CorsConfig {
 #[serde(default)]
 pub struct Authentication {
     pub strategy: AuthStrategy,
-    pub jwt: JwtConfig,
-    pub session: SessionConfig,
     pub email: EmailConfig,
     pub password: PasswordConfig,
 }
+impl Authentication {
+    pub fn jwt(&self) -> Result<&JwtConfig, Error> {
+        match &self.strategy {
+            AuthStrategy::Jwt(config) => Ok(config),
+            _ => Err(Error::Internal(InternalError::MissingConfiguration(
+                "auth.strategy is not Jwt".into(),
+            ))),
+        }
+    }
+    pub fn session(&self) -> Result<&SessionConfig, Error> {
+        match &self.strategy {
+            AuthStrategy::Session(config) => Ok(config),
+            _ => Err(Error::Internal(InternalError::MissingConfiguration(
+                "auth.strategy is not Session".into(),
+            ))),
+        }
+    }
+}
 // AuthStrategy
 // ------------------------------------------------------------
-#[derive(Debug, Default, Clone, PartialEq, Eq, Deserialize, Serialize, ToSchema)]
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize, ToSchema)]
+#[serde(tag = "type")]
 pub enum AuthStrategy {
-    #[default]
-    Session,
-    Jwt,
+    Session(SessionConfig),
+    Jwt(JwtConfig),
+}
+impl Default for AuthStrategy {
+    fn default() -> Self {
+        Self::Session(SessionConfig::default())
+    }
 }
 // JwtConfig
 // ------------------------------------------------------------
@@ -176,6 +226,17 @@ pub struct JwtConfig {
     pub refresh_token_expires_in: i64,
     pub issuer: String,
     pub audience: String,
+}
+impl Default for JwtConfig {
+    fn default() -> Self {
+        Self {
+            algorithm: AlgorithmConfig::default(),
+            access_token_expires_in: 900,
+            refresh_token_expires_in: 604800,
+            issuer: String::new(),
+            audience: String::new(),
+        }
+    }
 }
 //
 #[derive(Debug, Default, Clone, PartialEq, Eq, Deserialize, Serialize, ToSchema)]
@@ -212,24 +273,13 @@ impl From<AlgorithmConfig> for jsonwebtoken::Algorithm {
         }
     }
 }
-impl Default for JwtConfig {
-    fn default() -> Self {
-        Self {
-            algorithm: AlgorithmConfig::default(),
-            access_token_expires_in: 900,
-            refresh_token_expires_in: 604800,
-            issuer: "http://locahost:3000".into(),
-            audience: "web-app".into(),
-        }
-    }
-}
 // SessionConfig
 // ------------------------------------------------------------
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize, ToSchema)]
 #[serde(default)]
 pub struct SessionConfig {
     pub name: String,
-    pub max_age: usize,
+    pub max_age: u64,
     pub secure: bool,
     pub http_only: bool,
     pub same_site: SameSiteConfig,
@@ -294,13 +344,34 @@ impl Default for EmailVerification {
 #[derive(Debug, Default, Clone, PartialEq, Eq, Deserialize, Serialize, ToSchema)]
 #[serde(default)]
 pub struct PasswordConfig {
-    // hashing:
-    //   algorithm: "bcrypt"   # bcrypt | argon2
-    //   rounds: 12
+    pub algorithm: HashingAlgorithm,
     pub requirements: PasswordRequirements,
     pub reset: PasswordReset,
     pub security: PasswordSecurity,
 }
+// ************************************************************
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize, ToSchema)]
+#[serde(tag = "type")]
+pub enum HashingAlgorithm {
+    Argon2 {
+        memory_kib: u32,
+        iterations: u32,
+        parallelism: u32,
+    },
+    Bcrypt {
+        cost: u32,
+    },
+}
+impl Default for HashingAlgorithm {
+    fn default() -> Self {
+        Self::Argon2 {
+            memory_kib: 65536, // 64 MiB
+            iterations: 3,
+            parallelism: 4,
+        }
+    }
+}
+
 // ************************************************************
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize, ToSchema)]
 #[serde(default)]
@@ -361,6 +432,7 @@ impl Default for PasswordSecurity {
 // =============================================================================
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize, ToSchema)]
 pub struct Security {
+    #[serde(skip_serializing)]
     pub secret_key: String,
     #[serde(default = "default_headers")]
     pub headers: Vec<(String, String)>,
@@ -385,6 +457,7 @@ fn default_headers() -> Vec<(String, String)> {
     ]
 }
 
+// humantime-serde is great for this — lets you write "15m" in config files.
 // server:
 //   rate_limiting:
 //     enabled: true

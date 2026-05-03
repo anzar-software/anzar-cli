@@ -65,6 +65,7 @@ async-trait = "0.1.82"
 # Cryptography
 sha2 = "0.10.9"
 argon2 = "0.5.3"
+bcrypt = "0.19.0"
 base64 = "0.22.1"
 hmac = "0.12.1"
 rustls = { version = "0.23.32", features = ["ring"] }

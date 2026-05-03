@@ -12,6 +12,9 @@ async fn main() -> std::io::Result<()> {
     // FIXME allow users to send emails, make some callbacks in you SDK
     let app_config = AppConfig::load().expect("Failed to read configuration");
 
+    let dummy = bcrypt::hash("dummy_password", 12).unwrap();
+    println!("{}", dummy);
+
     let file = std::fs::OpenOptions::new()
         .create(true)
         .append(true)

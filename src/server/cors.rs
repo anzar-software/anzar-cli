@@ -29,7 +29,7 @@ pub fn configure_cors(configuration: &AnzarConfiguration) -> Cors {
                     .map(|h| h.as_str())
                     .collect::<Vec<&str>>(),
             )
-            .max_age(cors_config.max_age)
+            .max_age(cors_config.max_age as usize)
             .supports_credentials()
     } else {
         Cors::default()

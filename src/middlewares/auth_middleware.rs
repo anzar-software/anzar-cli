@@ -27,7 +27,7 @@ async fn validate_token(req: &ServiceRequest) -> Result<(), Error> {
     let app_state = support::extract_app_state(req)?;
 
     match app_state.configuration.auth.strategy {
-        AuthStrategy::Session => {
+        AuthStrategy::Session(..) => {
             let data: Option<String> = req.get_session().get(AuthSupport::SESSION_COOKIE)?;
 
             if let Some(session_id) = data {
@@ -66,7 +66,7 @@ async fn validate_token(req: &ServiceRequest) -> Result<(), Error> {
                 req.extensions_mut().insert::<Session>(session);
             }
         }
-        AuthStrategy::Jwt => {
+        AuthStrategy::Jwt(..) => {
             let access_token = extract_token_from_header(req, header::AUTHORIZATION.to_string());
 
             if let Some(token) = access_token {

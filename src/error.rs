@@ -177,6 +177,9 @@ pub enum InternalError {
 
     #[error("missing app data: {0}")]
     MissingConfiguration(String),
+
+    #[error("missing configuration field: {field} - {reason}")]
+    MissingField { field: String, reason: String },
 }
 
 // Categories Errors

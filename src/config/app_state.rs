@@ -32,7 +32,7 @@ impl AppState {
                 .with_token_size64();
 
             match configuration.auth.strategy {
-                AuthStrategy::Jwt => base.with_jwt(configuration.clone()),
+                AuthStrategy::Jwt(..) => base.with_jwt(configuration.clone()),
                 _ => base,
             }
         };
@@ -55,7 +55,7 @@ impl AppState {
                 .with_token_size64();
 
             match configuration.auth.strategy {
-                AuthStrategy::Jwt => base.with_jwt(configuration.clone()),
+                AuthStrategy::Jwt(..) => base.with_jwt(configuration.clone()),
                 _ => base,
             }
         };

@@ -18,8 +18,9 @@ impl JwtSigner {
 
 impl JwtSigner {
     pub fn encode(&self, claims: Claims) -> Result<String> {
-        let header =
-            jsonwebtoken::Header::new(self.configuration.auth.jwt.algorithm.clone().into());
+        let jwt = self.configuration.auth.jwt()?;
+
+        let header = jsonwebtoken::Header::new(jwt.algorithm.clone().into());
         let encoding_secret = jsonwebtoken::EncodingKey::from_secret(
             self.configuration.security.secret_key.as_bytes(),
         );
@@ -29,7 +30,7 @@ impl JwtSigner {
     }
 
     pub fn decode<C: DeserializeOwned>(&self, token: &str) -> Result<C> {
-        let jwt_config = &self.configuration.auth.jwt;
+        let jwt_config = self.configuration.auth.jwt()?;
 
         let mut validation = jsonwebtoken::Validation::new(jwt_config.algorithm.clone().into());
         validation.set_audience(&[jwt_config.clone().audience]);
