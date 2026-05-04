@@ -4,7 +4,8 @@ use crate::shared::EmailRequest;
 #[actix_web::test]
 async fn test_passing_rate_limits() {
     // Arrange
-    let test_app = Helpers::init_config().await;
+    let helpers = Helpers::init_config().await;
+    let test_app = helpers.test_app.clone();
 
     // Create User
     let response = test_app.register(None).await;

@@ -73,7 +73,7 @@ impl Common {
         Ok(TestApp {
             address,
             client,
-            configuration: app_state.configuration,
+            app_state,
         })
     }
 }

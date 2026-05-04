@@ -2,7 +2,8 @@ use super::shared::{Helpers, InvalidTestCases};
 
 #[actix_web::test]
 async fn test_register_success() {
-    let test_app = Helpers::init_config().await;
+    let helpers = Helpers::init_config().await;
+    let test_app = helpers.test_app.clone();
 
     let response = test_app.register(None).await;
     assert!(response.status().is_success());
@@ -11,7 +12,8 @@ async fn test_register_success() {
 #[actix_web::test]
 async fn test_register_failures() {
     // Arrange
-    let test_app = Helpers::init_config().await;
+    let helpers = Helpers::init_config().await;
+    let test_app = helpers.test_app.clone();
 
     for (body, message, code) in InvalidTestCases::registration_credentials().into_iter() {
         // for duplication email test, need to create a valid user before

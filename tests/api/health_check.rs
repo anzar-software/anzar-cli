@@ -3,7 +3,8 @@ use crate::shared::Helpers;
 #[actix_web::test]
 async fn test_health_check() {
     // Arrange
-    let test_app = Helpers::init_config().await;
+    let helpers = Helpers::init_config().await;
+    let test_app = helpers.test_app.clone();
 
     // Act
     let response = test_app

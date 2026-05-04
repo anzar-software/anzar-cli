@@ -4,7 +4,8 @@ use anzar::{config::AuthStrategy, scopes::auth::AuthResponse};
 
 #[actix_web::test]
 async fn test_jwt_contains_correct_claims() {
-    let test_app = Helpers::init_config().await;
+    let helpers = Helpers::init_config().await;
+    let test_app = helpers.test_app.clone();
 
     // Create User
     let response = test_app.register(None).await;
@@ -16,15 +17,16 @@ async fn test_jwt_contains_correct_claims() {
 
     let auth_response: AuthResponse = response.json().await.unwrap();
 
-    if test_app.configuration.auth.strategy == AuthStrategy::Jwt
+    let strategy = &test_app.app_state.configuration.auth.strategy;
+    if matches!(strategy, AuthStrategy::Jwt(..))
         && let Some(tokens) = &auth_response.tokens
     {
         let access_token: &str = &tokens.access;
         let refresh_token: &str = &tokens.refresh;
 
         assert!(!access_token.is_empty() && !refresh_token.is_empty());
-        let access_token_claims = Helpers::decode_token(access_token, &test_app.configuration);
-        let refresh_token_claims = Helpers::decode_token(refresh_token, &test_app.configuration);
+        let access_token_claims = helpers.decode_token(access_token);
+        let refresh_token_claims = helpers.decode_token(refresh_token);
 
         assert!(access_token_claims.is_ok());
         assert!(refresh_token_claims.is_ok());
@@ -38,7 +40,8 @@ async fn test_jwt_contains_correct_claims() {
 
 #[actix_web::test]
 async fn test_protected_route_with_valid_jwt() {
-    let test_app = Helpers::init_config().await;
+    let helpers = Helpers::init_config().await;
+    let test_app = helpers.test_app.clone();
 
     // Create User
     let response = test_app.register(None).await;
@@ -50,17 +53,19 @@ async fn test_protected_route_with_valid_jwt() {
 
     let auth_response: AuthResponse = response.json().await.unwrap();
 
-    if test_app.configuration.auth.strategy == AuthStrategy::Jwt
+    let strategy = &test_app.app_state.configuration.auth.strategy;
+    if matches!(strategy, AuthStrategy::Jwt(..))
         && let Some(tokens) = &auth_response.tokens
     {
-        let response = test_app.user(&tokens.access).await;
+        let response = test_app.user(&format!("Bearer {}", &tokens.access)).await;
         assert!(response.status().is_success());
     }
 }
 
 #[actix_web::test]
 async fn test_protected_route_with_invalid_jwt() {
-    let test_app = Helpers::init_config().await;
+    let helpers = Helpers::init_config().await;
+    let test_app = helpers.test_app.clone();
 
     // Create User
     let response = test_app.register(None).await;
@@ -72,7 +77,8 @@ async fn test_protected_route_with_invalid_jwt() {
 
     let auth_response: AuthResponse = response.json().await.unwrap();
 
-    if test_app.configuration.auth.strategy == AuthStrategy::Jwt
+    let strategy = &test_app.app_state.configuration.auth.strategy;
+    if matches!(strategy, AuthStrategy::Jwt(..))
         && let Some(tokens) = &auth_response.tokens
     {
         let valid_token: &str = &tokens.access;
@@ -92,7 +98,8 @@ async fn test_protected_route_with_invalid_jwt() {
 
 #[actix_web::test]
 async fn test_protected_route_with_refresh_token() {
-    let test_app = Helpers::init_config().await;
+    let helpers = Helpers::init_config().await;
+    let test_app = helpers.test_app.clone();
 
     // Create User
     let response = test_app.register(None).await;
@@ -104,7 +111,8 @@ async fn test_protected_route_with_refresh_token() {
 
     let auth_response: AuthResponse = response.json().await.unwrap();
 
-    if test_app.configuration.auth.strategy == AuthStrategy::Jwt
+    let strategy = &test_app.app_state.configuration.auth.strategy;
+    if matches!(strategy, AuthStrategy::Jwt(..))
         && let Some(tokens) = &auth_response.tokens
     {
         let response = test_app.user(&tokens.refresh).await;

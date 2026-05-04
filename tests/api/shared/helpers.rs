@@ -1,5 +1,5 @@
-use anzar::config::AnzarConfiguration;
-use anzar::{extractors::Claims, services::jwt::JwtDecoder};
+use anzar::config::AppState;
+use anzar::extractors::Claims;
 use reqwest::Response;
 
 use crate::shared::TestApp;
@@ -8,10 +8,18 @@ use anzar::error::Result;
 use super::common::Common;
 use super::test_cases::ValidTestCases;
 
-pub struct Helpers;
+pub struct Helpers {
+    pub app_state: AppState,
+    pub test_app: TestApp,
+}
 impl Helpers {
-    pub async fn init_config() -> TestApp {
-        Common.spawn_app().await.unwrap()
+    pub async fn init_config() -> Self {
+        let test_app = Common.spawn_app().await.unwrap();
+
+        Self {
+            app_state: test_app.clone().app_state,
+            test_app,
+        }
     }
 
     pub async fn login_with_email(test_app: &TestApp, email: &str) -> Response {
@@ -36,7 +44,7 @@ impl Helpers {
             .expect("Failed to execute request.")
     }
 
-    pub fn decode_token(token: &str, configuration: &AnzarConfiguration) -> Result<Claims> {
-        JwtDecoder::new(token, configuration).decode()
+    pub fn decode_token(&self, token: &str) -> Result<Claims> {
+        self.app_state.crypto.jwt()?.decode(token)
     }
 }

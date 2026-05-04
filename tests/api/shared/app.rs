@@ -1,14 +1,15 @@
-use anzar::config::AnzarConfiguration;
+use anzar::config::AppState;
 
 use crate::shared::{
     EmailRequest, LoginRequest, RefreshTokenRequest, RegisterRequest, ValidTestCases,
 };
 
+#[derive(Clone)]
 pub struct TestApp {
     pub address: String,
     pub client: reqwest::Client,
     #[allow(dead_code)]
-    pub configuration: AnzarConfiguration,
+    pub app_state: AppState,
 }
 impl TestApp {
     fn init(&self) -> reqwest::Client {
@@ -63,7 +64,7 @@ impl TestApp {
     ) -> reqwest::Response {
         let client = self.init();
         client
-            .get(format!("{}/auth/logout", self.address))
+            .post(format!("{}/auth/logout", self.address))
             .bearer_auth(bearer_token)
             .json(refresh_token)
             .send()
@@ -73,7 +74,7 @@ impl TestApp {
     pub async fn refresh(&self, refresh_token: &RefreshTokenRequest) -> reqwest::Response {
         let client = self.init();
         client
-            .get(format!("{}/auth/refresh-token", self.address))
+            .post(format!("{}/auth/refresh-token", self.address))
             .json(refresh_token)
             .send()
             .await

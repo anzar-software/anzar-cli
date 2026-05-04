@@ -2,7 +2,8 @@ use super::shared::{Helpers, InvalidTestCases};
 
 #[actix_web::test]
 async fn test_login_success() {
-    let test_app = Helpers::init_config().await;
+    let helpers = Helpers::init_config().await;
+    let test_app = helpers.test_app.clone();
 
     // Create User
     let response = test_app.register(None).await;
@@ -16,7 +17,8 @@ async fn test_login_success() {
 #[actix_web::test]
 async fn test_login_failure() {
     // Arrange
-    let test_app = Helpers::init_config().await;
+    let helpers = Helpers::init_config().await;
+    let test_app = helpers.test_app.clone();
 
     for (body, message, code) in InvalidTestCases::login_credentials().into_iter() {
         // Act
@@ -35,7 +37,8 @@ async fn test_login_failure() {
 #[actix_web::test]
 async fn test_account_lockout() {
     // Arrange
-    let test_app = Helpers::init_config().await;
+    let helpers = Helpers::init_config().await;
+    let test_app = helpers.test_app.clone();
 
     // Create User
     let unique_email = format!("failure_{}@test.com", uuid::Uuid::new_v4());
@@ -43,6 +46,7 @@ async fn test_account_lockout() {
     assert!(response.status().is_success());
 
     for _ in 0..test_app
+        .app_state
         .configuration
         .auth
         .password

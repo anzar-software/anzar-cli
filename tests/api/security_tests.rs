@@ -3,7 +3,8 @@ use anzar::{config::AuthStrategy, scopes::auth::AuthResponse};
 
 #[actix_web::test]
 async fn test_password_not_returned_in_responses() {
-    let test_app = Helpers::init_config().await;
+    let helpers = Helpers::init_config().await;
+    let test_app = helpers.test_app.clone();
 
     // Create User
     let response = test_app.register(None).await;
@@ -23,7 +24,8 @@ async fn test_password_not_returned_in_responses() {
 
     let auth_response: AuthResponse = response.json().await.unwrap();
 
-    if test_app.configuration.auth.strategy == AuthStrategy::Jwt
+    let strategy = &test_app.app_state.configuration.auth.strategy;
+    if matches!(strategy, AuthStrategy::Jwt(..))
         && let Some(tokens) = &auth_response.tokens
     {
         let refresh_token: &str = &tokens.refresh;
@@ -42,7 +44,8 @@ async fn test_password_not_returned_in_responses() {
 
 #[actix_web::test]
 async fn test_complete_auth_flow() {
-    let test_app = Helpers::init_config().await;
+    let helpers = Helpers::init_config().await;
+    let test_app = helpers.test_app.clone();
 
     // [1] Create User
     let response = test_app.register(None).await;
@@ -54,7 +57,8 @@ async fn test_complete_auth_flow() {
 
     let auth_response: AuthResponse = response.json().await.unwrap();
 
-    if test_app.configuration.auth.strategy == AuthStrategy::Jwt
+    let strategy = &test_app.app_state.configuration.auth.strategy;
+    if matches!(strategy, AuthStrategy::Jwt(..))
         && let Some(tokens) = &auth_response.tokens
     {
         let old_refresh_token: &str = &tokens.refresh;
@@ -80,9 +84,8 @@ async fn test_complete_auth_flow() {
         // assert tokens are not empty
         assert!(!new_access_token.is_empty() && !new_refresh_token.is_empty());
 
-        let access_token_claims = Helpers::decode_token(new_access_token, &test_app.configuration);
-        let refresh_token_claims =
-            Helpers::decode_token(new_refresh_token, &test_app.configuration);
+        let access_token_claims = helpers.decode_token(new_access_token);
+        let refresh_token_claims = helpers.decode_token(new_refresh_token);
 
         // assert new tokens are valid
         assert!(access_token_claims.is_ok());
@@ -94,7 +97,7 @@ async fn test_complete_auth_flow() {
         );
 
         // [5] Access protected route with valid token
-        let response = test_app.user(new_access_token).await;
+        let response = test_app.user(&format!("Bearer {new_access_token}")).await;
         assert!(response.status().is_success());
 
         // [6] Logout with invalid refreshToken

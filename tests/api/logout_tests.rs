@@ -5,7 +5,8 @@ use crate::shared::RefreshTokenRequest;
 
 #[actix_web::test]
 async fn test_logout_success() {
-    let test_app = Helpers::init_config().await;
+    let helpers = Helpers::init_config().await;
+    let test_app = helpers.test_app.clone();
 
     // Create User
     let response = test_app.register(None).await;
@@ -17,7 +18,8 @@ async fn test_logout_success() {
 
     let auth_response: AuthResponse = response.json().await.unwrap();
 
-    if test_app.configuration.auth.strategy == AuthStrategy::Jwt
+    let strategy = &test_app.app_state.configuration.auth.strategy;
+    if matches!(strategy, AuthStrategy::Jwt(..))
         && let Some(tokens) = &auth_response.tokens
     {
         let refresh_token: &str = &tokens.refresh;
@@ -33,7 +35,8 @@ async fn test_logout_success() {
 
 #[actix_web::test]
 async fn test_logout_with_invalid_token() {
-    let test_app = Helpers::init_config().await;
+    let helpers = Helpers::init_config().await;
+    let test_app = helpers.test_app.clone();
 
     // Create User
     let response = test_app.register(None).await;
@@ -45,7 +48,8 @@ async fn test_logout_with_invalid_token() {
 
     let auth_response: AuthResponse = response.json().await.unwrap();
 
-    if test_app.configuration.auth.strategy == AuthStrategy::Jwt
+    let strategy = &test_app.app_state.configuration.auth.strategy;
+    if matches!(strategy, AuthStrategy::Jwt(..))
         && let Some(tokens) = &auth_response.tokens
     {
         let access_token: &str = &tokens.access;
