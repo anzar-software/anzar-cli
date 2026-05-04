@@ -30,6 +30,9 @@ pub enum Error {
     #[error("invalid argument `{arg}`: {reason}")]
     InvalidArg { arg: String, reason: String },
 
+    #[error("Validation failed")]
+    InvalidAppConfig(Vec<Error>),
+
     // ── Parsing / Serialization ───────────────────────────────────────────────
     /// JSON parse failure — `#[transparent]` delegates Display and Source
     /// directly to the inner error, so the user sees serde's own message.

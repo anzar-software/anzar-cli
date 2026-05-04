@@ -44,7 +44,7 @@ fn build_anzar() {
     let (cache_driver, cache_uri) = select_cache();
     let strategy = select_strategy();
 
-    let auth = if strategy == AuthStrategy::Jwt {
+    let auth = if matches!(strategy, AuthStrategy::Jwt(..)) {
         constants::JWT_AUTH
     } else {
         constants::SESSION_AUTH

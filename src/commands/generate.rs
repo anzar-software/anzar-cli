@@ -47,8 +47,8 @@ pub fn run() -> Result<()> {
     }
 
     let files = match config.auth.strategy {
-        AuthStrategy::Session => constants::session_tables(config.database.driver),
-        AuthStrategy::Jwt => constants::jwt_tables(config.database.driver),
+        AuthStrategy::Session(..) => constants::session_tables(config.database.driver),
+        AuthStrategy::Jwt(..) => constants::jwt_tables(config.database.driver),
     };
 
     println!();

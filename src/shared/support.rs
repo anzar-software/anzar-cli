@@ -35,14 +35,7 @@ pub fn load_config() -> Result<AnzarConfiguration> {
         }
     };
 
-    serde_yaml::from_str::<AnzarConfiguration>(&raw).map_err(|e| {
-        print_result(
-            "Invalid anzar.yml",
-            false,
-            Some(&format!("parse error: {}", e)),
-        );
-        e.into()
-    })
+    serde_yaml::from_str::<AnzarConfiguration>(&raw).map_err(Into::into)
 }
 
 pub fn print_result(label: &str, passed: bool, hint: Option<&str>) {

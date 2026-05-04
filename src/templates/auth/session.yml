@@ -1,4 +1,4 @@
-session:
+  type: Session:
     name: "id"
     max_age: 3600
     secure: true
