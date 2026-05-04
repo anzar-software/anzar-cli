@@ -91,6 +91,7 @@ impl IntoDbFilter for QueryBuilder {
             .enumerate()
             .map(|(i, f)| match f.op {
                 Op::Eq => format!("\"{}\" = ${}", f.field, i + 1 + offset),
+                Op::Null => format!("\"{}\" IS NULL", f.field), // no binding needed
                 Op::Ne => format!("\"{}\" != ${}", f.field, i + 1 + offset),
                 Op::Gt => format!("\"{}\" > ${}", f.field, i + 1 + offset),
                 Op::Lt => format!("\"{}\" < ${}", f.field, i + 1 + offset),
@@ -129,6 +130,7 @@ impl IntoDbFilter for QueryBuilder {
             .enumerate()
             .map(|(i, f)| match f.op {
                 Op::Eq => format!("\"{}\" = ?", f.field),
+                Op::Null => format!("\"{}\" IS NULL", f.field),
                 Op::Ne => format!("\"{}\" != ?", f.field),
                 Op::Gt => format!("\"{}\" > ?", f.field),
                 Op::Lt => format!("\"{}\" < ?", f.field),

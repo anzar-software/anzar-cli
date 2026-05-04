@@ -38,25 +38,14 @@ impl JWTRepository {
     )]
     pub async fn find_and_consume(&self, claims: &Claims) -> Result<RefreshToken> {
         let filter = QueryBuilder::default()
-            .eq("jti", claims.jti)
-            .eq("userId", claims.clone().sub);
+            .eq("jti", claims.jti.to_string())
+            .eq("userId", claims.clone().sub)
+            .gt("expiresAt", Utc::now())
+            .is_null("usedAt");
 
         let update = QueryBuilder::default().set("usedAt", Utc::now());
 
         match self.adapter.find_one_and_update(filter, update).await {
-            // Token was already consumed — potential replay attack
-            // Consider revoking ALL refresh tokens for this user
-            Ok(Some(token)) if token.used_at.is_some() => {
-                Err(Error::Unauthenticated(AuthError::TokenReplay {
-                    token_type: TokenErrorType::RefreshToken,
-                }))
-            }
-            Ok(Some(token)) if Utc::now() > token.expires_at => {
-                Err(Error::Unauthenticated(AuthError::TokenExpired {
-                    token_type: TokenErrorType::RefreshToken,
-                    expired_at: token.expires_at,
-                }))
-            }
             Ok(Some(token)) => Ok(token),
             Ok(None) => Err(Error::Unauthenticated(AuthError::TokenInvalid {
                 token_type: TokenErrorType::RefreshToken,
@@ -86,7 +75,7 @@ impl JWTRepository {
 
     #[tracing::instrument(name = "db.jwt.invalidate", skip(self, jti))]
     pub async fn invalidate(&self, jti: uuid::Uuid) -> Result<RefreshToken> {
-        let filter = QueryBuilder::default().eq("jti", jti);
+        let filter = QueryBuilder::default().eq("jti", jti.to_string());
         let update = QueryBuilder::default().set("usedAt", Utc::now());
 
         match self.adapter.find_one_and_update(filter, update).await {

@@ -17,25 +17,9 @@ pub async fn run(listener: TcpListener, app_state: AppState) -> Result<Server, s
     let config = app_state.configuration.clone();
 
     let http_server = HttpServer::new(move || {
-        let app = App::new().wrap(TracingLogger::default());
+        let app = App::new();
 
-        // let app = match &app_state.configuration.database.cache.driver {
-        //     CacheDriver::MemCached => {
-        //         app.wrap(server::configure_cookie_session(&app_state.configuration))
-        //     }
-        //     CacheDriver::Redis => {
-        //         app.wrap(server::configure_redis_session(&app_state.configuration).await)
-        //     }
-        //     CacheDriver::InMemory => todo!(),
-        // };
-
-        // let app = if &app_state.configuration.database.cache.driver == &CacheDriver::MemCached {
-        //     app.wrap(server::configure_cookie_session(&app_state.configuration))
-        // } else {
-        //     app.wrap(server::configure_redis_session(&app_state.configuration))
-        // };
-
-        app
+        app.wrap(TracingLogger::default())
             // .wrap(from_fn(ip_rate_limit_middleware))
             .wrap(server::configure_cors(&app_state.configuration))
             .wrap(server::configure_cookie_session(&app_state.configuration))

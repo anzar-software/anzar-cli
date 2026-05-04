@@ -24,13 +24,13 @@ impl JwtServiceTrait for AppState {
             }));
         }
 
-        let _ = match self
+        match self
             .auth_service
             .jwt_repository
             .find_and_consume(&claims)
             .await
         {
-            Ok(token) => Ok(token.user_id),
+            Ok(_) => Ok(claims.sub),
             Err(Error::Unauthenticated { .. }) => {
                 // Potential breach — revoke everything for this user
                 // TODO: Send an email indicating a breach
@@ -40,9 +40,7 @@ impl JwtServiceTrait for AppState {
                 }))
             }
             Err(e) => Err(e), // NotFound, Expired bubble up as-is
-        };
-
-        Ok(claims.sub)
+        }
     }
 
     #[tracing::instrument(

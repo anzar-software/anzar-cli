@@ -263,8 +263,8 @@ pub async fn get_session(session: Session) -> Result<HttpResponse> {
     )]
 #[tracing::instrument(name = "Refresh user accessToken", skip(req, app_state))]
 pub async fn refresh_token(
-    req: web::Json<RefreshTokenRequest>,
     AppStateExtractor(app_state): AppStateExtractor,
+    req: web::Json<RefreshTokenRequest>,
 ) -> Result<HttpResponse> {
     let jwt = app_state.configuration.auth.jwt()?;
 

@@ -133,16 +133,112 @@ mod tests {
             .with_hmac_secret(&"a".repeat(32))
             .with_token_size64()
     }
+    fn bcrypt_crypto() -> Crypto {
+        Crypto::with_bcrypt()
+            .with_hmac_secret(&"a".repeat(32))
+            .with_token_size64()
+    }
+    fn mock_configuration() -> AnzarConfiguration {
+        AnzarConfiguration {
+            app: crate::config::App {
+                environment: "dev".into(),
+                url: "localhost:3000".to_string(),
+            },
+            database: crate::config::Database {
+                driver: crate::config::database::driver::DatabaseDriver::PostgreSQL,
+                connection_string: "postgres://hakou:password@localhost:5432/dev".into(),
+                cache: crate::config::Cache {
+                    driver: crate::config::database::cache_driver::CacheDriver::InMemory,
+                    url: "".into(),
+                },
+            },
+            server: crate::config::Server::default(),
+            auth: crate::config::Authentication {
+                strategy: AuthStrategy::Jwt(crate::config::JwtConfig {
+                    issuer: "localhost:3000".into(),
+                    audience: "users".into(),
+                    ..Default::default()
+                }),
+                ..Default::default()
+            },
+            security: crate::config::Security {
+                secret_key: String::default(),
+                headers: vec![],
+            },
+        }
+    }
 
     #[test]
     fn test_valid_session_strategy() {
         let crypto = base_crypto();
-        assert!(
-            crypto
-                .validate(&AuthStrategy::Session(crate::config::SessionConfig {
-                    ..Default::default()
-                }))
-                .is_ok()
-        );
+        let strategy = &AuthStrategy::Session(crate::config::SessionConfig {
+            ..Default::default()
+        });
+
+        assert!(crypto.validate(strategy).is_ok());
     }
+
+    #[test]
+    fn test_valid_jwt_strategy() {
+        let crypto = base_crypto().with_jwt(mock_configuration());
+        let strategy = &AuthStrategy::Jwt(crate::config::JwtConfig {
+            ..Default::default()
+        });
+
+        assert!(crypto.validate(strategy).is_ok());
+    }
+    #[test]
+    fn test_valid_session_strategy_with_bcrypt() {
+        let crypto = bcrypt_crypto();
+        let strategy = &AuthStrategy::Session(crate::config::SessionConfig {
+            ..Default::default()
+        });
+
+        assert!(crypto.validate(strategy).is_ok());
+    }
+
+    #[test]
+    fn test_valid_jwt_strategy_with_bcrypt() {
+        let crypto = bcrypt_crypto().with_jwt(mock_configuration());
+        let strategy = &AuthStrategy::Jwt(crate::config::JwtConfig {
+            ..Default::default()
+        });
+
+        assert!(crypto.validate(strategy).is_ok());
+    }
+
+    #[test]
+    fn test_jwt_strategy_missing_signer() {
+        let crypto = base_crypto(); // no .with_jwt()
+        let strategy = &AuthStrategy::Jwt(crate::config::JwtConfig {
+            ..Default::default()
+        });
+
+        assert!(crypto.validate(strategy).is_err());
+    }
+
+    #[test]
+    fn test_hmac_secret_empty() {
+        let crypto = Crypto::with_argon()
+            .with_hmac_secret("")
+            .with_token_size64();
+        let strategy = &AuthStrategy::Session(crate::config::SessionConfig {
+            ..Default::default()
+        });
+
+        assert!(crypto.validate(strategy).is_err());
+    }
+
+    // #[test]
+    // fn test_hmac_secret_too_short() {
+    //     let crypto = Crypto::with_argon()
+    //         .with_hmac_secret("tooshort")
+    //         .with_token_size64();
+    //     let strategy = &AuthStrategy::Session(crate::config::SessionConfig {
+    //         ..Default::default()
+    //     });
+    //
+    //     let err = crypto.validate(strategy).unwrap_err();
+    //     assert!(err.to_string().contains("too short"));
+    // }
 }

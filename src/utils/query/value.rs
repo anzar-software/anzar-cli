@@ -16,6 +16,7 @@ pub enum Op {
     Gt,
     Lt,
     In,
+    Null,
     // Update ops
     Set,
     Inc,
