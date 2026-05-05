@@ -23,31 +23,47 @@ pub fn validate_password(
     arg: &PasswordRequirements,
 ) -> Result<(), ValidationError> {
     if (password.len() as u16) < arg.min_length {
-        return Err(ValidationError::new(
-            "password must meet minimum length requirement",
-        ));
+        return Err(
+            ValidationError::new("ValidationError::Malformed").with_message(
+                format!(
+                    "Password must be at least {} characters long",
+                    arg.min_length
+                )
+                .into(),
+            ),
+        );
     }
     if (password.len() as u16) > arg.max_length {
-        return Err(ValidationError::new("password exceeds maximum length"));
+        return Err(
+            ValidationError::new("ValidationError::Malformed").with_message(
+                format!(
+                    "Password must be no longer than {} characters",
+                    arg.max_length
+                )
+                .into(),
+            ),
+        );
     }
 
     let has_uppercase = password.chars().any(|c| c.is_ascii_uppercase());
     if arg.require_uppercase && !has_uppercase {
-        return Err(ValidationError::new(
-            "password must include an uppercase letter",
-        ));
+        return Err(ValidationError::new("ValidationError::Malformed")
+            .with_message("Password must contain at least one uppercase letter".into()));
     }
 
     let has_number = password.chars().any(|c| c.is_ascii_digit());
     if arg.require_number && !has_number {
-        return Err(ValidationError::new("password must include a number"));
+        return Err(ValidationError::new("ValidationError::Malformed")
+            .with_message("Password must contain at least one number".into()));
     }
 
     let has_special = password.chars().any(|c| !c.is_alphanumeric());
     if arg.require_special_char && !has_special {
-        return Err(ValidationError::new(
-            "password must include a special character",
-        ));
+        return Err(
+            ValidationError::new("ValidationError::Malformed").with_message(
+                "Password must contain at least one special character (e.g. !@#$%)".into(),
+            ),
+        );
     }
 
     Ok(())
