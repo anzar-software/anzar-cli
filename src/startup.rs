@@ -12,20 +12,19 @@ use crate::scopes::{auth, email, health, user};
 use crate::server;
 
 pub async fn run(listener: TcpListener, app_state: AppState) -> Result<Server, std::io::Error> {
-    // FIXME use Arc to remove these multiple cloning
-    let app_state_inner = app_state.clone();
     let config = app_state.configuration.clone();
+    let data = web::Data::new(app_state);
 
     let http_server = HttpServer::new(move || {
         let app = App::new();
 
         app.wrap(TracingLogger::default())
             // .wrap(from_fn(ip_rate_limit_middleware))
-            .wrap(server::configure_cors(&app_state.configuration))
-            .wrap(server::configure_cookie_session(&app_state.configuration))
+            .wrap(server::configure_cors(&data.configuration))
+            .wrap(server::configure_cookie_session(&data.configuration))
             .wrap(from_fn(validate_content_type))
-            .wrap(server::build_default_headers(&app_state.configuration))
-            .app_data(web::Data::new(app_state_inner.clone()))
+            .wrap(server::build_default_headers(&data.configuration))
+            .app_data(data.clone())
             .service(server::swagger_service())
             .service(health::health_scope())
             .service(auth::auth_scope())

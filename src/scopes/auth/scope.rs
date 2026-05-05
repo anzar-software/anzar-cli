@@ -62,7 +62,8 @@ use super::user::{User, service::UserServiceTrait};
     fields(
         user.id = tracing::field::Empty,
         user.email = %req.email,
-        login.attempted = true
+        login.attempted = true,
+        attempts.remaining = tracing::field::Empty
     )
 )]
 pub async fn login(
