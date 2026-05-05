@@ -1,7 +1,7 @@
 use std::str::FromStr;
 
 use argon2::{
-    Argon2, PasswordHash, PasswordHasher, PasswordVerifier,
+    Argon2, Params, PasswordHash, PasswordHasher, PasswordVerifier,
     password_hash::{SaltString, rand_core::OsRng},
 };
 
@@ -12,27 +12,60 @@ pub trait Hashable: Send + Sync {
     fn verify(&self, a: &str, b: &str) -> Result<bool>;
 }
 
-// pub struct Argon2Password {
-//     memory_cost: u32,
-//     iterations: u32,
-// }
-
 // =============================================================================
 // Password Hasher - Argon
 // =============================================================================
 #[derive(Clone)]
-pub struct Argon2Password;
+pub struct Argon2Password {
+    memory_kib: u32,
+    iterations: u32,
+    parallelism: u32,
+}
+impl Default for Argon2Password {
+    fn default() -> Self {
+        pub const DEFAULT_M_COST: u32 = 19 * 1024; // ~19 MiB
+        pub const DEFAULT_T_COST: u32 = 2;
+        pub const DEFAULT_P_COST: u32 = 1;
+
+        Self {
+            memory_kib: DEFAULT_M_COST,
+            iterations: DEFAULT_T_COST,
+            parallelism: DEFAULT_P_COST,
+        }
+    }
+}
+impl Argon2Password {
+    pub fn new(m_cost: u32, t_cost: u32, p_cost: u32) -> Self {
+        Self {
+            memory_kib: m_cost,
+            iterations: t_cost,
+            parallelism: p_cost,
+        }
+    }
+}
 
 impl Hashable for Argon2Password {
     fn hash(&self, password: &str) -> Result<String> {
+        let params = Params::new(
+            self.memory_kib,  // m_cost: memory size in KiB (19 MB)
+            self.iterations,  // t_cost: number of iterations
+            self.parallelism, // p_cost: parallelism (threads)
+            None,             // output length (None = default 32 bytes)
+        )
+        .unwrap();
+
         let salt = SaltString::generate(&mut OsRng);
-        let argon2 = Argon2::default();
-        let hash = argon2
-            .hash_password(password.as_bytes(), &salt)
-            .map_err(|e| {
-                tracing::error!("Failed to hash user password: {:?}", e);
-                Error::Internal(InternalError::Hashing)
-            })?;
+
+        let hash = Argon2::new(
+            argon2::Algorithm::default(),
+            argon2::Version::default(),
+            params,
+        )
+        .hash_password(password.as_bytes(), &salt)
+        .map_err(|e| {
+            tracing::error!("Failed to hash user password: {:?}", e);
+            Error::Internal(InternalError::Hashing)
+        })?;
 
         Ok(hash.to_string())
     }
@@ -58,11 +91,18 @@ impl Hashable for Argon2Password {
 // Password Hasher - BCrypt
 // =============================================================================
 #[derive(Clone)]
-pub struct BcryptPassword;
+pub struct BcryptPassword {
+    cost: u32,
+}
+impl BcryptPassword {
+    pub fn new(cost: u32) -> Self {
+        Self { cost }
+    }
+}
 
 impl Hashable for BcryptPassword {
     fn hash(&self, value: &str) -> Result<String> {
-        let hash = bcrypt::hash(value, bcrypt::DEFAULT_COST).map_err(|e| {
+        let hash = bcrypt::hash(value, self.cost).map_err(|e| {
             tracing::error!("Failed to hash user password: {:?}", e);
             Error::Internal(InternalError::Hashing)
         })?;

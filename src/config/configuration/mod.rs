@@ -364,15 +364,22 @@ pub enum HashingAlgorithm {
         parallelism: u32,
     },
     Bcrypt {
+        // const MIN_COST: u32 = 4;
+        // const MAX_COST: u32 = 31;
+        // pub const DEFAULT_COST: u32 = 12;
         cost: u32,
     },
 }
 impl Default for HashingAlgorithm {
     fn default() -> Self {
+        pub const DEFAULT_M_COST: u32 = 19 * 1024; // ~19 MiB
+        pub const DEFAULT_T_COST: u32 = 2;
+        pub const DEFAULT_P_COST: u32 = 1;
+
         Self::Argon2 {
-            memory_kib: 65536, // 64 MiB
-            iterations: 3,
-            parallelism: 4,
+            memory_kib: DEFAULT_M_COST,
+            iterations: DEFAULT_T_COST,
+            parallelism: DEFAULT_P_COST,
         }
     }
 }

@@ -28,7 +28,7 @@ pub struct Crypto {
 impl Default for Crypto {
     fn default() -> Self {
         Self {
-            password_hasher: Arc::new(Argon2Password),
+            password_hasher: Arc::new(Argon2Password::default()),
             token: SecureToken::default(),
             hmac: HmacSigner::default(),
             jwt: None,
@@ -37,12 +37,15 @@ impl Default for Crypto {
 }
 
 impl Crypto {
-    pub fn with_argon() -> Self {
-        Self::default()
-    }
-    pub fn with_bcrypt() -> Self {
+    pub fn with_argon(m_cost: u32, t_cost: u32, p_cost: u32) -> Self {
         Self {
-            password_hasher: Arc::new(BcryptPassword),
+            password_hasher: Arc::new(Argon2Password::new(m_cost, t_cost, p_cost)),
+            ..Self::default()
+        }
+    }
+    pub fn with_bcrypt(cost: u32) -> Self {
+        Self {
+            password_hasher: Arc::new(BcryptPassword::new(cost)),
             ..Self::default()
         }
     }
@@ -110,8 +113,12 @@ impl Crypto {
 impl Crypto {
     pub fn from_configuration(configuration: &AnzarConfiguration) -> Result<Self> {
         let base = match configuration.auth.password.algorithm {
-            HashingAlgorithm::Argon2 { .. } => Crypto::with_argon(),
-            HashingAlgorithm::Bcrypt { .. } => Crypto::with_bcrypt(),
+            HashingAlgorithm::Argon2 {
+                memory_kib,
+                iterations,
+                parallelism,
+            } => Crypto::with_argon(memory_kib, iterations, parallelism),
+            HashingAlgorithm::Bcrypt { cost } => Crypto::with_bcrypt(cost),
         }
         .with_hmac_secret(&configuration.security.secret_key)
         .with_token_size64();
@@ -129,12 +136,17 @@ mod tests {
     use super::*;
 
     fn base_crypto() -> Crypto {
-        Crypto::with_argon()
+        pub const DEFAULT_M_COST: u32 = 19 * 1024; // ~19 MiB
+        pub const DEFAULT_T_COST: u32 = 2;
+        pub const DEFAULT_P_COST: u32 = 1;
+
+        Crypto::with_argon(DEFAULT_M_COST, DEFAULT_T_COST, DEFAULT_P_COST)
             .with_hmac_secret(&"a".repeat(32))
             .with_token_size64()
     }
     fn bcrypt_crypto() -> Crypto {
-        Crypto::with_bcrypt()
+        let cost = 12;
+        Crypto::with_bcrypt(cost)
             .with_hmac_secret(&"a".repeat(32))
             .with_token_size64()
     }
@@ -219,7 +231,10 @@ mod tests {
 
     #[test]
     fn test_hmac_secret_empty() {
-        let crypto = Crypto::with_argon()
+        pub const DEFAULT_M_COST: u32 = 19 * 1024; // ~19 MiB
+        pub const DEFAULT_T_COST: u32 = 2;
+        pub const DEFAULT_P_COST: u32 = 1;
+        let crypto = Crypto::with_argon(DEFAULT_M_COST, DEFAULT_T_COST, DEFAULT_P_COST)
             .with_hmac_secret("")
             .with_token_size64();
         let strategy = &AuthStrategy::Session(crate::config::SessionConfig {
