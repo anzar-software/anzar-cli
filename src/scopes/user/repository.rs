@@ -21,9 +21,21 @@ impl UserRepository {
 
 impl UserRepository {
     // Cache
+    #[tracing::instrument(name = "cache.user.insert", skip(self))]
+    pub async fn add(&self, key: &str, expiration: u64) -> Result<()> {
+        self.cache.insert(key, "1", expiration).await
+    }
     #[tracing::instrument(name = "cache.user.increment", skip(self))]
-    pub async fn increment(&self, key: &str) -> u8 {
-        self.cache.increment(key, 1).await.unwrap_or(1) as u8
+    pub async fn increment(&self, key: &str, expiration: u64) -> u8 {
+        match self.cache.find_one(key).await {
+            Ok(Some(_)) => self
+                .cache
+                .increment(key)
+                .await
+                .map(|v| v as u8)
+                .unwrap_or(1),
+            Ok(None) | Err(_) => self.add(key, expiration).await.map(|_| 1).unwrap_or(1),
+        }
     }
     #[tracing::instrument(name = "cache.user.get_increment", skip(self))]
     pub async fn get_attempts(&self, key: &str) -> u8 {
@@ -43,8 +55,8 @@ impl UserRepository {
         self.cache.find_one(key).await.is_ok_and(|v| v.is_some())
     }
     #[tracing::instrument(name = "cache.user.reset", skip(self))]
-    pub async fn reset_attempts(&self, key: &str) -> Result<()> {
-        self.cache.update(key, "0", 1000000).await
+    pub async fn reset_attempts(&self, key: &str, expiration: u64) -> Result<()> {
+        self.cache.update(key, "0", expiration).await
     }
     #[tracing::instrument(name = "cache.user.clear", skip(self))]
     pub async fn clear_key(&self, key: &str) -> Result<()> {

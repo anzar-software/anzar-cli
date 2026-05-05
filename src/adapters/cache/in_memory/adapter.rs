@@ -72,14 +72,14 @@ impl CacheAdapter for InMemoryAdapter {
         Ok(())
     }
 
-    async fn increment(&self, key: &str, step: u64) -> Result<u64> {
+    async fn increment(&self, key: &str) -> Result<u64> {
         let mut store = self.store.lock().await;
         let entry = store.entry(key.to_string()).or_insert(CacheEntry {
             value: "0".to_string(),
             expires_at: None,
         });
 
-        let new_val: u64 = entry.value.parse().unwrap_or(0) + step;
+        let new_val: u64 = entry.value.parse().unwrap_or(0) + 1;
         entry.value = new_val.to_string();
 
         Ok(new_val)

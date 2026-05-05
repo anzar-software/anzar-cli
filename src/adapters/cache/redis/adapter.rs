@@ -36,10 +36,10 @@ impl CacheAdapter for RedisAdapter {
             .map_err(|e| e.into())
     }
 
-    async fn increment(&self, key: &str, step: u64) -> Result<u64, Error> {
+    async fn increment(&self, key: &str) -> Result<u64, Error> {
         self.connection
             .clone()
-            .incr(key, step)
+            .incr(key, 1)
             .await
             .map(|v| v as u64)
             .map_err(|e| e.into())

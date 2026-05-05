@@ -33,9 +33,10 @@ pub trait UserServiceTrait {
 }
 impl UserServiceTrait for AppState {
     #[tracing::instrument(
-        name = "auth.authenticate_user",
-        skip(self, body, session),
-        fields(user.id = tracing::field::Empty)
+        name = "auth.authenticate_user", skip(self, body, session),
+        fields(
+            attempts.remaining = tracing::field::Empty
+        )
     )]
     async fn authenticate_user(
         &self,
@@ -66,8 +67,6 @@ impl UserServiceTrait for AppState {
         // FIXME
         // 4. Use cache_service instead of user_service (more readable)
         if user_repo.is_locked(&lockout_key).await {
-            let _ = user_repo.reset_attempts(&identity).await;
-
             tracing::warn!(
                 user.id = %user_id,
                 error.code = "ForbiddenReason::AccountSuspended",
@@ -89,11 +88,15 @@ impl UserServiceTrait for AppState {
                     .await
                     .unwrap_or(1);
 
-                let password_config = &self.configuration.auth.password;
-                tracing::Span::current().record(
-                    "attempts.remaining",
-                    password_config.security.max_failed_attempts - attempts,
-                );
+                let remaining = &self
+                    .configuration
+                    .auth
+                    .password
+                    .security
+                    .max_failed_attempts
+                    .saturating_sub(attempts);
+
+                tracing::Span::current().record("attempts.remaining", remaining);
                 (AccountStatus::InvalidCredentials, attempts)
             }
         };
@@ -107,18 +110,19 @@ impl UserServiceTrait for AppState {
         device_cookie: Option<&str>,
     ) -> Result<u8> {
         let user_repo = &self.auth_service.user_repository;
-        let attempts = user_repo.increment(identity).await;
 
         let pass_config = &self.configuration.auth.password;
+        let expiry = pass_config.security.lockout_duration as u64;
+
+        let attempts = user_repo.increment(identity, expiry).await;
+
         // max_failed_attempts of authentication within for this specific cookie
         let max_failed_attempts = match device_cookie {
             Some(_) => pass_config.security.max_failed_attempts * 2,
             None => pass_config.security.max_failed_attempts,
         };
         if attempts >= max_failed_attempts {
-            user_repo
-                .put_cookie_in_lockout(identity, pass_config.security.lockout_duration as u64)
-                .await?;
+            user_repo.put_cookie_in_lockout(identity, expiry).await?;
             tracing::warn!("Authentication Failed — update lockout countdown");
         }
 

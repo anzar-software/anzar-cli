@@ -31,11 +31,8 @@ impl CacheAdapter for MemCacheAdapter {
             .map_err(|e| e.into())
     }
 
-    async fn increment(&self, key: &str, step: u64) -> Result<u64, Error> {
-        self.client
-            .increment(key, step)
-            .map(|v| v + 1)
-            .map_err(|e| e.into())
+    async fn increment(&self, key: &str) -> Result<u64, Error> {
+        self.client.increment(key, 1).map_err(|e| e.into())
     }
 
     async fn delete_one(&self, key: &str) -> Result<(), Error> {
