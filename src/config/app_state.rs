@@ -1,20 +1,25 @@
 use std::fs;
 use uuid::Uuid;
 
-use crate::adapters::{
+use crate::error::Result;
+
+use crate::infrastructure::{
     cache::{CacheAdapters, in_memory::InMemoryAdapter, memcache::MemCache, redis::Redis},
     database::{DatabaseAdapters, mongodb::MongoDB, postgres::PostgreSQL, sqlite::SQLite},
 };
-use crate::config::database::cache_driver::CacheDriver;
-use crate::config::{AnzarConfiguration, AppConfig, Database, DatabaseDriver};
-use crate::error::Result;
-use crate::scopes::auth::service::AuthService;
 use crate::utils::crypto::{Crypto, SecureToken};
+
+use super::repository_registry::RepositoryRegistry;
+
+use super::boot::AppConfig;
+use super::boot::cache::CacheDriver;
+use super::boot::database::DatabaseDriver;
+use super::configuration::{AnzarConfiguration, Database};
 
 #[derive(Clone)]
 pub struct AppState {
     pub crypto: Crypto,
-    pub auth_service: AuthService,
+    pub repositories: RepositoryRegistry,
     pub configuration: AnzarConfiguration,
 }
 
@@ -22,14 +27,14 @@ impl AppState {
     pub async fn production(app_config: &AppConfig) -> Result<Self> {
         let content = fs::read_to_string(&app_config.config_path)?;
         let configuration: AnzarConfiguration = serde_yaml::from_str(content.as_str())?;
-        let auth_service = AuthService::from_database(&configuration.database).await?;
+        let repositories = RepositoryRegistry::from_database(&configuration.database).await?;
 
         configuration.validate()?;
         let crypto = Crypto::from_configuration(&configuration)?;
 
         Ok(Self {
             crypto,
-            auth_service,
+            repositories,
             configuration,
         })
     }
@@ -43,7 +48,7 @@ impl AppState {
 
         Ok(Self {
             crypto,
-            auth_service,
+            repositories: auth_service,
             configuration,
         })
     }
@@ -72,7 +77,7 @@ impl AppState {
             .with_secret(&secret))
     }
 
-    async fn build_authservice(database: &Database) -> Result<AuthService> {
+    async fn build_authservice(database: &Database) -> Result<RepositoryRegistry> {
         let cache_adapters = match database.cache.driver {
             CacheDriver::MemCached => {
                 let client = MemCache::start(&database.cache.url).await?;
@@ -108,6 +113,6 @@ impl AppState {
             }
         };
 
-        Ok(AuthService::new(database_adapters, cache_adapters))
+        Ok(RepositoryRegistry::new(database_adapters, cache_adapters))
     }
 }

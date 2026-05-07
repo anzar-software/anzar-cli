@@ -1,9 +1,9 @@
 use jsonwebtoken::errors::ErrorKind;
 use serde::de::DeserializeOwned;
 
+use crate::application::model::Claims;
 use crate::config::AnzarConfiguration;
 use crate::error::{AuthError, Error, Result, TokenErrorType};
-use crate::extractors::Claims;
 
 #[derive(Clone)]
 pub struct JwtSigner {

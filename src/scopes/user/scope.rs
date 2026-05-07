@@ -3,13 +3,12 @@ use actix_web::{
     web::{self},
 };
 
-use crate::{
-    error::{ErrorResponse, Result},
-    extractors::{AppStateExtractor, AuthenticatedUser},
-    scopes::user::{User, UserRoleServiceTrait},
-};
+use crate::error::{ErrorResponse, Result};
+use crate::http::extractors::{AppStateExtractor, AuthenticatedUser};
 
-use super::user_role::model::RoleRequest;
+use super::model::RoleRequest;
+use crate::application::model::User;
+use crate::application::traits::UserRoleServiceTrait;
 
 #[utoipa::path(
         get,

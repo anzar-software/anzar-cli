@@ -1,11 +1,12 @@
-pub mod adapters;
+pub mod application;
 pub mod config;
-pub mod error;
-pub mod extractors;
-pub mod middlewares;
+pub mod domain;
+pub mod http;
+pub mod infrastructure;
 pub mod scopes;
-pub mod server;
-pub mod services;
+
+pub mod utils;
+
+pub mod error;
 pub mod startup;
 pub mod telemetry;
-pub mod utils;

@@ -1,13 +1,14 @@
 pub mod validate;
 
-use super::database::{cache_driver::CacheDriver, driver::DatabaseDriver};
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 
-use crate::{
-    config::validate::Validate,
-    error::{Error, InternalError},
-};
+use crate::error::{Error, InternalError};
+
+use super::boot::AppConfig;
+use super::boot::cache::CacheDriver;
+use super::boot::database::DatabaseDriver;
+use super::validate::Validate;
 
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize, ToSchema)]
 pub struct AnzarConfiguration {
@@ -40,7 +41,7 @@ impl AnzarConfiguration {
 }
 
 impl AnzarConfiguration {
-    pub fn new(app_config: super::AppConfig) -> Self {
+    pub fn new(app_config: AppConfig) -> Self {
         Self {
             app: App {
                 environment: "dev".into(),

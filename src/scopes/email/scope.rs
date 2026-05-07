@@ -5,11 +5,10 @@ use actix_web::{
 use secrecy::ExposeSecret;
 
 use crate::error::{ErrorResponse, Result};
-use crate::extractors::{AppStateExtractor, ValidatedQuery};
-use crate::scopes::{
-    auth::TokenQuery, email::service::EmailVerificationTokenServiceTrait,
-    user::service::UserServiceTrait,
-};
+
+use crate::application::model::TokenQuery;
+use crate::application::traits::{AccountServiceTrait, EmailVerificationTokenServiceTrait};
+use crate::http::extractors::{AppStateExtractor, ValidatedQuery};
 
 #[utoipa::path(
     get,
@@ -37,10 +36,10 @@ async fn verify_email(
 ) -> Result<HttpResponse> {
     let token = query.token;
 
+    // FIXME merge into one
     let email_verificaiton_token = app_state
         .validate_email_verification_token(token.expose_secret())
         .await?;
-
     let verification_token_id = email_verificaiton_token.id()?;
     app_state
         .invalidate_email_verification_token(verification_token_id)

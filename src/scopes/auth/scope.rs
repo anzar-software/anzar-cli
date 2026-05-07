@@ -3,30 +3,31 @@ use actix_web::{
     middleware::from_fn,
     web::{self},
 };
-
 use secrecy::ExposeSecret;
 use validator::{Validate, ValidateArgs};
 
 use crate::error::{
     AuthError, ConflictReason, CredentialField, Error, ErrorResponse, ForbiddenReason, Result,
 };
-use crate::extractors::{AppStateExtractor, ValidatedQuery};
-use crate::middlewares::{auth_middleware, authorization_middleware, rate_limiting::RATE_LIMITS};
-use crate::{config::AuthStrategy, scopes::user::CreateUserOutcome};
 
-use crate::services::{
-    account::{model::AccountStatus, service::AccountServiceTrait},
-    jwt::service::JwtServiceTrait,
-    session::{model::Session, service::SessionServiceTrait},
+use crate::config::AuthStrategy;
+
+use crate::application::model::{
+    AccountStatus, CreateUserOutcome, ExpiringLink, LoginRequest, RegisterRequest,
+    ResetPasswordRequest, Session, TokenQuery, User,
+};
+use crate::application::traits::{
+    AccountServiceTrait, EmailVerificationTokenServiceTrait, JwtServiceTrait,
+    PasswordResetTokenServiceTrait, SessionServiceTrait, UserServiceTrait,
+};
+use crate::http::{
+    cookies,
+    extractors::{AppStateExtractor, ValidatedQuery},
+    middlewares::{auth_middleware, authorization_middleware, rate_limiting::RATE_LIMITS},
 };
 
-use super::models::{
-    AuthResponse, EmailRequest, ExpiringLink, LoginRequest, RefreshTokenRequest, RegisterRequest,
-    ResetPasswordRequest, TokenQuery,
-};
-use super::reset_password::{model::PasswordResetToken, service::PasswordResetTokenServiceTrait};
-use super::support;
-use super::user::{User, service::UserServiceTrait};
+use super::model::{AuthResponse, EmailRequest, RefreshTokenRequest};
+use super::utils as throttle;
 
 #[utoipa::path(
         post,
@@ -77,15 +78,20 @@ pub async fn login(
     // START TIMING-SAFE EXECUTION BLOCK
     let start = std::time::Instant::now();
 
+    // Fetch device cookie
+    let raw = session.get::<String>(cookies::DEVICE_COOKIE).ok().flatten();
+    let device_cookie = raw.as_deref();
+
     // ALWAYS execute the same operations regardless of user existence
-    let (user, account_status, attempts) = app_state.authenticate_user(&req, &session).await?;
+    let (user, account, account_status, attempts) =
+        app_state.authenticate_user(&req, device_cookie).await?;
 
     // ENFORCE CONSTANT-TIME EXECUTION
-    support::throttle_since(start).await;
+    throttle::throttle_since(start).await;
 
     // Now handle responses
     // NOTE this can be removed, if it's not needed
-    if auth_config.email.verification.required && !user.verified {
+    if auth_config.email.verification.required && !account.verified {
         tracing::warn!(
             user_id = %user.id()?,
             error_code = "AuthError::AccountNotVerified",
@@ -99,19 +105,22 @@ pub async fn login(
             // Issue new device cookie
 
             let cookie = app_state.crypto.hmac.issue(&req.email)?;
+            let user_id = user.id()?;
 
             match &app_state.configuration.auth.strategy {
-                AuthStrategy::Session(..) => app_state.issue_session(&user).await.map(|token| {
+                AuthStrategy::Session(..) => {
+                    app_state.issue_session(user_id).await.map(|token| {
+                        session.clear();
+                        session.renew();
+                        session.insert(cookies::DEVICE_COOKIE, &cookie)?;
+                        session.insert(cookies::SESSION_COOKIE, token)?;
+                        Ok(HttpResponse::Ok().json(AuthResponse::new(user)))
+                    })?
+                }
+                AuthStrategy::Jwt(jwt) => app_state.issue_jwt(user_id).await.map(|tokens| {
                     session.clear();
                     session.renew();
-                    session.insert(support::DEVICE_COOKIE, &cookie)?;
-                    session.insert(support::SESSION_COOKIE, token)?;
-                    Ok(HttpResponse::Ok().json(AuthResponse::new(user)))
-                })?,
-                AuthStrategy::Jwt(jwt) => app_state.issue_jwt(&user).await.map(|tokens| {
-                    session.clear();
-                    session.renew();
-                    session.insert(support::DEVICE_COOKIE, &cookie)?;
+                    session.insert(cookies::DEVICE_COOKIE, &cookie)?;
 
                     Ok(HttpResponse::Ok().json(
                         AuthResponse::new(user).with_jwt(tokens, jwt.access_token_expires_in),
@@ -123,7 +132,7 @@ pub async fn login(
         // only return InvalidCredentials
         AccountStatus::Suspended => Err(Error::Forbidden(ForbiddenReason::AccountSuspended)),
         _ => {
-            support::delay(attempts as u32).await;
+            throttle::delay(attempts as u32).await;
             return Err(Error::Unauthenticated(AuthError::InvalidCredentials {
                 field: CredentialField::EmailOrPassword,
             }));
@@ -182,8 +191,10 @@ pub async fn register(
                 let mut response = AuthResponse::new(user.clone());
                 let email_config = &app_state.configuration.auth.email.verification;
 
+                let user_id = user.id()?;
+
                 if email_config.required {
-                    let token = app_state.create_verification_email(&user).await?;
+                    let token = app_state.create_verification_email(user_id).await?;
                     let link = format!(
                         "{}/email/verify?token={}",
                         &app_state.configuration.app.url, &token
@@ -194,17 +205,17 @@ pub async fn register(
 
                 let http_response = match &app_state.configuration.auth.strategy {
                     AuthStrategy::Session(..) => {
-                        let token = app_state.issue_session(&user).await?;
+                        let token = app_state.issue_session(user_id).await?;
 
                         session.clear();
                         session.renew();
-                        session.insert(support::SESSION_COOKIE, token)?;
+                        session.insert(cookies::SESSION_COOKIE, token)?;
 
                         response
                     }
 
                     AuthStrategy::Jwt(jwt) => {
-                        let tokens = app_state.issue_jwt(&user).await?;
+                        let tokens = app_state.issue_jwt(user_id).await?;
                         response.with_jwt(tokens, jwt.access_token_expires_in)
                     }
                 };
@@ -221,7 +232,7 @@ pub async fn register(
     .await;
 
     // ENFORCE CONSTANT-TIME EXECUTION
-    support::throttle_since(start).await;
+    throttle::throttle_since(start).await;
     result
 }
 
@@ -273,9 +284,10 @@ pub async fn refresh_token(
         .consume_refresh_token(req.0.refresh_token.expose_secret())
         .await?;
 
+    // FIXME maybe don't return User here, its not needed
     let user: User = app_state.find_user(&user_id).await?;
 
-    app_state.issue_jwt(&user).await.map(|tokens| {
+    app_state.issue_jwt(&user_id).await.map(|tokens| {
         let expiry = jwt.access_token_expires_in;
         Ok(HttpResponse::Ok().json(AuthResponse::new(user).with_jwt(tokens, expiry)))
     })?
@@ -351,40 +363,17 @@ async fn request_password_reset(
         app_state.revoke_password_reset_token(user_id).await?;
 
         // 4.
-        let token = app_state.crypto.token.generate()?;
-        let hashed_token = app_state.crypto.token.hash(&token);
+        let expiring_link = app_state.insert_password_reset_token(user_id).await?;
 
         // 5.
-        let expiry_timestamp = chrono::Utc::now()
-            + chrono::Duration::seconds(
-                app_state.configuration.auth.password.reset.token_expires_in,
-            );
-
-        let password_reset_token = PasswordResetToken::default()
-            .with_user_id(user_id)
-            .with_token_hash(&hashed_token)
-            .with_expiray(&expiry_timestamp);
-        app_state
-            .insert_password_reset_token(password_reset_token)
-            .await?;
-
-        // 6.
         let mut bucket = RATE_LIMITS.entry(user_id.to_string()).or_default();
         bucket.run()?;
 
-        let link = format!(
-            "{}/auth/password/reset?token={}",
-            &app_state.configuration.app.url, &token
-        );
-        let expiring_link = ExpiringLink {
-            link,
-            expires_at: expiry_timestamp,
-        };
         Ok::<ExpiringLink, Error>(expiring_link)
     }
     .await;
 
-    support::throttle_since(start).await;
+    throttle::throttle_since(start).await;
 
     // NOTE Use HMAC or JWT signing so you can later verify it server-side.
     // NOTE maybe use for email_verification
@@ -422,7 +411,7 @@ async fn render_reset_form(
 
     let csrf_token = app_state.crypto.token.generate()?;
     session.clear();
-    session.insert(support::CSRF_COOKIE, &csrf_token)?;
+    session.insert(cookies::CSRF_COOKIE, &csrf_token)?;
 
     let script_nonce = app_state.crypto.token.generate()?;
     let style_nonce = app_state.crypto.token.generate()?;
@@ -472,7 +461,7 @@ async fn submit_new_password(
     form.validate_with_args(&app_state.configuration.auth.password.requirements)?;
 
     // 0.5 Verify CSRF token
-    if let Some(expected) = session.get::<String>(support::CSRF_COOKIE)? {
+    if let Some(expected) = session.get::<String>(cookies::CSRF_COOKIE)? {
         if !app_state
             .crypto
             .token
@@ -483,7 +472,7 @@ async fn submit_new_password(
     } else {
         return Ok(HttpResponse::Forbidden().body("Missing CSRF token"));
     }
-    session.remove(support::CSRF_COOKIE);
+    session.remove(cookies::CSRF_COOKIE);
 
     let token: &str = form.token.expose_secret();
 

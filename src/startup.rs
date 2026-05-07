@@ -7,9 +7,9 @@ use actix_web::{App, HttpServer, web};
 use tracing_actix_web::TracingLogger;
 
 use crate::config::AppState;
-use crate::middlewares::{auth_middleware, authorization_middleware, validate_content_type};
 use crate::scopes::{auth, email, health, role, user};
-use crate::server;
+
+use crate::http;
 
 pub async fn run(listener: TcpListener, app_state: AppState) -> Result<Server, std::io::Error> {
     let config = app_state.configuration.clone();
@@ -20,18 +20,18 @@ pub async fn run(listener: TcpListener, app_state: AppState) -> Result<Server, s
 
         app.wrap(TracingLogger::default())
             // .wrap(from_fn(ip_rate_limit_middleware))
-            .wrap(server::configure_cors(&data.configuration))
-            .wrap(server::configure_cookie_session(&data.configuration))
-            .wrap(from_fn(validate_content_type))
-            .wrap(server::build_default_headers(&data.configuration))
+            .wrap(http::configure_cors(&data.configuration))
+            .wrap(http::configure_cookie_session(&data.configuration))
+            .wrap(from_fn(http::middlewares::validate_content_type))
+            .wrap(http::build_default_headers(&data.configuration))
             .app_data(data.clone())
-            .service(server::swagger_service())
+            .service(http::swagger_service())
             .service(health::health_scope())
             .service(auth::auth_scope())
             .service(
                 user::user_scope()
-                    .wrap(from_fn(authorization_middleware))
-                    .wrap(from_fn(auth_middleware)),
+                    .wrap(from_fn(http::middlewares::authorization_middleware))
+                    .wrap(from_fn(http::middlewares::auth_middleware)),
             )
             .service(email::email_scope())
             .service(role::role_scope())
@@ -46,7 +46,7 @@ pub async fn run(listener: TcpListener, app_state: AppState) -> Result<Server, s
 
     let server = match (&https_cfg.cert_path, &https_cfg.key_path) {
         (Some(cert), Some(key)) => {
-            let tls_config = server::configure_tls(cert, key)?;
+            let tls_config = http::configure_tls(cert, key)?;
             tracing::info!("HTTPS enabled");
             http_server.listen_rustls_0_23(listener, tls_config)?.run()
         }

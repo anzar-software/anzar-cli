@@ -1,8 +1,10 @@
 use actix_web::{HttpResponse, Scope, web};
 
+use crate::application::traits::RoleServiceTrait;
+use crate::error::Result;
+use crate::http::extractors::AppStateExtractor;
+
 use super::model::RoleName;
-use super::service::RoleServiceTrait;
-use crate::{error::Result, extractors::AppStateExtractor};
 
 #[actix_web::post("")]
 async fn create(
