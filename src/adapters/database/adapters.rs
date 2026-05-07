@@ -2,18 +2,18 @@ use std::sync::Arc;
 
 use sqlx::{Pool, Postgres, Sqlite};
 
-use crate::{
-    adapters::database::{
-        DatabaseAdapter, mongodb::MongodbAdapter, postgres::PostgreSQLAdapter,
-        sqlite::SQLiteAdapter,
-    },
-    scopes::{auth::model::PasswordResetToken, email::model::EmailVerificationToken, user::User},
-    services::{
-        account::model::Account,
-        jwt::RefreshToken,
-        session::model::Session,
-        // transaction::adapter::MongodbTransaction,
-    },
+use crate::adapters::database::{
+    DatabaseAdapter, mongodb::MongodbAdapter, postgres::PostgreSQLAdapter, sqlite::SQLiteAdapter,
+};
+use crate::scopes::role::model::Role;
+use crate::scopes::{
+    auth::model::PasswordResetToken, email::model::EmailVerificationToken, user::User,
+    user::UserRole,
+};
+use crate::services::{
+    account::model::Account,
+    jwt::RefreshToken,
+    session::model::Session, // transaction::adapter::MongodbTransaction,
 };
 
 const USER: &str = "users";
@@ -23,6 +23,9 @@ const PASSWORD_RESET_TOKEN: &str = "password_reset_tokens";
 const EMAIL_VERIFICATION_TOKEN: &str = "email_verification_tokens";
 const SESSION: &str = "sessions";
 
+const ROLE: &str = "roles";
+const USER_ROLE: &str = "user_roles";
+
 pub struct DatabaseAdapters {
     pub user_adapter: Arc<dyn DatabaseAdapter<User>>,
     pub account_adapter: Arc<dyn DatabaseAdapter<Account>>,
@@ -30,6 +33,8 @@ pub struct DatabaseAdapters {
     pub session_adapter: Arc<dyn DatabaseAdapter<Session>>,
     pub reset_token_adapter: Arc<dyn DatabaseAdapter<PasswordResetToken>>,
     pub email_verification_token: Arc<dyn DatabaseAdapter<EmailVerificationToken>>,
+    pub role_adapter: Arc<dyn DatabaseAdapter<Role>>,
+    pub user_role_adapter: Arc<dyn DatabaseAdapter<UserRole>>,
     // pub transaction_adapter: MongodbTransaction,
 }
 
@@ -54,6 +59,12 @@ impl DatabaseAdapters {
                 conn_string,
                 EMAIL_VERIFICATION_TOKEN,
             )),
+            role_adapter: Arc::new(MongodbAdapter::<Role>::new(client, conn_string, ROLE)),
+            user_role_adapter: Arc::new(MongodbAdapter::<UserRole>::new(
+                client,
+                conn_string,
+                USER_ROLE,
+            )),
             // transaction_adapter: MongodbTransaction::new(client),
         }
     }
@@ -72,6 +83,8 @@ impl DatabaseAdapters {
                 pool,
                 EMAIL_VERIFICATION_TOKEN,
             )),
+            role_adapter: Arc::new(SQLiteAdapter::<Role>::new(pool, ROLE)),
+            user_role_adapter: Arc::new(SQLiteAdapter::<UserRole>::new(pool, USER_ROLE)),
             // transaction_adapter: todo!(),
         }
     }
@@ -90,6 +103,8 @@ impl DatabaseAdapters {
                 pool,
                 EMAIL_VERIFICATION_TOKEN,
             )),
+            role_adapter: Arc::new(PostgreSQLAdapter::<Role>::new(pool, ROLE)),
+            user_role_adapter: Arc::new(PostgreSQLAdapter::<UserRole>::new(pool, USER_ROLE)),
             // transaction_adapter: todo!(),
         }
     }

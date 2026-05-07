@@ -93,6 +93,7 @@ secrecy = { version = "0.10.3", features = ["serde"] }
 utoipa = { version = "5.4.0", features = ["chrono", "actix_extras", "yaml"] }
 utoipa-swagger-ui = { version = "9.0.2", features = ["actix-web", "vendored"] }
 opentelemetry = "0.31.0"
+futures = "0.3.32"
 
 
 [dev-dependencies]

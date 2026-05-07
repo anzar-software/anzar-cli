@@ -5,6 +5,7 @@ use crate::scopes::auth::{LoginRequest, RegisterRequest, support};
 use crate::scopes::email::{
     model::EmailVerificationToken, service::EmailVerificationTokenServiceTrait,
 };
+use crate::scopes::user::UserRoleServiceTrait;
 use crate::scopes::user::models::CreateUserOutcome;
 
 use crate::services::account::model::{Account, AccountStatus};
@@ -163,6 +164,9 @@ impl UserServiceTrait for AppState {
 
         let account = Account::user(&user_id).with_password(&password);
         self.auth_service.account_repository.insert(account).await?;
+
+        self.insert_user_role(&user_id, "Admin").await?;
+        // self.auth_service.user_role_repository.insert(role).await?;
 
         // self.transaction_repository
         //     .commit_transaction(session)

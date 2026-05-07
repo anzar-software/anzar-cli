@@ -90,6 +90,9 @@ pub enum ResourceKind {
         email: Option<String>,
     },
 
+    #[error("role not found (id: {id:?}")]
+    Role { id: Option<String> },
+
     #[error("{token_type:?} not found")]
     Token { token_type: TokenErrorType },
 }
@@ -376,6 +379,7 @@ pub enum ErrorCode {
     InsufficientPermissions,
     AccountSuspended,
     // Not Found
+    RoleNotFound,
     UserNotFound,
     TokenNotFound,
     // Conflict
@@ -413,6 +417,7 @@ impl Error {
             },
             Error::NotFound(resource) => match resource {
                 ResourceKind::User { .. } => ErrorCode::UserNotFound,
+                ResourceKind::Role { .. } => ErrorCode::RoleNotFound,
                 ResourceKind::Token { .. } => ErrorCode::TokenNotFound,
             },
             Error::Conflict(reason) => match reason {

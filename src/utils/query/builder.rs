@@ -1,6 +1,6 @@
 use super::value::{DbValue, Op, Operation};
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct QueryBuilder {
     pub filters: Vec<Operation>,
     pub updates: Vec<Operation>,

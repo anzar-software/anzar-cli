@@ -1,15 +1,13 @@
 use mongodb::bson::Bson;
 
-use crate::scopes::user::Role;
-
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct Operation {
     pub field: &'static str,
     pub op: Op,
     pub value: DbValue,
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub enum Op {
     Eq,
     Ne,
@@ -26,7 +24,6 @@ pub enum Op {
 #[derive(Clone, Debug)]
 pub enum DbValue {
     String(String),
-    Role(Role),
     Int(i64),
     Float(f64),
     Uuid(uuid::Uuid),
@@ -44,11 +41,6 @@ impl From<&str> for DbValue {
 impl From<String> for DbValue {
     fn from(value: String) -> Self {
         DbValue::String(value)
-    }
-}
-impl From<Role> for DbValue {
-    fn from(value: Role) -> Self {
-        DbValue::Role(value)
     }
 }
 impl From<bool> for DbValue {
@@ -100,7 +92,6 @@ impl DbValue {
             DbValue::Bool(b) => query.bind(b),
             DbValue::Date(dt) => query.bind(dt),
             DbValue::Null => query.bind::<Option<String>>(None),
-            DbValue::Role(r) => query.bind(r),
             DbValue::Uuid(uuid) => query.bind(uuid),
             DbValue::List(_) => todo!(),
         }
@@ -117,7 +108,6 @@ impl DbValue {
             DbValue::Bool(b) => query.bind::<bool>(b),
             DbValue::Date(dt) => query.bind(dt),
             DbValue::Null => query.bind::<Option<String>>(None),
-            DbValue::Role(r) => query.bind(r),
             DbValue::Uuid(uuid) => query.bind(uuid),
             DbValue::List(_db_values) => todo!(),
         }
@@ -137,7 +127,6 @@ impl DbValue {
                     Bson::String(s)
                 }
             }
-            DbValue::Role(r) => Bson::String(format!("{:?}", r)),
             DbValue::Int(i) => Bson::Int64(i),
             DbValue::Float(f) => Bson::Double(f),
             DbValue::Uuid(u) => Bson::String(u.to_string()),

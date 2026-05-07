@@ -35,7 +35,6 @@ impl FakeUserGenerator {
             username: "some name".to_string(),
             email: email.to_string(),
             verified: true,
-            role: crate::scopes::user::Role::User,
             created_at: chrono::Utc::now(),
         }
     }

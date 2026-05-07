@@ -1,6 +1,7 @@
 use std::fmt::Debug;
 
 use async_trait::async_trait;
+use futures::TryStreamExt;
 use mongodb::{Collection, options::ReturnDocument};
 use serde::{Serialize, de::DeserializeOwned};
 
@@ -42,6 +43,15 @@ where
         })?;
 
         Ok(id.to_string())
+    }
+
+    async fn find_all(&self, _query: QueryBuilder) -> Result<Vec<T>, Error> {
+        self.collection
+            .find(mongodb::bson::doc! {})
+            .await?
+            .try_collect()
+            .await
+            .map_err(Into::into)
     }
 
     async fn find_one(&self, query: QueryBuilder) -> Result<Option<T>, Error> {

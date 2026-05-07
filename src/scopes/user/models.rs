@@ -9,17 +9,8 @@ pub enum CreateUserOutcome {
     AlreadyExists,
 }
 
-#[derive(Default, Debug, Serialize, Deserialize, Clone, PartialEq, Eq, sqlx::Type, ToSchema)]
-#[schema(example = json!({"role": Role::default()}))]
-#[sqlx(type_name = "role")]
-pub enum Role {
-    #[default]
-    User,
-    Admin,
-}
-
 #[derive(Default, Debug, Clone, PartialEq, Eq, Deserialize, Serialize, FromRow, ToSchema)]
-#[schema(example = json!({"id": Some(String::default()), "username": String::default(), "email": String::default(), "role": Role::default(), "verified": "false", "created_at": "2026-02-19T22:42:23.467Z"}))]
+#[schema(example = json!({"id": Some(String::default()), "username": String::default(), "email": String::default(), "verified": "false", "created_at": "2026-02-19T22:42:23.467Z"}))]
 pub struct User {
     #[serde(
         rename = "_id",
@@ -31,7 +22,6 @@ pub struct User {
 
     pub username: String,
     pub email: String,
-    pub role: Role,
     pub verified: bool,
 
     #[sqlx(rename = "createdAt")]

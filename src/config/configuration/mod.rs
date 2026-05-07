@@ -188,6 +188,7 @@ pub struct Authentication {
     pub strategy: AuthStrategy,
     pub email: EmailConfig,
     pub password: PasswordConfig,
+    pub rbac: RbacConfig,
 }
 impl Authentication {
     pub fn jwt(&self) -> Result<&JwtConfig, Error> {
@@ -435,6 +436,23 @@ impl Default for PasswordSecurity {
         Self {
             max_failed_attempts: 5,
             lockout_duration: 1800,
+        }
+    }
+}
+
+// RbacConfig
+// ------------------------------------------------------------
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize, ToSchema)]
+#[serde(default)]
+pub struct RbacConfig {
+    pub enabled: bool,
+    pub default_role: String,
+}
+impl Default for RbacConfig {
+    fn default() -> Self {
+        Self {
+            enabled: false,
+            default_role: "User".into(),
         }
     }
 }

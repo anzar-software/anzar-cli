@@ -51,7 +51,8 @@ impl JwtServiceTrait for AppState {
         let jwt = self.crypto.jwt()?;
 
         let user_id = user.id()?;
-        let (access_claims, refresh_claims) = Claims::new(user_id, user.role.clone())
+        let role = &self.configuration.auth.rbac.default_role;
+        let (access_claims, refresh_claims) = Claims::new(user_id, role.clone())
             .with_issuer(&jwt_config.issuer)
             .with_audience(&jwt_config.audience)
             .into_token_pair(jwt_config);

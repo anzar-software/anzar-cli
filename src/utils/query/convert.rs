@@ -21,22 +21,23 @@ impl IntoDbFilter for QueryBuilder {
         // filters
         for op in self.filters {
             let value = op.value.into_boson(op.field);
+            let field = if op.field == "id" { "_id" } else { op.field };
 
             match op.op {
                 Op::Eq => {
-                    doc.insert(op.field, value);
+                    doc.insert(field, value);
                 }
                 Op::Ne => {
-                    doc.insert(op.field, doc! { "$ne": value });
+                    doc.insert(field, doc! { "$ne": value });
                 }
                 Op::Gt => {
-                    doc.insert(op.field, doc! { "$gt": value });
+                    doc.insert(field, doc! { "$gt": value });
                 }
                 Op::Lt => {
-                    doc.insert(op.field, doc! { "$lt": value });
+                    doc.insert(field, doc! { "$lt": value });
                 }
                 Op::In => {
-                    doc.insert(op.field, doc! { "$in": value });
+                    doc.insert(field, doc! { "$in": value });
                 }
                 _ => {}
             }

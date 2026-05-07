@@ -7,7 +7,6 @@ use validator::Validate;
 
 use crate::config::JwtConfig;
 use crate::error::Error;
-use crate::scopes::user::Role;
 use crate::utils::validation::validate_objectid;
 
 #[derive(Debug, Default, Serialize, Deserialize, Clone, PartialEq)]
@@ -26,15 +25,15 @@ pub struct Claims {
     pub iss: String,
     pub aud: String,
     pub jti: uuid::Uuid,
-    pub role: Role,
+    pub roles: Vec<String>,
     pub token_type: TokenType,
 }
 
 impl Claims {
-    pub fn new(user_id: &str, role: Role) -> Self {
+    pub fn new(user_id: &str, role: String) -> Self {
         Claims {
             sub: user_id.into(),
-            role,
+            roles: vec![role],
             iat: Local::now().timestamp() as usize,
             jti: uuid::Uuid::new_v4(),
             ..Default::default()

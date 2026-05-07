@@ -61,6 +61,18 @@ where
         Ok(row.id)
     }
 
+    async fn find_all(&self, _filter: QueryBuilder) -> Result<Vec<T>, Error> {
+        // let (where_clause, values) = filter.into_postgres_filter(0);
+
+        let sql = format!("SELECT * FROM {}", self.table);
+        let query = sqlx::query_as::<_, T>(&sql);
+        // for v in values {
+        //     query = v.bind_pg(query);
+        // }
+
+        query.fetch_all(&self.pool).await.map_err(Into::into)
+    }
+
     async fn find_one(&self, filter: QueryBuilder) -> Result<Option<T>, Error> {
         let (where_clause, values) = filter.into_postgres_filter(0);
 

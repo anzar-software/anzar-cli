@@ -1,38 +1,31 @@
 use sqlx::{Postgres, Sqlite, postgres::PgArguments, query::QueryAs, sqlite::SqliteArguments};
 
-use super::traits::{IdResult, PgInsert, SqliteInsert};
-use crate::scopes::user::User;
+use crate::scopes::role::model::Role;
 
-impl PgInsert for User {
+use super::traits::{IdResult, PgInsert, SqliteInsert};
+
+impl PgInsert for Role {
     fn columns() -> Vec<&'static str> {
-        vec!["username", "email", "verified", "createdAt"]
+        vec!["name", "createdAt"]
     }
 
     fn bind_query<'q>(
         self,
         query: QueryAs<'q, Postgres, IdResult, PgArguments>,
     ) -> QueryAs<'q, Postgres, IdResult, PgArguments> {
-        query
-            .bind(self.username)
-            .bind(self.email)
-            .bind(self.verified)
-            .bind(self.created_at)
+        query.bind(self.name).bind(self.created_at)
     }
 }
 
-impl SqliteInsert for User {
+impl SqliteInsert for Role {
     fn columns() -> Vec<&'static str> {
-        vec!["username", "email", "verified", "createdAt"]
+        vec!["name", "createdAt"]
     }
 
     fn bind_query<'q>(
         self,
         query: QueryAs<'q, Sqlite, IdResult, SqliteArguments<'q>>,
     ) -> QueryAs<'q, Sqlite, IdResult, SqliteArguments<'q>> {
-        query
-            .bind(self.username)
-            .bind(self.email)
-            .bind(self.verified)
-            .bind(self.created_at)
+        query.bind(self.name).bind(self.created_at)
     }
 }

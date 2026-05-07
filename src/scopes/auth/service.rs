@@ -10,7 +10,8 @@ use crate::error::Result;
 
 use crate::scopes::auth::PasswordResetTokenRepository;
 use crate::scopes::email::EmailVerificationTokenRepository;
-use crate::scopes::user::UserRepository;
+use crate::scopes::role::RoleRepository;
+use crate::scopes::user::{UserRepository, UserRoleRepository};
 use crate::services::account::AccountRepository;
 use crate::services::jwt::JWTRepository;
 use crate::services::session::SessionRepository;
@@ -24,6 +25,8 @@ pub struct AuthService {
     pub(crate) session_repository: SessionRepository,
     pub(crate) password_reset_token_repository: PasswordResetTokenRepository,
     pub(crate) email_verification_token_repository: EmailVerificationTokenRepository,
+    pub(crate) role_repository: RoleRepository,
+    pub(crate) user_role_repository: UserRoleRepository,
     // pub(crate) transaction_repository: TransactionRepository,
 }
 
@@ -43,6 +46,8 @@ impl AuthService {
             email_verification_token_repository: EmailVerificationTokenRepository::new(
                 database_adapters.email_verification_token,
             ),
+            role_repository: RoleRepository::new(database_adapters.role_adapter),
+            user_role_repository: UserRoleRepository::new(database_adapters.user_role_adapter),
             // transaction_repository: TransactionRepository::new(adapters.transaction_adapter),
         }
     }

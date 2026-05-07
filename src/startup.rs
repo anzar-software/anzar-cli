@@ -8,7 +8,7 @@ use tracing_actix_web::TracingLogger;
 
 use crate::config::AppState;
 use crate::middlewares::{auth_middleware, authorization_middleware, validate_content_type};
-use crate::scopes::{auth, email, health, user};
+use crate::scopes::{auth, email, health, role, user};
 use crate::server;
 
 pub async fn run(listener: TcpListener, app_state: AppState) -> Result<Server, std::io::Error> {
@@ -34,6 +34,7 @@ pub async fn run(listener: TcpListener, app_state: AppState) -> Result<Server, s
                     .wrap(from_fn(auth_middleware)),
             )
             .service(email::email_scope())
+            .service(role::role_scope())
     });
 
     let https_cfg = config.server.https;

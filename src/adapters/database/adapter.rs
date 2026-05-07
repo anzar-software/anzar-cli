@@ -8,6 +8,7 @@ pub trait DatabaseAdapter<T: Send + Sync + Serialize + DeserializeOwned + 'stati
     Send + Sync
 {
     async fn insert(&self, data: T) -> Result<String, Error>;
+    async fn find_all(&self, filter: QueryBuilder) -> Result<Vec<T>, Error>;
     async fn find_one(&self, filter: QueryBuilder) -> Result<Option<T>, Error>;
     async fn find_one_and_update(
         &self,
