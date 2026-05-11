@@ -2,11 +2,14 @@ use sqlx::{Postgres, Sqlite, postgres::PgArguments, query::QueryAs, sqlite::Sqli
 
 use crate::domain::model::Role;
 
-use super::traits::{IdResult, PgInsert, SqliteInsert};
+use super::traits::{IdResult, MongoInsert, PgInsert, SqliteInsert};
 
 impl PgInsert for Role {
     fn columns() -> Vec<&'static str> {
         vec!["name", "createdAt"]
+    }
+    fn uniques() -> Vec<&'static str> {
+        vec!["name"]
     }
 
     fn bind_query<'q>(
@@ -21,11 +24,23 @@ impl SqliteInsert for Role {
     fn columns() -> Vec<&'static str> {
         vec!["name", "createdAt"]
     }
+    fn uniques() -> Vec<&'static str> {
+        vec!["name"]
+    }
 
     fn bind_query<'q>(
         self,
         query: QueryAs<'q, Sqlite, IdResult, SqliteArguments<'q>>,
     ) -> QueryAs<'q, Sqlite, IdResult, SqliteArguments<'q>> {
         query.bind(self.name).bind(self.created_at)
+    }
+}
+
+impl MongoInsert for Role {
+    fn columns() -> Vec<&'static str> {
+        vec!["name", "createdAt"]
+    }
+    fn uniques() -> Vec<&'static str> {
+        vec!["name"]
     }
 }

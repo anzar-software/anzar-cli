@@ -44,6 +44,26 @@ impl MongoDB {
                 );
             })?;
 
+        mongodb_indexes
+            .create_role_permission_index()
+            .await
+            .inspect_err(|e| {
+                tracing::error!(
+                    error_code = "InternalError::Database",
+                    "Failed to create index for roleId+permissionId attribute in role_permissions Collection - {e}"
+                );
+            })?;
+
+        mongodb_indexes
+            .create_user_role_index()
+            .await
+            .inspect_err(|e| {
+                tracing::error!(
+                    error_code = "InternalError::Database",
+                    "Failed to create index for roleId+userId attribute in user_roles Collection - {e}"
+                );
+            })?;
+
         Ok(client)
     }
 }

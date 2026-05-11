@@ -128,20 +128,35 @@ impl IntoDbFilter for QueryBuilder {
         let clause = self
             .filters
             .iter()
-            .enumerate()
-            .map(|(i, f)| match f.op {
+            .map(|f| match f.op {
                 Op::Eq => format!("\"{}\" = ?", f.field),
                 Op::Null => format!("\"{}\" IS NULL", f.field),
                 Op::Ne => format!("\"{}\" != ?", f.field),
                 Op::Gt => format!("\"{}\" > ?", f.field),
                 Op::Lt => format!("\"{}\" < ?", f.field),
-                Op::In => format!("\"{}\" = ANY(?{})", f.field, i + 1),
+                // Op::In => format!("\"{}\" = ANY(?{})", f.field, i + 1),
+                Op::In => match &f.value {
+                    DbValue::List(list) => {
+                        let placeholders = list.iter().map(|_| "?").collect::<Vec<_>>().join(", ");
+                        format!("\"{}\" IN ({})", f.field, placeholders)
+                    }
+                    _ => unreachable!("In op must have List value"),
+                },
                 _ => unreachable!("update ops not valid in filter context"),
             })
             .collect::<Vec<_>>()
             .join(" AND ");
 
-        let values = self.filters.iter().map(|f| f.value.clone()).collect();
+        // let values = self.filters.iter().map(|f| f.value.clone()).collect();
+        let values = self
+            .filters
+            .iter()
+            .flat_map(|f| match &f.value {
+                DbValue::List(list) => list.clone(),
+                _ => vec![f.value.clone()],
+            })
+            .collect();
+
         (clause, values)
     }
     fn into_sqlite_update(self) -> (String, Vec<DbValue>) {

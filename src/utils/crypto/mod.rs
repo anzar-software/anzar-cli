@@ -157,10 +157,10 @@ mod tests {
                 url: "localhost:3000".to_string(),
             },
             database: crate::config::Database {
-                driver: crate::config::database::driver::DatabaseDriver::PostgreSQL,
+                driver: crate::config::database::DatabaseDriver::PostgreSQL,
                 connection_string: "postgres://hakou:password@localhost:5432/dev".into(),
                 cache: crate::config::Cache {
-                    driver: crate::config::database::cache_driver::CacheDriver::InMemory,
+                    driver: crate::config::cache::CacheDriver::InMemory,
                     url: "".into(),
                 },
             },

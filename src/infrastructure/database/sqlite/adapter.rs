@@ -39,6 +39,39 @@ where
         + Unpin
         + SqliteInsert,
 {
+    async fn insert_many(&self, data: Vec<T>) -> Result<Vec<String>, Error> {
+        let columns: String = T::columns()
+            .iter()
+            .map(|k| format!("\"{}\"", k))
+            .collect::<Vec<String>>()
+            .join(", ");
+
+        let mut count = 0;
+        let mut rows: Vec<String> = Vec::new();
+        for _ in 0..data.len() {
+            let values = T::columns()
+                .iter()
+                .map(|_| {
+                    count += 1;
+                    format!("${}", count)
+                })
+                .collect::<Vec<String>>()
+                .join(", ");
+            rows.push(format!("({values})"));
+        }
+        let placeholders = rows.join(", ");
+
+        let sql = format!(
+            "INSERT INTO {} ({}) VALUES {} RETURNING id",
+            self.table, columns, placeholders
+        );
+
+        let query = sqlx::query_as::<_, IdResult>(&sql);
+        let query = data.into_iter().fold(query, |q, d| d.bind_query(q));
+
+        let rows: Vec<IdResult> = query.fetch_all(&self.pool).await?;
+        Ok(rows.into_iter().map(|r| r.id).collect())
+    }
     async fn insert(&self, data: T) -> Result<String, Error> {
         let columns: String = T::columns()
             .iter()
@@ -51,6 +84,7 @@ where
             .map(|(i, _)| format!("${}", i + 1))
             .collect::<Vec<String>>()
             .join(", ");
+
         let sql = format!(
             "INSERT INTO {} ({}) VALUES ({}) RETURNING id",
             self.table, columns, values
@@ -62,14 +96,73 @@ where
         Ok(row.id)
     }
 
-    async fn find_all(&self, _filter: QueryBuilder) -> Result<Vec<T>, Error> {
-        // let (where_clause, values) = filter.into_postgres_filter(0);
+    async fn upsert(&self, data: T) -> Result<String, Error> {
+        let columns: String = T::columns()
+            .iter()
+            .map(|k| format!("\"{}\"", k))
+            .collect::<Vec<String>>()
+            .join(", ");
+        let values = T::columns()
+            .iter()
+            .enumerate()
+            .map(|(i, _)| format!("${}", i + 1))
+            .collect::<Vec<String>>()
+            .join(", ");
+        let conflict_vals = T::uniques().join(", ");
 
-        let sql = format!("SELECT * FROM {}", self.table);
-        let query = sqlx::query_as::<_, T>(&sql);
-        // for v in values {
-        //     query = v.bind_pg(query);
-        // }
+        let sql = format!(
+            "INSERT INTO {} ({}) VALUES ({}) ON CONFLICT ({}) DO UPDATE SET id = excluded.id RETURNING id",
+            self.table, columns, values, conflict_vals
+        );
+
+        let query = sqlx::query_as::<_, IdResult>(&sql);
+
+        let row: IdResult = data.bind_query(query).fetch_one(&self.pool).await?;
+        Ok(row.id)
+    }
+    async fn upsert_many(&self, data: Vec<T>) -> Result<Vec<String>, Error> {
+        let columns: String = T::columns()
+            .iter()
+            .map(|k| format!("\"{}\"", k))
+            .collect::<Vec<String>>()
+            .join(", ");
+        let conflict_vals = T::uniques().join(", ");
+
+        let mut count = 0;
+        let mut rows: Vec<String> = Vec::new();
+        for _ in 0..data.len() {
+            let row = T::columns()
+                .iter()
+                .map(|_| {
+                    count += 1;
+                    format!("${}", count)
+                })
+                .collect::<Vec<String>>()
+                .join(", ");
+            rows.push(format!("({row})"));
+        }
+        let placeholders = rows.join(", ");
+
+        let sql = format!(
+            "INSERT INTO {} ({}) VALUES {} ON CONFLICT ({}) DO UPDATE SET id = excluded.id RETURNING id",
+            self.table, columns, placeholders, conflict_vals
+        );
+
+        let query = sqlx::query_as::<_, IdResult>(&sql);
+        let query = data.into_iter().fold(query, |q, d| d.bind_query(q));
+
+        let rows: Vec<IdResult> = query.fetch_all(&self.pool).await?;
+        Ok(rows.into_iter().map(|r| r.id).collect())
+    }
+
+    async fn find_all(&self, filter: QueryBuilder) -> Result<Vec<T>, Error> {
+        let (where_clause, values) = filter.into_sqlite_filter();
+
+        let sql = format!("SELECT * FROM {} WHERE {}", self.table, where_clause);
+        let mut query = sqlx::query_as::<_, T>(&sql);
+        for v in values {
+            query = v.bind_sqlite(query);
+        }
 
         query.fetch_all(&self.pool).await.map_err(Into::into)
     }

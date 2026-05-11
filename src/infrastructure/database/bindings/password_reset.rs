@@ -1,11 +1,14 @@
 use sqlx::{Postgres, Sqlite, postgres::PgArguments, query::QueryAs, sqlite::SqliteArguments};
 
-use super::traits::{IdResult, PgInsert, SqliteInsert};
+use super::traits::{IdResult, MongoInsert, PgInsert, SqliteInsert};
 use crate::domain::model::PasswordResetToken;
 
 impl PgInsert for PasswordResetToken {
     fn columns() -> Vec<&'static str> {
         vec!["userId", "issuedAt", "expiresAt", "usedAt", "token"]
+    }
+    fn uniques() -> Vec<&'static str> {
+        vec!["token"]
     }
 
     fn bind_query<'q>(
@@ -25,6 +28,9 @@ impl SqliteInsert for PasswordResetToken {
     fn columns() -> Vec<&'static str> {
         vec!["userId", "issuedAt", "expiresAt", "usedAt", "token"]
     }
+    fn uniques() -> Vec<&'static str> {
+        vec!["token"]
+    }
 
     fn bind_query<'q>(
         self,
@@ -36,5 +42,14 @@ impl SqliteInsert for PasswordResetToken {
             .bind(self.expires_at)
             .bind(self.used_at)
             .bind(self.token)
+    }
+}
+
+impl MongoInsert for PasswordResetToken {
+    fn columns() -> Vec<&'static str> {
+        vec!["userId", "issuedAt", "expiresAt", "usedAt", "token"]
+    }
+    fn uniques() -> Vec<&'static str> {
+        vec!["token"]
     }
 }

@@ -1,3 +1,4 @@
+use crate::application::traits::{PermissionServiceTrait, RoleServiceTrait};
 use crate::config::AppState;
 use crate::error::{AuthError, Error, Result, TokenErrorType};
 
@@ -39,32 +40,55 @@ impl JwtServiceTrait for AppState {
     )]
     async fn issue_jwt(&self, user_id: &str) -> Result<IssuedTokens> {
         let jwt_config = self.configuration.auth.jwt()?;
+        let rbac_config = &self.configuration.auth.rbac;
         let jwt = self.crypto.jwt()?;
 
-        let role = &self.configuration.auth.rbac.default_role;
-        let (access_claims, refresh_claims) = Claims::new(user_id, role.clone())
+        // permissions = get list of permissions by role_id
+        let mut full_permissions: Vec<String> = Vec::new();
+
+        if self.configuration.auth.rbac.enabled {
+            let roles = self.find_roles_by_user_id(user_id).await?;
+
+            for role in roles {
+                let role_id = role.id()?;
+                let response = self.find_permissions_by_role_id(role_id).await?;
+
+                let mut permissions = response.iter().map(|r| r.name.clone()).collect();
+
+                // NOTE
+                // YOU CAN USE LOCAL FETCH FROM `config.yml`
+                // let mut permissions: Vec<String> = rbac_config
+                //     .roles
+                //     .iter()
+                //     .filter(|r| r.name == role.name)
+                //     .flat_map(|r| r.permissions.iter().cloned())
+                //     .collect();
+
+                full_permissions.append(&mut permissions);
+            }
+        }
+
+        let (access_claims, refresh_claims) = Claims::new(user_id, &rbac_config.default_role)
             .with_issuer(&jwt_config.issuer)
             .with_audience(&jwt_config.audience)
+            .with_permissions(full_permissions)
             .into_token_pair(jwt_config);
-
         let jti = refresh_claims.jti;
-        let access = jwt.encode(access_claims)?;
-        let refresh = jwt.encode(refresh_claims)?;
 
-        let tokens = IssuedTokens::default()
-            .with_access_token(&access)
-            .with_refresh_token(&refresh)
-            .with_jti(jti);
-
-        let refresh_token = RefreshToken::new(&tokens)
+        let refresh_token = RefreshToken::new(&jti.to_string())
             .with_user_id(user_id)
             .with_expire_at(jwt_config.refresh_token_expires_in);
-
         self.repositories
             .jwt_repository
             .insert(refresh_token)
             .await?;
-        Ok(tokens)
+
+        let access = jwt.encode(access_claims)?;
+        let refresh = jwt.encode(refresh_claims)?;
+        Ok(IssuedTokens::default()
+            .with_access_token(&access)
+            .with_refresh_token(&refresh)
+            .with_jti(jti))
     }
 
     #[tracing::instrument(name = "auth.invalidate_jwt", skip(self, refresh_token))]

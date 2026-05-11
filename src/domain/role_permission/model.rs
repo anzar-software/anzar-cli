@@ -7,8 +7,8 @@ use super::super::serde::{
 };
 
 #[derive(Default, Debug, Clone, PartialEq, Eq, Deserialize, Serialize, FromRow, ToSchema)]
-#[schema(example = json!({ "userId": String::default(), "roleId": String::default() }))]
-pub struct UserRole {
+#[schema(example = json!({ "permissionId": String::default(), "roleId": String::default() }))]
+pub struct RolePermission {
     #[serde(
         rename = "_id",
         default,
@@ -17,14 +17,14 @@ pub struct UserRole {
     )]
     pub id: Option<String>,
 
-    #[sqlx(rename = "userId")]
+    #[sqlx(rename = "permissionId")]
     #[serde(
-        rename = "userId",
+        rename = "permissionId",
         default,
         serialize_with = "serialize_object_id_as_string",
         deserialize_with = "deserialize_object_id"
     )]
-    pub user_id: String,
+    pub permission_id: String,
 
     #[sqlx(rename = "roleId")]
     #[serde(
@@ -40,12 +40,12 @@ pub struct UserRole {
     pub issued_at: chrono::DateTime<chrono::Utc>,
 }
 
-impl UserRole {
-    pub fn new(user_id: &str, role_id: &str) -> Self {
+impl RolePermission {
+    pub fn new(role_id: &str, permission_id: &str) -> Self {
         Self {
             id: None,
-            user_id: user_id.into(),
             role_id: role_id.into(),
+            permission_id: permission_id.into(),
             issued_at: chrono::Utc::now(),
         }
     }

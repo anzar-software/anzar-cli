@@ -19,9 +19,9 @@ impl RoleRepository {
 
 impl RoleRepository {
     #[tracing::instrument(name = "db.role.insert", skip(self, role))]
-    pub async fn insert(&self, role: Role) -> Result<()> {
-        match self.adapter.insert(role).await {
-            Ok(_id) => Ok(()),
+    pub async fn insert(&self, role: Role) -> Result<String> {
+        match self.adapter.upsert(role).await {
+            Ok(id) => Ok(id),
             Err(err) => {
                 tracing::error!("Failed to insert role to database - {err}");
                 Err(Error::Internal(InternalError::Database(err.to_string())))
@@ -45,9 +45,9 @@ impl RoleRepository {
         }
     }
 
-    #[tracing::instrument(name = "db.role.find", skip(self))]
-    pub async fn find_all(&self) -> Result<Vec<Role>> {
-        let filter = QueryBuilder::default();
+    #[tracing::instrument(name = "db.role.find_by_id", skip(self, ids))]
+    pub async fn find_by_ids(&self, ids: Vec<String>) -> Result<Vec<Role>> {
+        let filter = QueryBuilder::default().in_("id", ids);
 
         match self.adapter.find_all(filter).await {
             Ok(roles) => Ok(roles),

@@ -2,11 +2,14 @@ use sqlx::{Postgres, Sqlite, postgres::PgArguments, query::QueryAs, sqlite::Sqli
 
 use crate::domain::model::Session;
 
-use super::traits::{IdResult, PgInsert, SqliteInsert};
+use super::traits::{IdResult, MongoInsert, PgInsert, SqliteInsert};
 
 impl PgInsert for Session {
     fn columns() -> Vec<&'static str> {
         vec!["userId", "issuedAt", "expiresAt", "usedAt", "token"]
+    }
+    fn uniques() -> Vec<&'static str> {
+        vec!["token"]
     }
 
     fn bind_query<'q>(
@@ -26,6 +29,9 @@ impl SqliteInsert for Session {
     fn columns() -> Vec<&'static str> {
         vec!["userId", "issuedAt", "expiresAt", "usedAt", "token"]
     }
+    fn uniques() -> Vec<&'static str> {
+        vec!["token"]
+    }
 
     fn bind_query<'q>(
         self,
@@ -37,5 +43,14 @@ impl SqliteInsert for Session {
             .bind(self.expires_at)
             .bind(self.used_at)
             .bind(self.token)
+    }
+}
+
+impl MongoInsert for Session {
+    fn columns() -> Vec<&'static str> {
+        vec!["userId", "issuedAt", "expiresAt", "usedAt", "token"]
+    }
+    fn uniques() -> Vec<&'static str> {
+        vec!["token"]
     }
 }

@@ -2,11 +2,14 @@ use sqlx::{Postgres, Sqlite, postgres::PgArguments, query::QueryAs, sqlite::Sqli
 
 use crate::domain::model::RefreshToken;
 
-use super::traits::{IdResult, PgInsert, SqliteInsert};
+use super::traits::{IdResult, MongoInsert, PgInsert, SqliteInsert};
 
 impl PgInsert for RefreshToken {
     fn columns() -> Vec<&'static str> {
         vec!["userId", "issuedAt", "expiresAt", "usedAt", "jti"]
+    }
+    fn uniques() -> Vec<&'static str> {
+        vec!["jti"]
     }
 
     fn bind_query<'q>(
@@ -26,6 +29,9 @@ impl SqliteInsert for RefreshToken {
     fn columns() -> Vec<&'static str> {
         vec!["userId", "issuedAt", "expiresAt", "usedAt", "jti"]
     }
+    fn uniques() -> Vec<&'static str> {
+        vec!["jti"]
+    }
 
     fn bind_query<'q>(
         self,
@@ -37,5 +43,14 @@ impl SqliteInsert for RefreshToken {
             .bind(self.expires_at)
             .bind(self.used_at)
             .bind(self.jti)
+    }
+}
+
+impl MongoInsert for RefreshToken {
+    fn columns() -> Vec<&'static str> {
+        vec!["userId", "issuedAt", "expiresAt", "usedAt", "jti"]
+    }
+    fn uniques() -> Vec<&'static str> {
+        vec!["jti"]
     }
 }

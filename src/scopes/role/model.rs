@@ -1,8 +1,11 @@
 use serde::Deserialize;
-use utoipa::ToSchema;
 
-#[derive(Debug, Deserialize, ToSchema)]
-#[schema(example = json!({"name": "Admin"}))]
+#[derive(Debug, Deserialize)]
 pub struct RoleName {
     pub name: String,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct PermissionId {
+    pub permission_id: String,
 }

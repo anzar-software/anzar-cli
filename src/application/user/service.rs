@@ -1,7 +1,6 @@
 use crate::config::AppState;
 use crate::error::Result;
 
-use crate::application::traits::UserRoleServiceTrait;
 use crate::domain::model::{
     Account, AccountStatus, CreateUserOutcome, LoginRequest, RegisterRequest, User,
 };
@@ -148,9 +147,6 @@ impl UserServiceTrait for AppState {
 
         let account = Account::user(&user_id).with_password(&password);
         self.repositories.account_repository.insert(account).await?;
-
-        self.insert_user_role(&user_id, "Admin").await?;
-        // self.auth_service.user_role_repository.insert(role).await?;
 
         // self.transaction_repository
         //     .commit_transaction(session)

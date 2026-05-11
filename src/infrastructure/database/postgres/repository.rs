@@ -40,7 +40,10 @@ impl PostgreSQL {
         let path = std::path::Path::new("migrations/postgres");
         if path.exists() {
             let migrator = sqlx::migrate::Migrator::new(path).await?;
-            migrator.run(&self.pool).await.expect("migrations to run");
+            migrator
+                .run(&self.pool)
+                .await
+                .inspect_err(|e| tracing::error!("Failed to run migrations - {e}"))?;
         }
 
         Ok(())

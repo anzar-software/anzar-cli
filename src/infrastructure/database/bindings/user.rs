@@ -2,11 +2,14 @@ use sqlx::{Postgres, Sqlite, postgres::PgArguments, query::QueryAs, sqlite::Sqli
 
 use crate::domain::model::User;
 
-use super::traits::{IdResult, PgInsert, SqliteInsert};
+use super::traits::{IdResult, MongoInsert, PgInsert, SqliteInsert};
 
 impl PgInsert for User {
     fn columns() -> Vec<&'static str> {
         vec!["username", "email", "createdAt"]
+    }
+    fn uniques() -> Vec<&'static str> {
+        vec!["email"]
     }
 
     fn bind_query<'q>(
@@ -24,6 +27,9 @@ impl SqliteInsert for User {
     fn columns() -> Vec<&'static str> {
         vec!["username", "email", "createdAt"]
     }
+    fn uniques() -> Vec<&'static str> {
+        vec!["email"]
+    }
 
     fn bind_query<'q>(
         self,
@@ -33,5 +39,14 @@ impl SqliteInsert for User {
             .bind(self.username)
             .bind(self.email)
             .bind(self.created_at)
+    }
+}
+
+impl MongoInsert for User {
+    fn columns() -> Vec<&'static str> {
+        vec!["username", "email", "createdAt"]
+    }
+    fn uniques() -> Vec<&'static str> {
+        vec!["email"]
     }
 }

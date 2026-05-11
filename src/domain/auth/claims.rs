@@ -22,14 +22,15 @@ pub struct Claims {
     pub aud: String,
     pub jti: uuid::Uuid,
     pub roles: Vec<String>,
+    pub permissions: Vec<String>,
     pub token_type: TokenType,
 }
 
 impl Claims {
-    pub fn new(user_id: &str, role: String) -> Self {
+    pub fn new(user_id: &str, role: &str) -> Self {
         Claims {
             sub: user_id.into(),
-            roles: vec![role],
+            roles: vec![role.into()],
             iat: Local::now().timestamp() as usize,
             jti: uuid::Uuid::new_v4(),
             ..Default::default()
@@ -44,6 +45,10 @@ impl Claims {
     }
     pub fn with_audience(mut self, audience: &str) -> Self {
         self.aud = audience.into();
+        self
+    }
+    pub fn with_permissions(mut self, permissions: Vec<String>) -> Self {
+        self.permissions = permissions;
         self
     }
     fn with_expiry(mut self, expires_in: i64) -> Self {

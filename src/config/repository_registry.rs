@@ -7,8 +7,8 @@ use crate::infrastructure::{
 
 use crate::domain::repositories::{
     AccountRepository, EmailVerificationTokenRepository, JWTRepository,
-    PasswordResetTokenRepository, RoleRepository, SessionRepository, UserRepository,
-    UserRoleRepository,
+    PasswordResetTokenRepository, PermissionRepository, RolePermissionRepository, RoleRepository,
+    SessionRepository, UserRepository, UserRoleRepository,
 };
 
 use super::Database;
@@ -26,6 +26,8 @@ pub struct RepositoryRegistry {
     pub(crate) email_verification_token_repository: EmailVerificationTokenRepository,
     pub(crate) role_repository: RoleRepository,
     pub(crate) user_role_repository: UserRoleRepository,
+    pub(crate) permission_repository: PermissionRepository,
+    pub(crate) role_permission_repository: RolePermissionRepository,
     // pub(crate) transaction_repository: TransactionRepository,
 }
 
@@ -47,6 +49,11 @@ impl RepositoryRegistry {
             ),
             role_repository: RoleRepository::new(database_adapters.role_adapter),
             user_role_repository: UserRoleRepository::new(database_adapters.user_role_adapter),
+
+            permission_repository: PermissionRepository::new(database_adapters.permission_adapter),
+            role_permission_repository: RolePermissionRepository::new(
+                database_adapters.role_permission_adapter,
+            ),
             // transaction_repository: TransactionRepository::new(adapters.transaction_adapter),
         }
     }
@@ -80,6 +87,8 @@ impl RepositoryRegistry {
             }
             DatabaseDriver::PostgreSQL => {
                 let postgresql = PostgreSQL::start(&database.connection_string).await?;
+                postgresql.run_migrations().await?;
+
                 DatabaseAdapters::postgres(&postgresql.pool)
             }
         };

@@ -6,12 +6,28 @@ use actix_web::{App, HttpServer, web};
 
 use tracing_actix_web::TracingLogger;
 
+use crate::application::traits::{
+    PermissionServiceTrait, RolePermissionServiceTrait, RoleServiceTrait,
+};
 use crate::config::AppState;
-use crate::scopes::{auth, email, health, role, user};
+use crate::scopes::{auth, email, health, permission, role, user};
 
 use crate::http;
 
 pub async fn run(listener: TcpListener, app_state: AppState) -> Result<Server, std::io::Error> {
+    // TODO
+    // Read RBAC from AnzarConfiguration and save permissions to DB
+    if app_state.configuration.auth.rbac.enabled {
+        for role in app_state.clone().configuration.auth.rbac.roles {
+            let role_id = app_state.upsert_role(&role.name).await?;
+            let permission_ids = app_state.upsert_permissions(role.permissions).await?;
+
+            app_state
+                .upsert_role_permissions(&role_id, permission_ids)
+                .await?;
+        }
+    }
+
     let config = app_state.configuration.clone();
     let data = web::Data::new(app_state);
 
@@ -35,6 +51,7 @@ pub async fn run(listener: TcpListener, app_state: AppState) -> Result<Server, s
             )
             .service(email::email_scope())
             .service(role::role_scope())
+            .service(permission::permission_scope())
     });
 
     let https_cfg = config.server.https;

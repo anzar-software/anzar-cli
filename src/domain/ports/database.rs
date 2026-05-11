@@ -8,15 +8,25 @@ use crate::error::Error;
 pub trait DatabaseAdapter<T: Send + Sync + Serialize + DeserializeOwned + 'static>:
     Send + Sync
 {
+    // -- INSERTS
     async fn insert(&self, data: T) -> Result<String, Error>;
-    async fn find_all(&self, filter: QueryBuilder) -> Result<Vec<T>, Error>;
+    async fn insert_many(&self, data: Vec<T>) -> Result<Vec<String>, Error>;
+    async fn upsert(&self, data: T) -> Result<String, Error>;
+    async fn upsert_many(&self, data: Vec<T>) -> Result<Vec<String>, Error>;
+
+    // -- FINDS
     async fn find_one(&self, filter: QueryBuilder) -> Result<Option<T>, Error>;
+    async fn find_all(&self, filter: QueryBuilder) -> Result<Vec<T>, Error>;
+
+    // -- UPDATES
     async fn find_one_and_update(
         &self,
         filter: QueryBuilder,
         update: QueryBuilder,
     ) -> Result<Option<T>, Error>;
     async fn update_many(&self, filter: QueryBuilder, update: QueryBuilder) -> Result<(), Error>;
+
+    // -- DELETES
     async fn delete_one(&self, filter: QueryBuilder) -> Result<(), Error>;
     async fn delete_many(&self, filter: QueryBuilder) -> Result<(), Error>;
 

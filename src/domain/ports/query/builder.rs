@@ -29,6 +29,15 @@ impl QueryBuilder {
         self
     }
 
+    pub fn in_(mut self, field: &'static str, value: impl Into<DbValue>) -> Self {
+        self.filters.push(Operation {
+            field,
+            op: Op::In,
+            value: value.into(),
+        });
+        self
+    }
+
     pub fn gt(mut self, field: &'static str, value: impl Into<DbValue>) -> Self {
         self.filters.push(Operation {
             field,

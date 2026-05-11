@@ -448,12 +448,24 @@ impl Default for PasswordSecurity {
 pub struct RbacConfig {
     pub enabled: bool,
     pub default_role: String,
+    pub roles: Vec<RoleConfig>,
 }
+
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize, ToSchema)]
+pub struct RoleConfig {
+    pub name: String,
+    pub permissions: Vec<String>,
+}
+
 impl Default for RbacConfig {
     fn default() -> Self {
         Self {
             enabled: false,
             default_role: "User".into(),
+            roles: vec![RoleConfig {
+                name: "User".into(),
+                permissions: vec!["*:read".into()],
+            }],
         }
     }
 }
@@ -488,6 +500,21 @@ fn default_headers() -> Vec<(String, String)> {
         ),
     ]
 }
+
+// rbac:
+//   default_role: user
+//   roles:
+//     - name: user
+//       permissions:
+//         - posts:read
+//         - posts:write
+//     - name: admin
+//       permissions:
+//         - posts:read
+//         - posts:write
+//         - users:read
+//         - users:write
+//         - billing:read
 
 // humantime-serde is great for this — lets you write "15m" in config files.
 // server:

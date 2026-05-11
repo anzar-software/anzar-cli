@@ -6,8 +6,11 @@ use actix_web::{
 use secrecy::ExposeSecret;
 use validator::{Validate, ValidateArgs};
 
-use crate::error::{
-    AuthError, ConflictReason, CredentialField, Error, ErrorResponse, ForbiddenReason, Result,
+use crate::{
+    application::traits::UserRoleServiceTrait,
+    error::{
+        AuthError, ConflictReason, CredentialField, Error, ErrorResponse, ForbiddenReason, Result,
+    },
 };
 
 use crate::config::AuthStrategy;
@@ -189,10 +192,15 @@ pub async fn register(
         match app_state.create_user(req.into_inner()).await? {
             CreateUserOutcome::Created(user) => {
                 let mut response = AuthResponse::new(user.clone());
-                let email_config = &app_state.configuration.auth.email.verification;
 
                 let user_id = user.id()?;
 
+                if app_state.configuration.auth.rbac.enabled {
+                    let role = &app_state.configuration.auth.rbac.default_role;
+                    app_state.insert_user_role(user_id, role).await?;
+                }
+
+                let email_config = &app_state.configuration.auth.email.verification;
                 if email_config.required {
                     let token = app_state.create_verification_email(user_id).await?;
                     let link = format!(

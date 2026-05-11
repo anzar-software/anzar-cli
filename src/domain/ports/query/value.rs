@@ -33,6 +33,12 @@ pub enum DbValue {
     List(Vec<DbValue>),
 }
 
+impl From<Vec<String>> for DbValue {
+    fn from(values: Vec<String>) -> Self {
+        let s: Vec<DbValue> = values.iter().map(|v| DbValue::String(v.clone())).collect();
+        DbValue::List(s)
+    }
+}
 impl From<&str> for DbValue {
     fn from(value: &str) -> Self {
         DbValue::String(value.to_string())
@@ -93,7 +99,17 @@ impl DbValue {
             DbValue::Date(dt) => query.bind(dt),
             DbValue::Null => query.bind::<Option<String>>(None),
             DbValue::Uuid(uuid) => query.bind(uuid),
-            DbValue::List(_) => todo!(),
+            DbValue::List(v) => {
+                let ids: Vec<String> = v
+                    .iter()
+                    .map(|db_value| match db_value {
+                        DbValue::String(id) => id.clone(),
+                        _ => String::new(),
+                    })
+                    .collect();
+
+                query.bind(ids)
+            }
         }
     }
 
@@ -109,12 +125,12 @@ impl DbValue {
             DbValue::Date(dt) => query.bind(dt),
             DbValue::Null => query.bind::<Option<String>>(None),
             DbValue::Uuid(uuid) => query.bind(uuid),
-            DbValue::List(_db_values) => todo!(),
+            DbValue::List(_db_values) => unreachable!(),
         }
     }
 
     pub fn into_boson(self, field: &'static str) -> Bson {
-        const IDS: [&str; 4] = ["id", "_id", "user_id", "userId"];
+        const IDS: [&str; 6] = ["id", "_id", "userId", "role_id", "roleId", "permissionId"];
 
         match self {
             DbValue::String(s) => {

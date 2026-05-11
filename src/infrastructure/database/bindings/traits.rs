@@ -12,6 +12,7 @@ pub trait PgInsert: Send + Sync {
     ) -> QueryAs<'q, Postgres, IdResult, PgArguments>;
 
     fn columns() -> Vec<&'static str>;
+    fn uniques() -> Vec<&'static str>;
 }
 
 pub trait SqliteInsert: Send + Sync {
@@ -21,4 +22,10 @@ pub trait SqliteInsert: Send + Sync {
     ) -> QueryAs<'q, Sqlite, IdResult, SqliteArguments<'q>>;
 
     fn columns() -> Vec<&'static str>;
+    fn uniques() -> Vec<&'static str>;
+}
+
+pub trait MongoInsert: Send + Sync {
+    fn columns() -> Vec<&'static str>;
+    fn uniques() -> Vec<&'static str>;
 }

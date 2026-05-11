@@ -1,52 +1,46 @@
 use sqlx::{Postgres, Sqlite, postgres::PgArguments, query::QueryAs, sqlite::SqliteArguments};
 
-use crate::domain::model::UserRole;
+use crate::domain::model::Permission;
 
 use super::traits::{IdResult, MongoInsert, PgInsert, SqliteInsert};
 
-impl PgInsert for UserRole {
+impl PgInsert for Permission {
     fn columns() -> Vec<&'static str> {
-        vec!["userId", "roleId", "issuedAt"]
+        vec!["name", "createdAt"]
     }
     fn uniques() -> Vec<&'static str> {
-        vec!["\"userId\"", "\"roleId\""]
+        vec!["name"]
     }
 
     fn bind_query<'q>(
         self,
         query: QueryAs<'q, Postgres, IdResult, PgArguments>,
     ) -> QueryAs<'q, Postgres, IdResult, PgArguments> {
-        query
-            .bind(self.user_id)
-            .bind(self.role_id)
-            .bind(self.issued_at)
+        query.bind(self.name).bind(self.created_at)
     }
 }
 
-impl SqliteInsert for UserRole {
+impl SqliteInsert for Permission {
     fn columns() -> Vec<&'static str> {
-        vec!["userId", "roleId", "issuedAt"]
+        vec!["name", "createdAt"]
     }
     fn uniques() -> Vec<&'static str> {
-        vec!["\"userId\"", "\"roleId\""]
+        vec!["name"]
     }
 
     fn bind_query<'q>(
         self,
         query: QueryAs<'q, Sqlite, IdResult, SqliteArguments<'q>>,
     ) -> QueryAs<'q, Sqlite, IdResult, SqliteArguments<'q>> {
-        query
-            .bind(self.user_id)
-            .bind(self.role_id)
-            .bind(self.issued_at)
+        query.bind(self.name).bind(self.created_at)
     }
 }
 
-impl MongoInsert for UserRole {
+impl MongoInsert for Permission {
     fn columns() -> Vec<&'static str> {
-        vec!["userId", "roleId", "issuedAt"]
+        vec!["name", "createdAt"]
     }
     fn uniques() -> Vec<&'static str> {
-        vec!["\"userId\"", "\"roleId\""]
+        vec!["name"]
     }
 }

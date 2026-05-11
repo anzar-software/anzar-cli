@@ -39,10 +39,10 @@ pub struct RefreshToken {
 }
 
 impl RefreshToken {
-    pub fn new(tokens: &IssuedTokens) -> Self {
+    pub fn new(jti: &str) -> Self {
         RefreshToken {
+            jti: jti.to_string(),
             issued_at: chrono::Utc::now(),
-            jti: tokens.refresh_token_jti.to_string(),
             ..Default::default()
         }
     }

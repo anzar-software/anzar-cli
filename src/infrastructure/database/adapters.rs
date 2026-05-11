@@ -4,8 +4,8 @@ use sqlx::{Pool, Postgres, Sqlite};
 
 use crate::domain::database::DatabaseAdapter;
 use crate::domain::model::{
-    Account, EmailVerificationToken, PasswordResetToken, RefreshToken, Role, Session, User,
-    UserRole,
+    Account, EmailVerificationToken, PasswordResetToken, Permission, RefreshToken, Role,
+    RolePermission, Session, User, UserRole,
 };
 
 use super::{mongodb::MongodbAdapter, postgres::PostgreSQLAdapter, sqlite::SQLiteAdapter};
@@ -20,6 +20,9 @@ const SESSION: &str = "sessions";
 const ROLE: &str = "roles";
 const USER_ROLE: &str = "user_roles";
 
+const PERMISSIONS: &str = "permissions";
+const ROLE_PERMISSIONS: &str = "role_permissions";
+
 pub struct DatabaseAdapters {
     pub user_adapter: Arc<dyn DatabaseAdapter<User>>,
     pub account_adapter: Arc<dyn DatabaseAdapter<Account>>,
@@ -29,6 +32,8 @@ pub struct DatabaseAdapters {
     pub email_verification_token: Arc<dyn DatabaseAdapter<EmailVerificationToken>>,
     pub role_adapter: Arc<dyn DatabaseAdapter<Role>>,
     pub user_role_adapter: Arc<dyn DatabaseAdapter<UserRole>>,
+    pub permission_adapter: Arc<dyn DatabaseAdapter<Permission>>,
+    pub role_permission_adapter: Arc<dyn DatabaseAdapter<RolePermission>>,
     // pub transaction_adapter: MongodbTransaction,
 }
 
@@ -59,6 +64,17 @@ impl DatabaseAdapters {
                 conn_string,
                 USER_ROLE,
             )),
+
+            permission_adapter: Arc::new(MongodbAdapter::<Permission>::new(
+                client,
+                conn_string,
+                PERMISSIONS,
+            )),
+            role_permission_adapter: Arc::new(MongodbAdapter::<RolePermission>::new(
+                client,
+                conn_string,
+                ROLE_PERMISSIONS,
+            )),
             // transaction_adapter: MongodbTransaction::new(client),
         }
     }
@@ -79,6 +95,11 @@ impl DatabaseAdapters {
             )),
             role_adapter: Arc::new(SQLiteAdapter::<Role>::new(pool, ROLE)),
             user_role_adapter: Arc::new(SQLiteAdapter::<UserRole>::new(pool, USER_ROLE)),
+            permission_adapter: Arc::new(SQLiteAdapter::<Permission>::new(pool, PERMISSIONS)),
+            role_permission_adapter: Arc::new(SQLiteAdapter::<RolePermission>::new(
+                pool,
+                ROLE_PERMISSIONS,
+            )),
             // transaction_adapter: todo!(),
         }
     }
@@ -99,6 +120,11 @@ impl DatabaseAdapters {
             )),
             role_adapter: Arc::new(PostgreSQLAdapter::<Role>::new(pool, ROLE)),
             user_role_adapter: Arc::new(PostgreSQLAdapter::<UserRole>::new(pool, USER_ROLE)),
+            permission_adapter: Arc::new(PostgreSQLAdapter::<Permission>::new(pool, PERMISSIONS)),
+            role_permission_adapter: Arc::new(PostgreSQLAdapter::<RolePermission>::new(
+                pool,
+                ROLE_PERMISSIONS,
+            )),
             // transaction_adapter: todo!(),
         }
     }
