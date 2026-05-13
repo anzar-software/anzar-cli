@@ -1,5 +1,5 @@
-use super::shared::Helpers;
-use anzar::{config::AuthStrategy, scopes::auth::AuthResponse};
+use super::shared::{Helpers, auth::AuthResponseDto as AuthResponse};
+use anzar::config::AuthStrategy;
 
 use crate::shared::RefreshTokenRequest;
 

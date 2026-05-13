@@ -1,13 +1,13 @@
 use std::net::TcpListener;
 use std::sync::LazyLock;
 
-use anzar::adapters::cache::{
-    CacheAdapter,
+use anzar::config::{AnzarConfiguration, AppState, cache::CacheDriver};
+use anzar::domain::cache::CacheAdapter;
+use anzar::infrastructure::cache::{
     in_memory::InMemoryAdapter,
     memcache::{MemCache, MemCacheAdapter},
     redis::{Redis, RedisAdapter},
 };
-use anzar::config::{AnzarConfiguration, AppState, database::cache_driver::CacheDriver};
 
 use crate::shared::TestApp;
 use anzar::telemetry::{get_subscriber, init_subscriber};

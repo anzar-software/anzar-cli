@@ -1,6 +1,6 @@
-use super::shared::{Helpers, InvalidTestCases};
+use super::shared::{Helpers, InvalidTestCases, auth::AuthResponseDto as AuthResponse};
 
-use anzar::{config::AuthStrategy, scopes::auth::AuthResponse};
+use anzar::config::AuthStrategy;
 
 #[actix_web::test]
 async fn test_jwt_contains_correct_claims() {

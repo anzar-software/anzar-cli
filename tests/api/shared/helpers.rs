@@ -1,5 +1,5 @@
 use anzar::config::AppState;
-use anzar::extractors::Claims;
+use anzar::domain::model::Claims;
 use reqwest::Response;
 
 use crate::shared::TestApp;

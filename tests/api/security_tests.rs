@@ -1,5 +1,6 @@
-use super::shared::{Helpers, RefreshTokenRequest};
-use anzar::{config::AuthStrategy, scopes::auth::AuthResponse};
+use super::shared::{Helpers, RefreshTokenRequest, auth::AuthResponseDto as AuthResponse};
+
+use anzar::config::AuthStrategy;
 
 #[actix_web::test]
 async fn test_password_not_returned_in_responses() {
