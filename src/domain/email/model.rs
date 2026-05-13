@@ -2,7 +2,12 @@ use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use sqlx::prelude::FromRow;
 
-use super::super::serde::{deserialize_object_id, deserialize_object_id_as_string};
+use crate::domain::query::IntoBsonDocument;
+
+use super::super::serde::{
+    deserialize_datetime, deserialize_object_id, deserialize_object_id_as_string,
+    deserialize_option_datetime,
+};
 
 #[derive(Clone, Debug, PartialEq, Eq, Deserialize, Serialize, FromRow)]
 pub struct EmailVerificationToken {
@@ -24,13 +29,13 @@ pub struct EmailVerificationToken {
     pub user_id: String,
 
     #[sqlx(rename = "issuedAt")]
-    #[serde(rename = "issuedAt")]
+    #[serde(rename = "issuedAt", deserialize_with = "deserialize_datetime")]
     pub issued_at: DateTime<Utc>,
     #[sqlx(rename = "expiresAt")]
-    #[serde(rename = "expiresAt")]
+    #[serde(rename = "expiresAt", deserialize_with = "deserialize_datetime")]
     pub expires_at: DateTime<Utc>,
     #[sqlx(rename = "usedAt")]
-    #[serde(rename = "usedAt")]
+    #[serde(rename = "usedAt", deserialize_with = "deserialize_option_datetime")]
     pub used_at: Option<DateTime<Utc>>,
 
     pub token: String,
@@ -74,5 +79,25 @@ impl EmailVerificationToken {
                 field: crate::error::CredentialField::ObjectId,
             })
         })
+    }
+}
+impl IntoBsonDocument for EmailVerificationToken {
+    fn into_bson_document(self) -> Result<mongodb::bson::Document, mongodb::bson::ser::Error> {
+        let mut doc = mongodb::bson::to_document(&self)?;
+
+        for key in &["issuedAt", "expiresAt", "usedAt"] {
+            if let Some(mongodb::bson::Bson::String(s)) = doc.get(*key).cloned() {
+                if let Ok(dt) = chrono::DateTime::parse_from_rfc3339(&s) {
+                    doc.insert(
+                        *key,
+                        mongodb::bson::Bson::DateTime(mongodb::bson::DateTime::from_millis(
+                            dt.timestamp_millis(),
+                        )),
+                    );
+                }
+            }
+        }
+
+        Ok(doc)
     }
 }

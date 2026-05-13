@@ -1,4 +1,4 @@
-use crate::error::Error;
+use crate::{domain::query::IntoBsonDocument, error::Error};
 use actix_web::{FromRequest, HttpMessage, HttpRequest, dev::Payload};
 use chrono::{DateTime, Duration, Utc};
 use serde::{Deserialize, Serialize};
@@ -6,7 +6,10 @@ use sqlx::FromRow;
 use std::future::{Ready, ready};
 use utoipa::ToSchema;
 
-use super::super::serde::{deserialize_object_id, deserialize_object_id_as_string};
+use super::super::serde::{
+    deserialize_datetime, deserialize_object_id, deserialize_object_id_as_string,
+    deserialize_option_datetime,
+};
 
 #[derive(Clone, Debug, PartialEq, Eq, Deserialize, Serialize, FromRow, ToSchema)]
 #[schema(example = json!({"id": Some(String::default()), "user_id": String::default(), "issued_at": "2026-02-19T22:42:23.467Z", "expires_at": "2026-02-19T22:42:23.467Z", "used_at": Some("2026-02-19T22:42:23.467Z"), "token": String::default()}))]
@@ -29,13 +32,13 @@ pub struct Session {
     pub user_id: String,
 
     #[sqlx(rename = "issuedAt")]
-    #[serde(rename = "issuedAt")]
+    #[serde(rename = "issuedAt", deserialize_with = "deserialize_datetime")]
     pub issued_at: DateTime<Utc>,
     #[sqlx(rename = "expiresAt")]
-    #[serde(rename = "expiresAt")]
+    #[serde(rename = "expiresAt", deserialize_with = "deserialize_datetime")]
     pub expires_at: DateTime<Utc>,
     #[sqlx(rename = "usedAt")]
-    #[serde(rename = "usedAt")]
+    #[serde(rename = "usedAt", deserialize_with = "deserialize_option_datetime")]
     pub used_at: Option<DateTime<Utc>>,
 
     pub token: String,
@@ -81,6 +84,27 @@ impl Session {
                 field: crate::error::CredentialField::ObjectId,
             })
         })
+    }
+}
+
+impl IntoBsonDocument for Session {
+    fn into_bson_document(self) -> Result<mongodb::bson::Document, mongodb::bson::ser::Error> {
+        let mut doc = mongodb::bson::to_document(&self)?;
+
+        for key in &["expiresAt", "issuedAt", "usedAt"] {
+            if let Some(mongodb::bson::Bson::String(s)) = doc.get(*key).cloned() {
+                if let Ok(dt) = chrono::DateTime::parse_from_rfc3339(&s) {
+                    doc.insert(
+                        *key,
+                        mongodb::bson::Bson::DateTime(mongodb::bson::DateTime::from_millis(
+                            dt.timestamp_millis(),
+                        )),
+                    );
+                }
+            }
+        }
+
+        Ok(doc)
     }
 }
 

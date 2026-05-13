@@ -49,11 +49,6 @@ impl From<String> for DbValue {
         DbValue::String(value)
     }
 }
-impl From<bool> for DbValue {
-    fn from(b: bool) -> Self {
-        DbValue::Bool(b)
-    }
-}
 
 impl From<i64> for DbValue {
     fn from(i: i64) -> Self {
@@ -69,6 +64,11 @@ impl From<f64> for DbValue {
 impl From<uuid::Uuid> for DbValue {
     fn from(u: uuid::Uuid) -> Self {
         DbValue::Uuid(u)
+    }
+}
+impl From<bool> for DbValue {
+    fn from(b: bool) -> Self {
+        DbValue::Bool(b)
     }
 }
 

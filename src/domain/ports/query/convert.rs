@@ -21,6 +21,7 @@ impl IntoDbFilter for QueryBuilder {
         // filters
         for op in self.filters {
             let value = op.value.into_boson(op.field);
+            dbg!(&value);
             let field = if op.field == "id" { "_id" } else { op.field };
 
             match op.op {
@@ -38,6 +39,9 @@ impl IntoDbFilter for QueryBuilder {
                 }
                 Op::In => {
                     doc.insert(field, doc! { "$in": value });
+                }
+                Op::Null => {
+                    doc.insert(field, doc! { "$in": [mongodb::bson::Bson::Null] });
                 }
                 _ => {}
             }

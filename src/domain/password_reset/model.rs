@@ -3,7 +3,12 @@ use serde::{Deserialize, Serialize};
 use sqlx::prelude::FromRow;
 use utoipa::ToSchema;
 
-use super::super::serde::{deserialize_object_id, deserialize_object_id_as_string};
+use crate::domain::query::IntoBsonDocument;
+
+use super::super::serde::{
+    deserialize_datetime, deserialize_object_id, deserialize_object_id_as_string,
+    deserialize_option_datetime,
+};
 
 #[derive(Default, Debug, Serialize, Deserialize, ToSchema)]
 #[schema(example = json!({"link": String::default(), "expires_at": "2026-02-19T22:42:23.467Z"}))]
@@ -32,13 +37,13 @@ pub struct PasswordResetToken {
     pub user_id: String,
 
     #[sqlx(rename = "issuedAt")]
-    #[serde(rename = "issuedAt")]
+    #[serde(rename = "issuedAt", deserialize_with = "deserialize_datetime")]
     pub issued_at: DateTime<Utc>,
     #[sqlx(rename = "expiresAt")]
-    #[serde(rename = "expiresAt")]
+    #[serde(rename = "expiresAt", deserialize_with = "deserialize_datetime")]
     pub expires_at: DateTime<Utc>,
     #[sqlx(rename = "usedAt")]
-    #[serde(rename = "usedAt")]
+    #[serde(rename = "usedAt", deserialize_with = "deserialize_option_datetime")]
     pub used_at: Option<DateTime<Utc>>,
 
     pub token: String,
@@ -87,5 +92,25 @@ impl PasswordResetToken {
                 field: crate::error::CredentialField::ObjectId,
             })
         })
+    }
+}
+impl IntoBsonDocument for PasswordResetToken {
+    fn into_bson_document(self) -> Result<mongodb::bson::Document, mongodb::bson::ser::Error> {
+        let mut doc = mongodb::bson::to_document(&self)?;
+
+        for key in &["issuedAt", "expiresAt", "usedAt"] {
+            if let Some(mongodb::bson::Bson::String(s)) = doc.get(*key).cloned() {
+                if let Ok(dt) = chrono::DateTime::parse_from_rfc3339(&s) {
+                    doc.insert(
+                        *key,
+                        mongodb::bson::Bson::DateTime(mongodb::bson::DateTime::from_millis(
+                            dt.timestamp_millis(),
+                        )),
+                    );
+                }
+            }
+        }
+
+        Ok(doc)
     }
 }

@@ -7,7 +7,7 @@ use std::fmt::Debug;
 use crate::error::Error;
 
 use crate::domain::database::DatabaseAdapter;
-use crate::domain::query::{IntoDbFilter, QueryBuilder};
+use crate::domain::query::{IntoBsonDocument, IntoDbFilter, QueryBuilder};
 use crate::infrastructure::database::bindings::traits::MongoInsert;
 
 #[derive(Debug, Clone)]
@@ -28,10 +28,20 @@ impl<T: Send + Sync + Debug> MongodbAdapter<T> {
 #[async_trait]
 impl<T> DatabaseAdapter<T> for MongodbAdapter<T>
 where
-    T: Debug + Send + Sync + Serialize + DeserializeOwned + 'static + MongoInsert,
+    T: Debug
+        + Send
+        + Sync
+        + Serialize
+        + DeserializeOwned
+        + 'static
+        + MongoInsert
+        + IntoBsonDocument,
 {
     async fn insert(&self, data: T) -> Result<String, Error> {
-        let operation = self.collection.insert_one(data);
+        let collection = self.collection.clone_with_type::<mongodb::bson::Document>();
+        let doc = data.into_bson_document().unwrap();
+
+        let operation = collection.insert_one(doc);
 
         let doc = operation.await?;
 
