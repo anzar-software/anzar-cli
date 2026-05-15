@@ -15,14 +15,39 @@ use crate::application::traits::UserRoleServiceTrait;
         path = "/user",
         tag = "Users",
         summary = "Get current User",
-        description = "Returns the currently authenticated user's data. Requires a valid Bearer token.",
+        description = "Returns the currently authenticated user's profile. \
+        Requires either a valid Bearer token or an active session cookie.",
         security(
-            ("session_auth" = []),  // OR
-            ("bearer_auth"  = []),
+            ("bearer_auth" = []),
+        ),
+        security(
+            ("session_auth" = []),
         ),
         responses(
-            (status = 200, description = "User Found", body = User),
-            (status = UNAUTHORIZED, description = "invalid request", body = ErrorResponse),
+            (
+                status = OK,
+                description = "Authenticated user's profile returned successfully",
+                body = User,
+                content_type = "application/json"
+            ),
+            (
+                status = UNAUTHORIZED,
+                description = "Missing or expired credentials",
+                body = ErrorResponse,
+                content_type = "application/json"
+            ),
+            (
+                status = NOT_FOUND,
+                description = "Authenticated token is valid but user no longer exists",
+                body = ErrorResponse,
+                content_type = "application/json"
+            ),
+            (
+                status = INTERNAL_SERVER_ERROR,
+                description = "Unexpected server error",
+                body = ErrorResponse,
+                content_type = "application/json"
+            ),
         ),
     )]
 #[tracing::instrument(name = "Find user", skip(user))]
@@ -31,6 +56,58 @@ async fn find_user(user: AuthenticatedUser) -> Result<HttpResponse> {
     Ok(HttpResponse::Ok().json(user.0))
 }
 
+#[utoipa::path(
+        post,
+        path = "/user/role",
+        tag = "Rbac",
+        summary = "Assign a role to user",
+        description = "Assigns the specified role to a target user. \
+                   Requires an authenticated session with sufficient privileges (admin only).",
+        security(
+            ("bearer_auth" = []),
+        ),
+        security(
+            ("session_auth" = []),
+        ),
+        request_body(
+            description = "Role assignment payload",
+            content = RoleRequest,
+            content_type = "application/json"
+        ),
+        responses(
+            (
+                status = OK,
+                description = "Role successfully assigned — returns updated user profile",
+                body = User,
+                content_type = "application/json"
+            ),
+            (
+                status = UNAUTHORIZED,
+                description = "Missing or expired credentials",
+                body = ErrorResponse,
+                content_type = "application/json"
+            ),
+            (
+                status = FORBIDDEN,
+                description = "Authenticated user does not have permission to assign roles",
+                body = ErrorResponse,
+                content_type = "application/json"
+            ),
+            (
+                status = NOT_FOUND,
+                description = "Target user not found",
+                body = ErrorResponse,
+                content_type = "application/json"
+            ),
+            (
+                status = INTERNAL_SERVER_ERROR,
+                description = "Unexpected server error",
+                body = ErrorResponse,
+                content_type = "application/json"
+            ),
+        ),
+)]
+#[tracing::instrument(name = "Assign role", skip(app_state, req, user))]
 #[actix_web::post("/role")]
 async fn assign_role(
     AppStateExtractor(app_state): AppStateExtractor,

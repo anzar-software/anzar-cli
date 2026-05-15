@@ -7,3 +7,5 @@ pub use scope::{
     __path_render_reset_form, __path_request_password_reset, __path_submit_new_password,
     auth_scope,
 };
+
+pub use model::{AuthResponse, EmailRequest, RefreshTokenRequest, SessionTokens};

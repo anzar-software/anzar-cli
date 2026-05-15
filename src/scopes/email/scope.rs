@@ -12,26 +12,41 @@ use crate::http::extractors::{AppStateExtractor, ValidatedQuery};
 
 #[utoipa::path(
     get,
-    path = "/email",
+    path = "/email/verify",
     tag = "Email",
     summary = "Verify user email",
-    description = "Validates the email token and update the user account.",
+    description = "Validates the email verification token and activates the user account. \
+                   On success, redirects the user to the confirmation page.",
     params(
-        ("token" = TokenQuery, Query, description = "Email Verification Token")
+        ("token" = String, Query, description = "One-time email verification token issued during registration"),
     ),
     responses(
-        (status = 302, description = "Redirect to success page", 
-         headers(
-             ("Location" = String, description = "Redirect URL")
-         )
+        (
+            status = FOUND,
+            description = "Token is valid — redirects to the success page",
+            headers(
+                ("Location" = String, description = "URL of the post-verification success page")
+            )
         ),
-        (status = BAD_REQUEST, description = "invalid request", body = ErrorResponse),
+        (
+            status = BAD_REQUEST,
+            description = "Token is missing, malformed, or already used",
+            body = ErrorResponse,
+            content_type = "application/json"
+        ),
+        (
+            status = INTERNAL_SERVER_ERROR,
+            description = "Unexpected server error",
+            body = ErrorResponse,
+            content_type = "application/json"
+        ),
     ),
-)]
+    security(()),
+    )]
 #[tracing::instrument(name = "Email Verification", skip(app_state, query))]
+#[actix_web::get("/verify")]
 async fn verify_email(
     AppStateExtractor(app_state): AppStateExtractor,
-    // FIXME to be validated
     ValidatedQuery(query): ValidatedQuery<TokenQuery>,
 ) -> Result<HttpResponse> {
     let token = query.token;
@@ -65,5 +80,5 @@ async fn verify_email(
 }
 
 pub fn email_scope() -> Scope {
-    web::scope("/email").route("/verify", web::get().to(verify_email))
+    web::scope("/email").service(verify_email)
 }

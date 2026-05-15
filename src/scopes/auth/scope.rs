@@ -36,28 +36,47 @@ use super::utils as throttle;
         post,
         path = "/auth/login",
         tag = "Auth",
+        operation_id = "login",
         summary = "User login",
         description = "Authenticates a user with email and password.\n\n\
             **Session strategy**: Returns a session cookie (`id`) managed by the server.\n\
             **JWT strategy**: Returns `access` and `refresh` in the response body.",
+        security(()),
         request_body(
             description = "User login credentials",
-            content = LoginRequest
+            content = LoginRequest,
+            content_type = "application/json"
         ),
         responses(
             (
-                status = 200,
-                description = "User logged successfully",
+                status = OK,
+                description = "Authentication successful",
                 body = AuthResponse,
+                content_type = "application/json",
                 headers(
                     ("Set-Cookie" = String,
                      description = "Session cookie (session strategy only). \
-                     HttpOnly, Secure, SameSite=Strict. \
-                                Format: id=<session_id>; HttpOnly; Secure; SameSite=Strict")
+                                    Format: id=<session_id>; HttpOnly; Secure; SameSite=Strict")
                 )
             ),
-            (status = BAD_REQUEST, description = "Invalid request", body = ErrorResponse),
-            (status = UNAUTHORIZED, description = "Invalid credentials", body = ErrorResponse),
+            (
+                status = BAD_REQUEST,
+                description = "Malformed request or validation error",
+                body = ErrorResponse,
+                content_type = "application/json"
+            ),
+            (
+                status = UNAUTHORIZED,
+                description = "Invalid email or password",
+                body = ErrorResponse,
+                content_type = "application/json"
+            ),
+            (
+                status = INTERNAL_SERVER_ERROR,
+                description = "Unexpected server error",
+                body = ErrorResponse,
+                content_type = "application/json"
+            ),
         ),
     )]
 #[tracing::instrument(
@@ -70,6 +89,7 @@ use super::utils as throttle;
         attempts.remaining = tracing::field::Empty
     )
 )]
+#[actix_web::post("/login")]
 pub async fn login(
     AppStateExtractor(app_state): AppStateExtractor,
     req: web::Json<LoginRequest>,
@@ -147,28 +167,47 @@ pub async fn login(
         post,
         path = "/auth/register",
         tag = "Auth",
+        operation_id = "register",
         summary = "Register a new user",
         description = "Creates a new user account with email and password.\n\n\
             **Session strategy**: Returns a session cookie (`id`) managed by the server.\n\
             **JWT strategy**: Returns `access` and `refresh` in the response body.",
+        security(()),
         request_body(
             description = "User register credentials",
-            content = RegisterRequest
+            content = RegisterRequest,
+            content_type = "application/json"
         ),
         responses(
             (
-                status = 201,
-                description = "User registerd successfully",
+                status = CREATED,
+                description = "User registered successfully",
                 body = AuthResponse,
+                content_type = "application/json",
                 headers(
                     ("Set-Cookie" = String,
                      description = "Session cookie (session strategy only). \
-                     HttpOnly, Secure, SameSite=Strict. \
-                                Format: id=<session_id>; HttpOnly; Secure; SameSite=Strict")
+                     Format: id=<session_id>; HttpOnly; Secure; SameSite=Strict")
                 )
             ),
-            (status = BAD_REQUEST, description = "Invalid request", body = ErrorResponse),
-            (status = UNAUTHORIZED, description = "Invalid credentials", body = ErrorResponse),
+            (
+                status = BAD_REQUEST,
+                description = "Malformed request or validation error",
+                body = ErrorResponse,
+                content_type = "application/json"
+            ),
+            (
+                status = CONFLICT,
+                description = "Email already registered",
+                body = ErrorResponse,
+                content_type = "application/json"
+            ),
+            (
+                status = INTERNAL_SERVER_ERROR,
+                description = "Unexpected server error",
+                body = ErrorResponse,
+                content_type = "application/json"
+            ),
         ),
     )]
 #[tracing::instrument(
@@ -176,6 +215,7 @@ pub async fn login(
     skip(req, app_state, session),
     fields(user_email = %req.email, user_name = %req.username)
 )]
+#[actix_web::post("/register")]
 pub async fn register(
     AppStateExtractor(app_state): AppStateExtractor,
     req: web::Json<RegisterRequest>,
@@ -245,22 +285,48 @@ pub async fn register(
 }
 
 #[utoipa::path(
-        get,
-        path = "/auth/session",
-        tag = "Auth",
-        summary = "Get current session",
-        description = "Returns the currently authenticated user's session data. Requires a valid Bearer token.",
-        security(
-            ("session_auth" = []),  // OR
-            ("bearer_auth"    = []),
+    get,
+    path = "/auth/session",
+    tag = "Auth",
+    operation_id = "getSession",
+    summary = "Get current session",
+    description = "Returns the currently authenticated user's session data. \
+                   Requires either a valid Bearer token or an active session cookie.",
+    security(
+        ("bearer_auth" = []),
+    ),
+    security(
+        ("session_auth" = []),
+    ),
+    responses(
+        (
+            status = OK,
+            description = "Session data returned successfully",
+            body = Session,
+            content_type = "application/json"
         ),
-        responses(
-            (status = 200, description = "Session data returned", body = Session),
-            (status = UNAUTHORIZED, description = "Unauthorized — missing or invalid token", body = ErrorResponse),
-            (status = 403, description = "Account suspended or unverified", body = ErrorResponse),
+        (
+            status = UNAUTHORIZED,
+            description = "Missing or expired credentials",
+            body = ErrorResponse,
+            content_type = "application/json"
         ),
-    )]
+        (
+            status = FORBIDDEN,
+            description = "Account suspended or unverified",
+            body = ErrorResponse,
+            content_type = "application/json"
+        ),
+        (
+            status = INTERNAL_SERVER_ERROR,
+            description = "Unexpected server error",
+            body = ErrorResponse,
+            content_type = "application/json"
+        ),
+    ),
+)]
 #[tracing::instrument(name = "Get user session", skip(session))]
+#[actix_web::get("/session")]
 pub async fn get_session(session: Session) -> Result<HttpResponse> {
     Ok(HttpResponse::Ok().json(session))
 }
@@ -269,19 +335,50 @@ pub async fn get_session(session: Session) -> Result<HttpResponse> {
         post,
         path = "/auth/refresh-token",
         tag = "Auth",
+        operation_id = "refreshToken",
         summary = "Refresh access token",
-        description = "Issues a new access token using a valid refresh token. Rotate refresh tokens on each call.",
+        description = "Issues a new access token using a valid refresh token. \
+                   Refresh tokens are rotated on each call — the old token is invalidated immediately.",
         security(
-            ("session_auth" = []),  // OR
-            ("bearer_auth"    = []),
+            ("bearer_auth" = []),
+        ),
+        security(
+            ("session_auth" = []),
+        ),
+        request_body(
+            description = "Valid refresh token",
+            content = RefreshTokenRequest,
+            content_type = "application/json"
         ),
         responses(
-            (status = 200, description = "New token issued", body = AuthResponse),
-            (status = 401, description = "Refresh token invalid or expired", body = ErrorResponse),
-            (status = BAD_REQUEST, description = "invalid request", body = ErrorResponse),
+            (
+                status = OK,
+                description = "New access token issued successfully",
+                body = AuthResponse,
+                content_type = "application/json"
+            ),
+            (
+                status = UNAUTHORIZED,
+                description = "Refresh token invalid, expired, or already rotated",
+                body = ErrorResponse,
+                content_type = "application/json"
+            ),
+            (
+                status = BAD_REQUEST,
+                description = "Malformed request or missing refresh token",
+                body = ErrorResponse,
+                content_type = "application/json"
+            ),
+            (
+                status = INTERNAL_SERVER_ERROR,
+                description = "Unexpected server error",
+                body = ErrorResponse,
+                content_type = "application/json"
+            ),
         ),
     )]
 #[tracing::instrument(name = "Refresh user accessToken", skip(req, app_state))]
+#[actix_web::post("/refresh-token")]
 pub async fn refresh_token(
     AppStateExtractor(app_state): AppStateExtractor,
     req: web::Json<RefreshTokenRequest>,
@@ -302,22 +399,50 @@ pub async fn refresh_token(
 }
 
 #[utoipa::path(
-        post,
-        path = "/auth/logout",
-        tag = "Auth",
-        summary = "Logout",
-        description = "Invalidates the current session and refresh token. The client should discard stored tokens.",
-        security(
-            ("session_auth" = []),  // OR
-            ("bearer_auth"    = []),
+    post,
+    path = "/auth/logout",
+    tag = "Auth",
+    summary = "Logout",
+    description = "Invalidates the current session and refresh token. \
+                   The client should discard all stored tokens and cookies after this call.",
+    security(
+        ("bearer_auth" = []),
+    ),
+    security(
+        ("session_auth" = []),
+    ),
+    request_body(
+        description = "Refresh token to invalidate",
+        content = RefreshTokenRequest,
+        content_type = "application/json"
+    ),
+    responses(
+        (
+            status = OK,
+            description = "Logged out successfully — session and refresh token invalidated",
         ),
-        responses(
-            (status = 200, description = "Logged out successfully"),
-            (status = 401, description = "Unauthorized", body = ErrorResponse),
-            (status = BAD_REQUEST, description = "invalid request", body = ErrorResponse),
+        (
+            status = UNAUTHORIZED,
+            description = "Missing or expired credentials",
+            body = ErrorResponse,
+            content_type = "application/json"
         ),
-    )]
+        (
+            status = BAD_REQUEST,
+            description = "Malformed request or missing refresh token",
+            body = ErrorResponse,
+            content_type = "application/json"
+        ),
+        (
+            status = INTERNAL_SERVER_ERROR,
+            description = "Unexpected server error",
+            body = ErrorResponse,
+            content_type = "application/json"
+        ),
+    ),
+)]
 #[tracing::instrument(name = "Logout user", skip(req, app_state, session, session_manager))]
+#[actix_web::post("/logout")]
 async fn logout(
     AppStateExtractor(app_state): AppStateExtractor,
     req: web::Json<RefreshTokenRequest>,
@@ -341,15 +466,41 @@ async fn logout(
         post,
         path = "/auth/password/forgot",
         tag = "Auth",
+        operation_id = "forgotPassword",
         summary = "Request a password reset",
-        description = "Sends a password reset link to the provided email address if an account exists.",
-        request_body(description = "Email address to send the reset link to", content = EmailRequest),
+
+        description = "Sends a password reset link to the provided email address if an account exists.\n\n\
+                       **Note**: Always returns `200` regardless of whether the email exists \
+                       to prevent user enumeration attacks.",
+        security(()),
+        request_body(
+            description = "Email address to send the reset link to",
+            content = EmailRequest,
+            content_type = "application/json"
+        ),
         responses(
-            (status = 200, description = "Reset email sent if account exists", body = ExpiringLink),
-            (status = BAD_REQUEST, description = "invalid request", body = ErrorResponse),
+            (
+                status = OK,
+                description = "Reset email sent if an account with that address exists",
+                body = ExpiringLink,
+                content_type = "application/json"
+            ),
+            (
+                status = BAD_REQUEST,
+                description = "Malformed request or invalid email format",
+                body = ErrorResponse,
+                content_type = "application/json"
+            ),
+            (
+                status = INTERNAL_SERVER_ERROR,
+                description = "Unexpected server error",
+                body = ErrorResponse,
+                content_type = "application/json"
+            ),
         ),
     )]
 #[tracing::instrument(name = "Forgot password", skip(app_state))]
+#[actix_web::post("/password/forgot")]
 async fn request_password_reset(
     req: web::Json<EmailRequest>,
     AppStateExtractor(app_state): AppStateExtractor,
@@ -395,20 +546,46 @@ async fn request_password_reset(
 }
 
 #[utoipa::path(
-        get,
-        path = "/auth/password/reset",
-        tag = "Auth",
-        summary = "Render password reset form",
-        description = "Validates the reset token from the email link and renders the password reset form.",
-        params(
-            ("token" = TokenQuery, Query, description = "Password reset token")
+    get,
+    path = "/auth/password/reset",
+    tag = "Auth",
+    operation_id = "renderPasswordResetForm",
+    summary = "Render password reset form",
+    description = "Validates the password reset token from the email link and renders an HTML form \
+                   to set a new password. The token is single-use and expires after a short window.",
+    security(()),
+    params(
+        ("token" = String, Query, description = "Single-use password reset token from the email link"),
+    ),
+    responses(
+        (
+            status = OK,
+            description = "Token valid — password reset form returned",
+            content_type = "text/html",
+            body = String
         ),
-        responses(
-            (status = 200, description = "Reset form rendered", content_type = "text/html", body = String),
-            (status = BAD_REQUEST, description = "invalid request", body = ErrorResponse),
+        (
+            status = BAD_REQUEST,
+            description = "Malformed request or missing token",
+            body = ErrorResponse,
+            content_type = "application/json"
         ),
-    )]
+        (
+            status = UNAUTHORIZED,
+            description = "Reset token invalid or expired",
+            body = ErrorResponse,
+            content_type = "application/json"
+        ),
+        (
+            status = INTERNAL_SERVER_ERROR,
+            description = "Unexpected server error",
+            body = ErrorResponse,
+            content_type = "application/json"
+        ),
+    ),
+)]
 #[tracing::instrument(name = "Render Reset Form", skip(app_state, session))]
+#[actix_web::get("/password/reset")]
 async fn render_reset_form(
     AppStateExtractor(app_state): AppStateExtractor,
     ValidatedQuery(query): ValidatedQuery<TokenQuery>,
@@ -442,24 +619,50 @@ async fn render_reset_form(
 }
 
 #[utoipa::path(
-        post,
-        path = "/auth/password/reset",
-        tag = "Auth",
-        summary = "Submit new password",
-        description = "Submits a new password using a valid reset token. Invalidates the token after use.",
-        request_body(description = "Reset token and the new password", content = ResetPasswordRequest),
-        responses(
-            (
-                status = 302,
-                description = "Redirect to success page", 
-                headers(
-                    ("Location" = String, description = "Redirect URL")
-                )
-            ),
-            (status = BAD_REQUEST, description = "invalid request", body = ErrorResponse),
+    post,
+    path = "/auth/password/reset",
+    tag = "Auth",
+    operation_id = "submitNewPassword",
+    summary = "Submit new password",
+    description = "Submits a new password using a valid reset token. \
+    The token is invalidated immediately after use. \
+                       Accepts a form submission (not JSON) since it is rendered from an HTML form.",
+    security(()),
+    request_body(
+        description = "Reset token, CSRF token, and new password",
+        content = ResetPasswordRequest,
+        content_type = "application/x-www-form-urlencoded"
+    ),
+    responses(
+        (
+            status = FOUND,
+            description = "Password reset successful — redirects to success page",
+            headers(
+                ("Location" = String, description = "URL of the post-reset success page")
+            )
         ),
+        (
+            status = BAD_REQUEST,
+            description = "Malformed request or validation error",
+            body = ErrorResponse,
+            content_type = "application/json"
+        ),
+        (
+            status = UNAUTHORIZED,
+            description = "Reset token or CSRF token invalid or expired",
+            body = ErrorResponse,
+            content_type = "application/json"
+        ),
+        (
+            status = INTERNAL_SERVER_ERROR,
+            description = "Unexpected server error",
+            body = ErrorResponse,
+            content_type = "application/json"
+        ),
+    ),
 )]
 #[tracing::instrument(name = "Update Password", skip(app_state, session, form))]
+#[actix_web::post("/password/reset")]
 async fn submit_new_password(
     AppStateExtractor(app_state): AppStateExtractor,
     session: actix_session::Session,
@@ -531,18 +734,18 @@ async fn submit_new_password(
 }
 
 pub fn auth_scope() -> Scope {
+    let protected = web::scope("")
+        .wrap(from_fn(authorization_middleware))
+        .wrap(from_fn(auth_middleware))
+        .service(get_session)
+        .service(logout);
+
     web::scope("/auth")
-        .route("/login", web::post().to(login))
-        .route("/register", web::post().to(register))
-        .route("/password/forgot", web::post().to(request_password_reset))
-        .route("/password/reset", web::get().to(render_reset_form))
-        .route("/password/reset", web::post().to(submit_new_password))
-        .route("/refresh-token", web::post().to(refresh_token))
-        .service(
-            web::scope("")
-                .wrap(from_fn(authorization_middleware))
-                .wrap(from_fn(auth_middleware))
-                .route("/session", web::get().to(get_session))
-                .route("/logout", web::post().to(logout)),
-        )
+        .service(login)
+        .service(register)
+        .service(refresh_token)
+        .service(request_password_reset)
+        .service(render_reset_form)
+        .service(submit_new_password)
+        .service(protected)
 }

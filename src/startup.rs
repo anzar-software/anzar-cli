@@ -41,7 +41,7 @@ pub async fn run(listener: TcpListener, app_state: AppState) -> Result<Server, s
             .wrap(from_fn(http::middlewares::validate_content_type))
             .wrap(http::build_default_headers(&data.configuration))
             .app_data(data.clone())
-            .service(http::swagger_service())
+            .service(http::swagger_service(&data.configuration))
             .service(health::health_scope())
             .service(auth::auth_scope())
             .service(
