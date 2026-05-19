@@ -53,7 +53,12 @@ where
         Ok(id.to_string())
     }
     async fn insert_many(&self, data: Vec<T>) -> Result<Vec<String>, Error> {
-        let operation = self.collection.insert_many(data);
+        let collection = self.collection.clone_with_type::<mongodb::bson::Document>();
+        let docs: Vec<mongodb::bson::Document> = data
+            .into_iter()
+            .map(|d| d.into_bson_document().unwrap())
+            .collect();
+        let operation = collection.insert_many(docs);
 
         let doc = operation.await?;
 
@@ -73,7 +78,7 @@ where
     }
 
     async fn upsert(&self, data: T) -> Result<String, Error> {
-        let doc = mongodb::bson::to_document(&data)?;
+        let doc = data.into_bson_document().unwrap();
 
         let filter: mongodb::bson::Document = T::uniques()
             .iter()
