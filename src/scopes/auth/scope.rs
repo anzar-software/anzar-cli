@@ -509,7 +509,7 @@ async fn request_password_reset(
 
     let start = std::time::Instant::now();
 
-    let email: String = req.into_inner().email;
+    let email = req.into_inner().email;
     // 2.
     let mut bucket = RATE_LIMITS.entry(email.clone()).or_default();
     bucket.run()?;
@@ -539,8 +539,8 @@ async fn request_password_reset(
     match result {
         Ok(reset_link) => Ok(HttpResponse::Ok().json(reset_link)),
         Err(err) => {
-            tracing::error!("Password reset failed for email {}: {}", email, err);
-            Err(err)
+            tracing::error!("Password reset failed for email {} - {}", email, err);
+            Ok(HttpResponse::Ok().json(ExpiringLink::default()))
         }
     }
 }
