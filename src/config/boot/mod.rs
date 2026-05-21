@@ -1,3 +1,4 @@
+mod auth;
 mod environment;
 mod server;
 

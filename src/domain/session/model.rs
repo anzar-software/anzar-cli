@@ -2,7 +2,6 @@ use crate::{domain::query::IntoBsonDocument, error::Error};
 use actix_web::{FromRequest, HttpMessage, HttpRequest, dev::Payload};
 use chrono::{DateTime, Duration, Utc};
 use serde::{Deserialize, Serialize};
-use sqlx::FromRow;
 use std::future::{Ready, ready};
 use utoipa::ToSchema;
 
@@ -11,7 +10,7 @@ use super::super::serde::{
     deserialize_option_datetime,
 };
 
-#[derive(Clone, Debug, PartialEq, Eq, Deserialize, Serialize, FromRow, ToSchema)]
+#[derive(Clone, Debug, PartialEq, Eq, Deserialize, Serialize, ToSchema)]
 #[schema(example = json!({"id": Some(String::default()), "user_id": String::default(), "issued_at": "2026-02-19T22:42:23.467Z", "expires_at": "2026-02-19T22:42:23.467Z", "used_at": Some("2026-02-19T22:42:23.467Z"), "token": String::default()}))]
 pub struct Session {
     #[serde(
@@ -22,7 +21,6 @@ pub struct Session {
     )]
     pub id: Option<String>,
 
-    #[sqlx(rename = "userId")]
     #[serde(
         rename = "userId",
         default,
@@ -31,17 +29,63 @@ pub struct Session {
     )]
     pub user_id: String,
 
-    #[sqlx(rename = "issuedAt")]
     #[serde(rename = "issuedAt", deserialize_with = "deserialize_datetime")]
     pub issued_at: DateTime<Utc>,
-    #[sqlx(rename = "expiresAt")]
     #[serde(rename = "expiresAt", deserialize_with = "deserialize_datetime")]
     pub expires_at: DateTime<Utc>,
-    #[sqlx(rename = "usedAt")]
     #[serde(rename = "usedAt", deserialize_with = "deserialize_option_datetime")]
     pub used_at: Option<DateTime<Utc>>,
 
     pub token: String,
+    pub roles: Vec<String>,
+    pub permissions: Vec<String>,
+}
+
+// Custom FromRow for SQLite JSON columns
+impl<'r> sqlx::FromRow<'r, sqlx::sqlite::SqliteRow> for Session {
+    fn from_row(row: &'r sqlx::sqlite::SqliteRow) -> Result<Self, sqlx::Error> {
+        use sqlx::Row;
+
+        let roles_str: String = row.try_get("roles")?;
+        let permissions_str: String = row.try_get("permissions")?;
+
+        Ok(Session {
+            id: row.try_get("id")?,
+            user_id: row.try_get("userId")?,
+            token: row.try_get("token")?,
+            issued_at: row.try_get("issuedAt")?,
+            expires_at: row.try_get("expiresAt")?,
+            used_at: row.try_get("usedAt")?,
+            roles: serde_json::from_str(&roles_str).map_err(|e| sqlx::Error::ColumnDecode {
+                index: "roles".to_string(),
+                source: Box::new(e),
+            })?,
+            permissions: serde_json::from_str(&permissions_str).map_err(|e| {
+                sqlx::Error::ColumnDecode {
+                    index: "permissions".to_string(),
+                    source: Box::new(e),
+                }
+            })?,
+        })
+    }
+}
+
+// Postgres: roles/permissions are native TEXT[] arrays
+impl<'r> sqlx::FromRow<'r, sqlx::postgres::PgRow> for Session {
+    fn from_row(row: &'r sqlx::postgres::PgRow) -> Result<Self, sqlx::Error> {
+        use sqlx::Row;
+
+        Ok(Session {
+            id: row.try_get("id")?,
+            user_id: row.try_get("userId")?,
+            token: row.try_get("token")?,
+            issued_at: row.try_get("issuedAt")?,
+            expires_at: row.try_get("expiresAt")?,
+            used_at: row.try_get("usedAt")?,
+            roles: row.try_get("roles")?,             // native TEXT[]
+            permissions: row.try_get("permissions")?, // native TEXT[]
+        })
+    }
 }
 
 impl Default for Session {
@@ -53,6 +97,8 @@ impl Default for Session {
             expires_at: Utc::now() + Duration::hours(24),
             used_at: None,
             token: String::default(),
+            roles: vec![],
+            permissions: vec![],
         }
     }
 }
@@ -70,6 +116,14 @@ impl Session {
     }
     pub fn with_token(mut self, token: &str) -> Self {
         self.token = token.into();
+        self
+    }
+    pub fn with_permissions(mut self, permissions: Vec<String>) -> Self {
+        self.permissions = permissions;
+        self
+    }
+    pub fn with_role(mut self, role: &str) -> Self {
+        self.roles = vec![role.into()];
         self
     }
 }

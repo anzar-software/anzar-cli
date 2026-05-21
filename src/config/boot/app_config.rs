@@ -1,8 +1,10 @@
 use super::environment::*;
 use super::server::ServerConfig;
 
+use super::auth::AuthDriver;
 use super::cache::{CacheConfig, CacheDriver};
 use super::database::{DatabaseConfig, DatabaseDriver};
+use crate::config::AuthStrategy;
 
 #[derive(Debug, serde::Deserialize)]
 pub struct AppConfig {
@@ -12,6 +14,7 @@ pub struct AppConfig {
     pub server: ServerConfig,
     pub database: DatabaseConfig,
     pub cache: CacheConfig,
+    pub auth: AuthStrategy,
 }
 
 impl AppConfig {
@@ -33,6 +36,12 @@ impl AppConfig {
             .try_into()
             .expect("Failed to parse CACHE")
     }
+    fn auth() -> AuthDriver {
+        std::env::var("AUTH")
+            .unwrap_or_else(|_| AuthDriver::Jwt.as_str().into())
+            .try_into()
+            .expect("Failed to parse AUTH")
+    }
 
     pub fn load() -> Result<AppConfig, config::ConfigError> {
         let environment: Environment = Self::env();
@@ -40,17 +49,20 @@ impl AppConfig {
 
         let environment_database: DatabaseDriver = Self::db();
         let database_path = format!(
-            "{}/{}.yaml",
+            "database/{}/{}.yaml",
             environment_database.as_str(),
             environment.as_str(),
         );
 
         let environment_cache = Self::cache();
         let cache_path = format!(
-            "{}/{}.yaml",
+            "cache/{}/{}.yaml",
             environment_cache.as_str(),
             environment.as_str(),
         );
+
+        let auth_driver = Self::auth();
+        let auth_path = format!("auth/{}.yaml", auth_driver.as_str(),);
 
         let value = match environment {
             Environment::Dev => "app/configuration",
@@ -63,6 +75,7 @@ impl AppConfig {
             .add_source(config::File::from(config_dir.join(environment_path)))
             .add_source(config::File::from(config_dir.join(database_path)))
             .add_source(config::File::from(config_dir.join(cache_path)))
+            .add_source(config::File::from(config_dir.join(auth_path)))
             .build()?;
 
         settings.try_deserialize::<AppConfig>()

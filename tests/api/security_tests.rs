@@ -98,7 +98,9 @@ async fn test_complete_auth_flow() {
         );
 
         // [5] Access protected route with valid token
-        let response = test_app.user(&format!("Bearer {new_access_token}")).await;
+        let response = test_app
+            .user(&format!("Bearer {new_access_token}"), strategy)
+            .await;
         assert!(response.status().is_success());
 
         // [6] Logout with invalid refreshToken

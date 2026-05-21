@@ -6,7 +6,15 @@ use super::traits::{IdResult, MongoInsert, PgInsert, SqliteInsert};
 
 impl PgInsert for Session {
     fn columns() -> Vec<&'static str> {
-        vec!["userId", "issuedAt", "expiresAt", "usedAt", "token"]
+        vec![
+            "userId",
+            "issuedAt",
+            "expiresAt",
+            "usedAt",
+            "token",
+            "roles",
+            "permissions",
+        ]
     }
     fn uniques() -> Vec<&'static str> {
         vec!["token"]
@@ -22,12 +30,22 @@ impl PgInsert for Session {
             .bind(self.expires_at)
             .bind(self.used_at)
             .bind(self.token)
+            .bind(self.roles)
+            .bind(self.permissions)
     }
 }
 
 impl SqliteInsert for Session {
     fn columns() -> Vec<&'static str> {
-        vec!["userId", "issuedAt", "expiresAt", "usedAt", "token"]
+        vec![
+            "userId",
+            "issuedAt",
+            "expiresAt",
+            "usedAt",
+            "token",
+            "roles",
+            "permissions",
+        ]
     }
     fn uniques() -> Vec<&'static str> {
         vec!["token"]
@@ -43,12 +61,22 @@ impl SqliteInsert for Session {
             .bind(self.expires_at)
             .bind(self.used_at)
             .bind(self.token)
+            .bind(serde_json::to_string(&self.roles).unwrap())
+            .bind(serde_json::to_string(&self.permissions).unwrap())
     }
 }
 
 impl MongoInsert for Session {
     fn columns() -> Vec<&'static str> {
-        vec!["userId", "issuedAt", "expiresAt", "usedAt", "token"]
+        vec![
+            "userId",
+            "issuedAt",
+            "expiresAt",
+            "usedAt",
+            "token",
+            "roles",
+            "permissions",
+        ]
     }
     fn uniques() -> Vec<&'static str> {
         vec!["token"]

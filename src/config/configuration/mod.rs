@@ -57,11 +57,7 @@ impl AnzarConfiguration {
             },
             server: Server::default(),
             auth: Authentication {
-                strategy: AuthStrategy::Jwt(JwtConfig {
-                    issuer: "localhost:3000".into(),
-                    audience: "users".into(),
-                    ..Default::default()
-                }),
+                strategy: app_config.auth,
                 ..Default::default()
             },
             security: Security {

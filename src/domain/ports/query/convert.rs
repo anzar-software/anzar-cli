@@ -21,7 +21,6 @@ impl IntoDbFilter for QueryBuilder {
         // filters
         for op in self.filters {
             let value = op.value.into_boson(op.field);
-            dbg!(&value);
             let field = if op.field == "id" { "_id" } else { op.field };
 
             match op.op {

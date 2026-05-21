@@ -1,0 +1,7 @@
+auth:
+  type: Jwt
+  algorithm: "HS256"
+  access_token_expires_in: 900
+  refresh_token_expires_in: 604800
+  issuer: "localhost:3000"
+  audience: "user"

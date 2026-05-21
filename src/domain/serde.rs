@@ -56,7 +56,6 @@ where
     use mongodb::bson::DateTime as BsonDateTime;
 
     let opt = Option::<BsonDateTime>::deserialize(d)?;
-    dbg!(&opt);
     Ok(opt.and_then(|bson_dt| {
         chrono::Utc
             .timestamp_millis_opt(bson_dt.timestamp_millis())

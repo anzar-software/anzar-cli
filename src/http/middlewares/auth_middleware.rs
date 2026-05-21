@@ -32,19 +32,6 @@ async fn validate_token(req: &ServiceRequest) -> Result<(), Error> {
             if let Some(session_id) = data {
                 let session = app_state.find_session(&session_id).await?;
 
-                if session.used_at.is_some() {
-                    tracing::error!(
-                        error.code = "AuthError::TokenReplay",
-                        "Session token was already used"
-                    );
-                    return Err(
-                        AuthError::Unauthenticated(crate::error::AuthError::TokenReplay {
-                            token_type: TokenErrorType::SessionToken,
-                        })
-                        .into(),
-                    );
-                }
-
                 if chrono::Utc::now() > session.expires_at {
                     tracing::error!(
                         error.code = "AuthError::TokenExpired",

@@ -458,6 +458,8 @@ async fn logout(
         }
     };
 
+    dbg!(&result);
+
     session_manager.purge();
     result.map(|_| Ok(HttpResponse::Ok().finish()))?
 }

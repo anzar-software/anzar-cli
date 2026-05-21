@@ -1,4 +1,4 @@
-use anzar::config::AppState;
+use anzar::config::{AppState, AuthStrategy};
 
 use crate::shared::{
     EmailRequest, LoginRequest, RefreshTokenRequest, RegisterRequest, ValidTestCases,
@@ -48,14 +48,16 @@ impl TestApp {
             .await
             .expect("Failed to execute request.")
     }
-    pub async fn user(&self, token: &str) -> reqwest::Response {
+    pub async fn user(&self, token: &str, strategy: &AuthStrategy) -> reqwest::Response {
         let client = self.init();
-        client
-            .get(format!("{}/user", self.address))
-            .header("authorization", token)
-            .send()
-            .await
-            .expect("Failed to execute request.")
+        let mut req = client.get(format!("{}/user", self.address));
+
+        req = match strategy {
+            AuthStrategy::Session(_) => req.header("Cookie", token),
+            AuthStrategy::Jwt(_) => req.header("authorization", token),
+        };
+
+        req.send().await.expect("Failed to execute request.")
     }
     pub async fn logout(
         &self,
@@ -67,6 +69,18 @@ impl TestApp {
             .post(format!("{}/auth/logout", self.address))
             .bearer_auth(bearer_token)
             .json(refresh_token)
+            .send()
+            .await
+            .expect("Failed to execute request.")
+    }
+    pub async fn session_logout(&self, token: &str) -> reqwest::Response {
+        let client = self.init();
+        client
+            .post(format!("{}/auth/logout", self.address))
+            .header("Cookie", token)
+            .json(&RefreshTokenRequest {
+                refresh_token: String::default(),
+            })
             .send()
             .await
             .expect("Failed to execute request.")

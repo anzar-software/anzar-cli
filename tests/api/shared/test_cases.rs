@@ -219,4 +219,18 @@ impl InvalidTestCases {
             (format!("Bearer {}", valid_token), "token wit Bearer keyword", 401),
         ]
     }
+
+    pub fn session_cookies() -> Vec<(String, &'static str, u16)> {
+        vec![
+            (String::default(), "cookie is empty", 401),
+            (
+                "id=13JedafSEL0P8TUUzwUQP+rdJzjyZa7SjzsJ4vqPtuRnJ0lhbrR2jHBLPKc2xzUiNZ+"
+                    .to_string(),
+                "cookie is wrong",
+                401,
+            ),
+            ("id=".to_string(), "cookie has no value", 401),
+            ("sessionid=13JedafSEL0P8TUUzwUQP+rdJzjyZa7SjzsJ4vqPtuRnJ0lhbrR2jHBLPKc2xzUiNZ+CW8Sq9HZpL9fpoQiGqz888sZYLrqnfxdbir6tO6bPIxWmG4TnuCNYPO1hUsa1mZu0yW8Q0rS%2FU9XH6cC0WiCcmInLxEfbvRVqkjEv6DIILztkOzV%2FdY8iYbiacTqwcA0K02zDPSh+Snyj%2Fm2lQvIbvgm9q9TVgOz2ScubCPSpNhRIVUrDzNc4wu0d16bG1oaoQ%2FYtHwsATZ4MmGCUxI3SQVEdJ5bv47ax1fmJ3f4z+r+08TG2SPa5fpdmrAsGRNi+VB83DoWtW8KUaFWkexEq1d9T2aWeFYey8aiB2g6zA41ePB39CA%3D%3D".to_string(), "cookie with invalid name", 401),
+        ]
+    }
 }

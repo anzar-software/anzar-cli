@@ -57,7 +57,9 @@ async fn test_protected_route_with_valid_jwt() {
     if matches!(strategy, AuthStrategy::Jwt(..))
         && let Some(tokens) = &auth_response.tokens
     {
-        let response = test_app.user(&format!("Bearer {}", &tokens.access)).await;
+        let response = test_app
+            .user(&format!("Bearer {}", &tokens.access), strategy)
+            .await;
         assert!(response.status().is_success());
     }
 }
@@ -84,7 +86,7 @@ async fn test_protected_route_with_invalid_jwt() {
         let valid_token: &str = &tokens.access;
 
         for (token, err_msg, status_code) in InvalidTestCases::jwt_tokens(valid_token) {
-            let response = test_app.user(&token).await;
+            let response = test_app.user(&token, strategy).await;
 
             assert_eq!(
                 status_code,
@@ -115,7 +117,7 @@ async fn test_protected_route_with_refresh_token() {
     if matches!(strategy, AuthStrategy::Jwt(..))
         && let Some(tokens) = &auth_response.tokens
     {
-        let response = test_app.user(&tokens.refresh).await;
+        let response = test_app.user(&tokens.refresh, strategy).await;
         assert_eq!(
             401,
             response.status().as_u16(),
