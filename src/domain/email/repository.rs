@@ -29,11 +29,15 @@ impl EmailVerificationTokenRepository {
         }
     }
 
-    #[tracing::instrument(name = "db.email.find", skip(self, hash))]
-    pub async fn find(&self, hash: &str) -> Result<EmailVerificationToken> {
-        let filter = QueryBuilder::default().eq("token", hash);
+    #[tracing::instrument(name = "db.email.consume", skip(self, hash))]
+    pub async fn consume(&self, hash: &str) -> Result<EmailVerificationToken> {
+        let filter = QueryBuilder::default()
+            .eq("hash", hash)
+            .gt("expiresAt", Utc::now())
+            .is_null("usedAt");
+        let update = QueryBuilder::default().set("usedAt", Utc::now());
 
-        match self.adapter.find_one(filter).await {
+        match self.adapter.find_one_and_update(filter, update).await {
             Ok(Some(token)) => Ok(token),
             Ok(None) => Err(Error::Unauthenticated(
                 crate::error::AuthError::TokenInvalid {

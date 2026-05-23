@@ -352,6 +352,7 @@ dependencies = [
  "chrono",
  "config",
  "dashmap",
+ "dotenvy",
  "futures",
  "hmac",
  "jsonwebtoken",

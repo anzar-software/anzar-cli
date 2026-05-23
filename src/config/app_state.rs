@@ -1,8 +1,9 @@
-use std::fs;
+use std::env::var;
 use uuid::Uuid;
 
 use crate::error::Result;
 
+use crate::http::middlewares::rate_limiting::RateLimiter;
 use crate::infrastructure::{
     cache::{CacheAdapters, in_memory::InMemoryAdapter, memcache::MemCache, redis::Redis},
     database::{DatabaseAdapters, mongodb::MongoDB, postgres::PostgreSQL, sqlite::SQLite},
@@ -21,12 +22,27 @@ pub struct AppState {
     pub crypto: Crypto,
     pub repositories: RepositoryRegistry,
     pub configuration: AnzarConfiguration,
+    pub rate_limiter: RateLimiter,
 }
 
 impl AppState {
     pub async fn production(app_config: &AppConfig) -> Result<Self> {
-        let content = fs::read_to_string(&app_config.config_path)?;
-        let configuration: AnzarConfiguration = serde_yaml::from_str(content.as_str())?;
+        dotenvy::dotenv().ok();
+
+        let env_overrides =
+            config::Environment::default().source(Some(std::collections::HashMap::from([
+                ("APP.URL".into(), var("API_BASE_URL")?),
+                ("SECURITY.SECRET_KEY".into(), var("SECRET_KEY")?),
+                ("DATABASE.CONNECTION_STRING".into(), var("DATABASE_URL")?),
+                ("CACHE.URL".into(), var("CACHE_URL")?),
+            ])));
+
+        let configuration = config::Config::builder()
+            .add_source(config::File::with_name(&app_config.config_path))
+            .add_source(env_overrides)
+            .build()?
+            .try_deserialize::<AnzarConfiguration>()?;
+
         let repositories = RepositoryRegistry::from_database(&configuration.database).await?;
 
         configuration.validate()?;
@@ -36,20 +52,22 @@ impl AppState {
             crypto,
             repositories,
             configuration,
+            rate_limiter: RateLimiter::default(),
         })
     }
 
     pub async fn testing(address: &str) -> Result<Self> {
         let configuration = Self::build_config(address).await?;
-        let auth_service = Self::build_authservice(&configuration.database).await?;
+        let repositories = Self::build_authservice(&configuration.database).await?;
 
         configuration.validate()?;
         let crypto = Crypto::from_configuration(&configuration)?;
 
         Ok(Self {
             crypto,
-            repositories: auth_service,
+            repositories,
             configuration,
+            rate_limiter: RateLimiter::default(),
         })
     }
 

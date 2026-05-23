@@ -29,19 +29,19 @@ pub async fn run(listener: TcpListener, app_state: AppState) -> Result<Server, s
     }
 
     let config = app_state.configuration.clone();
-    let data = web::Data::new(app_state);
+    let appstate_data = web::Data::new(app_state);
 
     let http_server = HttpServer::new(move || {
         let app = App::new();
 
-        app.wrap(TracingLogger::default())
-            // .wrap(from_fn(ip_rate_limit_middleware))
-            .wrap(http::configure_cors(&data.configuration))
-            .wrap(http::configure_cookie_session(&data.configuration))
-            .wrap(from_fn(http::middlewares::validate_content_type))
-            .wrap(http::build_default_headers(&data.configuration))
-            .app_data(data.clone())
-            .service(http::swagger_service(&data.configuration))
+        app.wrap(from_fn(http::middlewares::validate_content_type))
+            .wrap(http::build_default_headers(&appstate_data.configuration))
+            .wrap(http::configure_cookie_session(&appstate_data.configuration))
+            .wrap(http::configure_cors(&appstate_data.configuration))
+            .wrap(from_fn(http::middlewares::ip_rate_limit_middleware))
+            .wrap(TracingLogger::default())
+            .app_data(appstate_data.clone())
+            .service(http::swagger_service(&appstate_data.configuration))
             .service(health::health_scope())
             .service(auth::auth_scope())
             .service(

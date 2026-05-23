@@ -7,7 +7,7 @@ use actix_web::{
     mime,
 };
 
-use crate::error::{Error as AuthError, ValidationError};
+use crate::error::Error as AuthError;
 
 pub async fn validate_content_type(
     req: ServiceRequest,
@@ -23,16 +23,15 @@ pub async fn validate_content_type(
     if let Some(content_type) = header {
         if req.path() == "/auth/password/reset" {
             if content_type != mime::APPLICATION_WWW_FORM_URLENCODED {
-                return Err(AuthError::Validation(ValidationError::UnsupportedMediaType(
+                return Err(AuthError::UnsupportedMediaType(
                     "Only application/x-www-form-urlencoded supported for this endpoint".into(),
-                ))
+                )
                 .into());
             }
         } else if req.method() == http::Method::POST && content_type != mime::APPLICATION_JSON {
-            return Err(AuthError::Validation(ValidationError::UnsupportedMediaType(
-                "Only application/json supported".into(),
-            ))
-            .into());
+            return Err(
+                AuthError::UnsupportedMediaType("Only application/json supported".into()).into(),
+            );
         }
     }
 

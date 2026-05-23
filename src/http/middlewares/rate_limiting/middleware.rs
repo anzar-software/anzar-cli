@@ -6,13 +6,11 @@ use actix_web::{
 };
 use std::{net::IpAddr, str::FromStr};
 
-use super::{RATE_LIMITS, TokenBucket};
-use crate::error::{Error as AuthError, InternalError};
+use crate::http::extractors::extract_app_state;
 
 fn extract_ipadd(req: &ServiceRequest) -> Option<String> {
     req.headers()
         .get("x-forwarded-for")
-        .or_else(|| req.headers().get("X-Forwarded-For"))
         .or_else(|| req.headers().get("x-real-ip"))
         .and_then(|v| v.to_str().ok())
         .and_then(|s| s.split(',').next())
@@ -25,14 +23,13 @@ pub async fn ip_rate_limit_middleware(
     req: ServiceRequest,
     next: Next<impl MessageBody>,
 ) -> Result<ServiceResponse<impl MessageBody>, Error> {
-    let ipadd = extract_ipadd(&req).ok_or_else(|| {
-        AuthError::Internal(InternalError::MissingConfiguration(
-            "Ip Header not registered".into(),
-        ))
-    })?;
+    let app_state = extract_app_state(&req)?;
+    let key = extract_ipadd(&req).unwrap_or_else(|| "unknown".to_string());
 
-    let mut bucket = RATE_LIMITS.entry(ipadd).or_insert_with(TokenBucket::ip);
-    bucket.run()?;
+    let ratelimit_config = app_state.configuration.security.rate_limit;
+    if ratelimit_config.enabled {
+        app_state.rate_limiter.check(&key, &ratelimit_config.ip)?;
+    }
 
     next.call(req).await
 }

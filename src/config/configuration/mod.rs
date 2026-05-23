@@ -62,6 +62,7 @@ impl AnzarConfiguration {
             },
             security: Security {
                 secret_key: String::default(),
+                rate_limit: RateLimit::default(),
                 headers: vec![],
             },
         }
@@ -473,11 +474,72 @@ impl Default for RbacConfig {
 pub struct Security {
     #[serde(skip_serializing)]
     pub secret_key: String,
+
+    #[serde(default)]
+    pub rate_limit: RateLimit,
+
     #[serde(default = "default_headers")]
     pub headers: Vec<(String, String)>,
-    // pub headers: std::collections::HashMap<String, String>,
 }
 
+// RateLimit
+// ------------------------------------------------------------
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize, ToSchema)]
+pub struct RateLimit {
+    #[serde(default)]
+    pub enabled: bool,
+
+    #[serde(default = "RateLimitConfig::ip")]
+    pub ip: RateLimitConfig,
+
+    #[serde(default = "RateLimitConfig::strict")]
+    pub strict: RateLimitConfig,
+
+    #[serde(default = "RateLimitConfig::defaults")]
+    pub default: RateLimitConfig,
+}
+
+impl Default for RateLimit {
+    fn default() -> Self {
+        Self {
+            enabled: false,
+            ip: RateLimitConfig::ip(),
+            strict: RateLimitConfig::strict(),
+            default: RateLimitConfig::defaults(),
+        }
+    }
+}
+
+// RateLimitConfig
+// ------------------------------------------------------------
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize, ToSchema)]
+pub struct RateLimitConfig {
+    pub capacity: u32,
+    pub duration_minutes: u32,
+}
+impl RateLimitConfig {
+    fn ip() -> RateLimitConfig {
+        RateLimitConfig {
+            duration_minutes: 1,
+            capacity: 100,
+        }
+    }
+    fn strict() -> RateLimitConfig {
+        RateLimitConfig {
+            duration_minutes: 60,
+            capacity: 5,
+        }
+    }
+    fn defaults() -> RateLimitConfig {
+        RateLimitConfig {
+            duration_minutes: 15,
+            capacity: 20,
+        }
+    }
+}
+
+// Headers
+// ------------------------------------------------------------
 fn default_headers() -> Vec<(String, String)> {
     vec![
         ("X-Content-Type-Options".into(), "nosniff".into()),
@@ -497,29 +559,8 @@ fn default_headers() -> Vec<(String, String)> {
     ]
 }
 
-// rbac:
-//   default_role: user
-//   roles:
-//     - name: user
-//       permissions:
-//         - posts:read
-//         - posts:write
-//     - name: admin
-//       permissions:
-//         - posts:read
-//         - posts:write
-//         - users:read
-//         - users:write
-//         - billing:read
-
 // humantime-serde is great for this — lets you write "15m" in config files.
 // server:
-//   rate_limiting:
-//     enabled: true
-//     window_ms: 60000        # 1 minute
-//     max_requests: 100
-//     strategy: "ip"          # ip | user | api_key
-//
 //   request:
 //     timeout_ms: 30000
 //     max_body_size: "2mb"

@@ -26,7 +26,7 @@ use crate::application::traits::{
 use crate::http::{
     cookies,
     extractors::{AppStateExtractor, ValidatedQuery},
-    middlewares::{auth_middleware, authorization_middleware, rate_limiting::RATE_LIMITS},
+    middlewares::{auth_middleware, authorization_middleware},
 };
 
 use super::model::{AuthResponse, EmailRequest, RefreshTokenRequest};
@@ -95,6 +95,13 @@ pub async fn login(
     req: web::Json<LoginRequest>,
     session: actix_session::Session,
 ) -> Result<HttpResponse> {
+    let ratelimit_config = &app_state.configuration.security.rate_limit;
+    if ratelimit_config.enabled {
+        app_state
+            .rate_limiter
+            .check(&req.email, &ratelimit_config.strict)?;
+    }
+
     let auth_config = &app_state.configuration.auth;
     req.validate_with_args(&auth_config.password.requirements)?;
 
@@ -221,9 +228,14 @@ pub async fn register(
     req: web::Json<RegisterRequest>,
     session: actix_session::Session,
 ) -> Result<HttpResponse> {
+    let ratelimit_config = &app_state.configuration.security.rate_limit;
+    if ratelimit_config.enabled {
+        app_state
+            .rate_limiter
+            .check(&req.email, &ratelimit_config.strict)?;
+    }
+
     req.validate_with_args(&app_state.configuration.auth.password.requirements)?;
-    // let mut bucket = RATE_LIMITS.entry(req.email.clone()).or_default();
-    // bucket.run()?;
 
     // START TIMING-SAFE EXECUTION BLOCK
     let start = std::time::Instant::now();
@@ -325,9 +337,19 @@ pub async fn register(
         ),
     ),
 )]
-#[tracing::instrument(name = "Get user session", skip(session))]
+#[tracing::instrument(name = "Get user session", skip(session, app_state))]
 #[actix_web::get("/session")]
-pub async fn get_session(session: Session) -> Result<HttpResponse> {
+pub async fn get_session(
+    AppStateExtractor(app_state): AppStateExtractor,
+    session: Session,
+) -> Result<HttpResponse> {
+    let ratelimit_config = &app_state.configuration.security.rate_limit;
+    if ratelimit_config.enabled {
+        app_state
+            .rate_limiter
+            .check(&session.user_id, &ratelimit_config.default)?;
+    }
+
     Ok(HttpResponse::Ok().json(session))
 }
 
@@ -383,15 +405,21 @@ pub async fn refresh_token(
     AppStateExtractor(app_state): AppStateExtractor,
     req: web::Json<RefreshTokenRequest>,
 ) -> Result<HttpResponse> {
-    let jwt = app_state.configuration.auth.jwt()?;
-
     let user_id = app_state
         .consume_refresh_token(req.0.refresh_token.expose_secret())
         .await?;
 
+    let ratelimit_config = &app_state.configuration.security.rate_limit;
+    if ratelimit_config.enabled {
+        app_state
+            .rate_limiter
+            .check(&user_id, &ratelimit_config.default)?;
+    }
+
     // FIXME maybe don't return User here, its not needed
     let user: User = app_state.find_user(&user_id).await?;
 
+    let jwt = app_state.configuration.auth.jwt()?;
     app_state.issue_jwt(&user_id).await.map(|tokens| {
         let expiry = jwt.access_token_expires_in;
         Ok(HttpResponse::Ok().json(AuthResponse::new(user).with_jwt(tokens, expiry)))
@@ -458,8 +486,6 @@ async fn logout(
         }
     };
 
-    dbg!(&result);
-
     session_manager.purge();
     result.map(|_| Ok(HttpResponse::Ok().finish()))?
 }
@@ -507,29 +533,28 @@ async fn request_password_reset(
     req: web::Json<EmailRequest>,
     AppStateExtractor(app_state): AppStateExtractor,
 ) -> Result<HttpResponse> {
+    // 1.
+    let ratelimit_config = &app_state.configuration.security.rate_limit;
+    if ratelimit_config.enabled {
+        app_state
+            .rate_limiter
+            .check(&req.email, &ratelimit_config.strict)?;
+    }
+
     req.validate()?;
 
     let start = std::time::Instant::now();
 
-    let email = req.into_inner().email;
-    // 2.
-    let mut bucket = RATE_LIMITS.entry(email.clone()).or_default();
-    bucket.run()?;
-
     let result = async {
-        let user = app_state.find_user_by_email(&email).await?;
-        let user_id = user.id()?;
+        // 2.
+        let user = app_state.find_user_by_email(&req.email).await?;
 
         // 3.
+        let user_id = user.id()?;
         app_state.revoke_password_reset_token(user_id).await?;
 
         // 4.
         let expiring_link = app_state.insert_password_reset_token(user_id).await?;
-
-        // 5.
-        let mut bucket = RATE_LIMITS.entry(user_id.to_string()).or_default();
-        bucket.run()?;
-
         Ok::<ExpiringLink, Error>(expiring_link)
     }
     .await;
@@ -541,7 +566,7 @@ async fn request_password_reset(
     match result {
         Ok(reset_link) => Ok(HttpResponse::Ok().json(reset_link)),
         Err(err) => {
-            tracing::error!("Password reset failed for email {} - {}", email, err);
+            tracing::error!("Password reset failed for email {} - {}", &req.email, err);
             Ok(HttpResponse::Ok().json(ExpiringLink::default()))
         }
     }
@@ -670,6 +695,13 @@ async fn submit_new_password(
     session: actix_session::Session,
     form: web::Form<ResetPasswordRequest>,
 ) -> Result<HttpResponse> {
+    let ratelimit_config = &app_state.configuration.security.rate_limit;
+    if ratelimit_config.enabled {
+        app_state
+            .rate_limiter
+            .check(form.token.expose_secret(), &ratelimit_config.strict)?;
+    }
+
     // 0. validat password strength
     form.validate_with_args(&app_state.configuration.auth.password.requirements)?;
 
@@ -693,8 +725,6 @@ async fn submit_new_password(
     let reset_token = app_state.validate_reset_password_token(token).await?;
     let user_id = &reset_token.user_id;
     let reset_token_id = reset_token.id()?;
-
-    // NOTE → Rate limit per token
 
     // 2. Ensure password is different then previous
     let account = app_state.find_account(user_id).await?;

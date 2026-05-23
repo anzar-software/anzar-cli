@@ -7,6 +7,14 @@ pub type Result<T> = core::result::Result<T, Error>;
 
 #[derive(thiserror::Error, Debug)]
 pub enum Error {
+    // -- Validation (400)
+    #[error("bad request: {0}")]
+    BadRequest(String),
+
+    // -- Validation (400)
+    #[error(transparent)]
+    Validation(#[from] ValidationError),
+
     // -- Auth (401)
     #[error(transparent)]
     Unauthenticated(#[from] AuthError),
@@ -23,9 +31,9 @@ pub enum Error {
     #[error(transparent)]
     Conflict(#[from] ConflictReason),
 
-    // -- Validation (400)
-    #[error(transparent)]
-    Validation(#[from] ValidationError),
+    // -- Validation (415)
+    #[error("unsupported media type: {0}")]
+    UnsupportedMediaType(String),
 
     // -- Rate Limiting (429)
     #[error("Rate limit exceeded: {limit} requests allowed per {window:?}")]
@@ -105,26 +113,20 @@ pub enum ConflictReason {
 
 #[derive(thiserror::Error, Debug)]
 pub enum ValidationError {
-    #[error("validation fields failed: {0}")]
-    Fields(String),
-
     #[error("malformed {field:?}")]
     Malformed { field: CredentialField },
 
     #[error("missing required field: {field:?}")]
     Missing { field: CredentialField },
 
-    #[error("unsupported media type: {0}")]
-    UnsupportedMediaType(String),
-
-    #[error("bad request: {0}")]
-    BadRequest(String),
+    #[error("invalid value for '{0}'")]
+    Invalid(String),
 }
 
 // -- Fields
 impl From<validator::ValidationErrors> for ValidationError {
     fn from(e: validator::ValidationErrors) -> Self {
-        ValidationError::Fields(e.to_string())
+        ValidationError::Invalid(e.to_string())
     }
 }
 impl From<validator::ValidationErrors> for Error {
@@ -134,7 +136,7 @@ impl From<validator::ValidationErrors> for Error {
 }
 impl From<validator::ValidationError> for ValidationError {
     fn from(e: validator::ValidationError) -> Self {
-        ValidationError::Fields(e.to_string())
+        ValidationError::Invalid(e.to_string())
     }
 }
 impl From<validator::ValidationError> for Error {
@@ -221,6 +223,11 @@ impl From<std::io::Error> for InternalError {
         InternalError::Io(e.to_string())
     }
 }
+impl From<std::env::VarError> for InternalError {
+    fn from(e: std::env::VarError) -> Self {
+        InternalError::Io(e.to_string())
+    }
+}
 
 // -- Database
 impl From<sqlx::Error> for InternalError {
@@ -269,6 +276,12 @@ impl From<serde_json::Error> for InternalError {
 
 impl From<serde_yaml::Error> for InternalError {
     fn from(e: serde_yaml::Error) -> Self {
+        InternalError::Serialization(e.to_string())
+    }
+}
+
+impl From<config::ConfigError> for InternalError {
+    fn from(e: config::ConfigError) -> Self {
         InternalError::Serialization(e.to_string())
     }
 }
@@ -347,11 +360,24 @@ impl From<SessionGetError> for Error {
     }
 }
 
+impl From<config::ConfigError> for Error {
+    fn from(e: config::ConfigError) -> Self {
+        Error::Internal(e.into())
+    }
+}
+
 impl From<std::io::Error> for Error {
     fn from(e: std::io::Error) -> Self {
         Error::Internal(e.into())
     }
 }
+
+impl From<std::env::VarError> for Error {
+    fn from(e: std::env::VarError) -> Self {
+        Error::Internal(e.into())
+    }
+}
+
 // -- JWT and Actix stay at top-level Error since they're not purely internal
 impl From<jsonwebtoken::errors::Error> for Error {
     fn from(_: jsonwebtoken::errors::Error) -> Self {
@@ -363,6 +389,14 @@ impl From<jsonwebtoken::errors::Error> for Error {
 
 #[derive(Serialize, utoipa::ToSchema, Debug)]
 pub enum ErrorCode {
+    // BadRequest
+    BadRequest,
+    // Validation
+    ValidationFailed,
+    MalformedField,
+    MissingField,
+    UnsupportedMediaType,
+
     // Auth
     TokenExpired,
     TokenReplay,
@@ -384,12 +418,6 @@ pub enum ErrorCode {
     TokenNotFound,
     // Conflict
     AlreadyExists,
-    // Validation
-    ValidationFailed,
-    MalformedField,
-    MissingField,
-    UnsupportedMediaType,
-    BadRequest,
     // Rate Limiting
     RateLimitExceeded,
     // Internal
@@ -399,6 +427,12 @@ pub enum ErrorCode {
 impl Error {
     pub fn to_code(&self) -> ErrorCode {
         match self {
+            Error::BadRequest(_) => ErrorCode::BadRequest,
+            Error::Validation(v) => match v {
+                ValidationError::Invalid(_) => ErrorCode::ValidationFailed,
+                ValidationError::Malformed { .. } => ErrorCode::MalformedField,
+                ValidationError::Missing { .. } => ErrorCode::MissingField,
+            },
             Error::Unauthenticated(auth) => match auth {
                 AuthError::TokenExpired { .. } => ErrorCode::TokenExpired,
                 AuthError::TokenReplay { .. } => ErrorCode::TokenReplay,
@@ -423,13 +457,7 @@ impl Error {
             Error::Conflict(reason) => match reason {
                 ConflictReason::AlreadyExists { .. } => ErrorCode::AlreadyExists,
             },
-            Error::Validation(v) => match v {
-                ValidationError::Fields(_) => ErrorCode::ValidationFailed,
-                ValidationError::Malformed { .. } => ErrorCode::MalformedField,
-                ValidationError::Missing { .. } => ErrorCode::MissingField,
-                ValidationError::UnsupportedMediaType(_) => ErrorCode::UnsupportedMediaType,
-                ValidationError::BadRequest(_) => ErrorCode::BadRequest,
-            },
+            Error::UnsupportedMediaType { .. } => ErrorCode::UnsupportedMediaType,
             Error::RateLimitExceeded { .. } => ErrorCode::RateLimitExceeded,
             Error::Internal(_) => ErrorCode::Internal,
         }
@@ -449,16 +477,24 @@ impl actix_web::ResponseError for Error {
             message: self.to_string(),
         };
 
-        HttpResponse::build(self.status_code()).json(error_response)
+        let mut builder = HttpResponse::build(self.status_code());
+
+        if let Error::RateLimitExceeded { window, .. } = self {
+            builder.insert_header(("Retry-After", window.as_seconds_f32().to_string()));
+        }
+
+        builder.json(error_response)
     }
 
     fn status_code(&self) -> StatusCode {
         match self {
+            Error::BadRequest(_) => StatusCode::BAD_REQUEST,
+            Error::Validation(_) => StatusCode::BAD_REQUEST,
             Error::Unauthenticated(_) => StatusCode::UNAUTHORIZED,
             Error::Forbidden(_) => StatusCode::FORBIDDEN,
             Error::NotFound(_) => StatusCode::NOT_FOUND,
             Error::Conflict(_) => StatusCode::CONFLICT,
-            Error::Validation(_) => StatusCode::BAD_REQUEST,
+            Error::UnsupportedMediaType(_) => StatusCode::UNSUPPORTED_MEDIA_TYPE,
             Error::RateLimitExceeded { .. } => StatusCode::TOO_MANY_REQUESTS,
             Error::Internal(_) => StatusCode::INTERNAL_SERVER_ERROR,
         }

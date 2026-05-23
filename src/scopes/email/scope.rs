@@ -44,33 +44,23 @@ use crate::http::extractors::{AppStateExtractor, ValidatedQuery};
     security(()),
     )]
 #[tracing::instrument(name = "Email Verification", skip(app_state, query))]
-#[actix_web::get("/verify")]
+#[actix_web::post("/verify")]
 async fn verify_email(
     AppStateExtractor(app_state): AppStateExtractor,
     ValidatedQuery(query): ValidatedQuery<TokenQuery>,
 ) -> Result<HttpResponse> {
     let token = query.token;
 
-    // FIXME merge into one
     let email_verificaiton_token = app_state
-        .validate_email_verification_token(token.expose_secret())
-        .await?;
-    let verification_token_id = email_verificaiton_token.id()?;
-    app_state
-        .invalidate_email_verification_token(verification_token_id)
+        .consume_email_verification_token(token.expose_secret())
         .await?;
 
     app_state
         .validate_account(&email_verificaiton_token.user_id)
         .await?;
 
-    let success_redirect = match app_state
-        .configuration
-        .auth
-        .email
-        .verification
-        .success_redirect
-    {
+    let email_config = app_state.configuration.auth.email;
+    let success_redirect = match email_config.verification.success_redirect {
         Some(url) => url,
         None => app_state.configuration.app.url,
     };
