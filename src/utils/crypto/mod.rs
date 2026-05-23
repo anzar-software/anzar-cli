@@ -133,6 +133,8 @@ impl Crypto {
 
 #[cfg(test)]
 mod tests {
+    use crate::config::RateLimit;
+
     use super::*;
 
     fn base_crypto() -> Crypto {
@@ -175,6 +177,7 @@ mod tests {
             },
             security: crate::config::Security {
                 secret_key: String::default(),
+                rate_limit: RateLimit::default(),
                 headers: vec![],
             },
         }

@@ -9,6 +9,7 @@ All notable changes to this project will be documented here.
 - Read secret values from .env file instead of saving them in anzar.yml.
 - Introduce tests for sesison authentication method.
 - RateLimit can be enabled or disabled.
+- Add rate limits testings
 
 ### Fixed
 - Search for token in Database using atomic operation withconsume method.

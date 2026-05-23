@@ -62,7 +62,12 @@ impl AnzarConfiguration {
             },
             security: Security {
                 secret_key: String::default(),
-                rate_limit: RateLimit::default(),
+                rate_limit: RateLimit {
+                    enabled: true,
+                    ip: RateLimitConfig::ip(),
+                    strict: RateLimitConfig::strict(),
+                    default: RateLimitConfig::defaults(),
+                },
                 headers: vec![],
             },
         }
