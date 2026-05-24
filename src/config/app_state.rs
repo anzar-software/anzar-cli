@@ -31,10 +31,9 @@ impl AppState {
 
         let env_overrides =
             config::Environment::default().source(Some(std::collections::HashMap::from([
-                ("APP.URL".into(), var("API_BASE_URL")?),
                 ("SECURITY.SECRET_KEY".into(), var("SECRET_KEY")?),
                 ("DATABASE.CONNECTION_STRING".into(), var("DATABASE_URL")?),
-                ("CACHE.URL".into(), var("CACHE_URL")?),
+                ("DATABASE.CACHE.URL".into(), var("CACHE_URL")?),
             ])));
 
         let configuration = config::Config::builder()

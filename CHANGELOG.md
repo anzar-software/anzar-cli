@@ -6,9 +6,9 @@ All notable changes to this project will be documented here.
 
 ### Added
 - Support for RateLimits using three type: default, ip and strict.
+- RateLimit can be enabled or disabled.
 - Read secret values from .env file instead of saving them in anzar.yml.
 - Introduce tests for sesison authentication method.
-- RateLimit can be enabled or disabled.
 - Add rate limits testings
 
 ### Fixed

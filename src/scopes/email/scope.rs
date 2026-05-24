@@ -11,7 +11,7 @@ use crate::application::traits::{AccountServiceTrait, EmailVerificationTokenServ
 use crate::http::extractors::{AppStateExtractor, ValidatedQuery};
 
 #[utoipa::path(
-    get,
+    post,
     path = "/email/verify",
     tag = "Email",
     summary = "Verify user email",

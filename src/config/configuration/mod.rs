@@ -65,7 +65,10 @@ impl AnzarConfiguration {
                 rate_limit: RateLimit {
                     enabled: true,
                     ip: RateLimitConfig::ip(),
-                    strict: RateLimitConfig::strict(),
+                    strict: RateLimitConfig {
+                        duration_minutes: 60,
+                        capacity: 7,
+                    },
                     default: RateLimitConfig::defaults(),
                 },
                 headers: vec![],
