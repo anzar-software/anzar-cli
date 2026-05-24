@@ -1,7 +1,8 @@
 use crate::error::Result;
 use crate::shared::configuration::{AuthStrategy, CacheDriver, DatabaseDriver};
 use crate::shared::{constants, support};
-use std::fs;
+use std::fs::{self, OpenOptions};
+use std::io::Write;
 
 use dialoguer::Confirm;
 use owo_colors::OwoColorize;
@@ -28,6 +29,27 @@ pub fn run(app_name: Option<String>) -> Result<()> {
     Ok(())
 }
 
+fn write_env_file(db: &str, cache: &str) {
+    let contents = format!(
+        r#"
+DATABASE_URL={db}
+CACHE_URL={cache}
+SECRET_KEY="REPLACE_THIS_WITH_A_CRYPTOGRAPHIC_SECURE_RANDOM_NUMBER"
+"#
+    );
+
+    let result = OpenOptions::new()
+        .create(true) // create if it doesn't exist
+        .append(true) // append if it does
+        .open(".env")
+        .and_then(|mut file| file.write_all(contents.as_bytes()));
+
+    match result {
+        Ok(_) => support::print_result(".env file written", true, None),
+        Err(e) => support::print_result(".env file written", false, Some(&e.to_string())),
+    }
+}
+
 fn build_anzar() {
     if std::path::Path::new("anzar.yml").exists() {
         let confirmation = Confirm::new()
@@ -52,11 +74,10 @@ fn build_anzar() {
 
     let config_content = constants::CONFIG_TEMPLATE
         .replace("{{DATABASE_DRIVER}}", &db_driver.to_string())
-        .replace("{{DATABASE_URI}}", &db_uri)
         .replace("{{CACHE_DRIVER}}", &cache_driver.to_string())
-        .replace("{{CACHE_URI}}", &cache_uri)
-        .replace("{{STRATEGY}}", &strategy.to_string())
         .replace("{{AUTH}}", auth);
+
+    write_env_file(&db_uri, &cache_uri);
 
     println!();
     match fs::write("anzar.yml", config_content) {
@@ -127,13 +148,13 @@ fn print_post_init_message() {
     println!("\n{}", "Action required:".yellow().bold());
     println!(
         "  Generate a secure secret key and add it to {}:",
-        "anzar.yml".cyan()
+        ".env".cyan()
     );
 
     println!("\n  {}", os_hint.dimmed());
     println!("  {}", command.on_black().white().bold());
 
-    println!("\n  Then set it in {}:", "anzar.yml".cyan());
-    println!("  {}", "secret_key: <paste output here>".dimmed());
+    println!("\n  Then set it in {}:", ".env".cyan());
+    println!("  {}", "SECRET_KEY= <paste output here>".dimmed());
     println!();
 }

@@ -167,6 +167,7 @@ pub struct Authentication {
     pub strategy: AuthStrategy,
     pub email: EmailConfig,
     pub password: PasswordConfig,
+    pub rbac: RbacConfig,
 }
 // AuthStrategy
 // ------------------------------------------------------------
@@ -373,6 +374,35 @@ impl Default for PasswordSecurity {
     }
 }
 
+// RbacConfig
+// ------------------------------------------------------------
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize)]
+#[serde(default)]
+pub struct RbacConfig {
+    pub enabled: bool,
+    pub default_role: String,
+    pub roles: Vec<RoleConfig>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize)]
+pub struct RoleConfig {
+    pub name: String,
+    pub permissions: Vec<String>,
+}
+
+impl Default for RbacConfig {
+    fn default() -> Self {
+        Self {
+            enabled: false,
+            default_role: "User".into(),
+            roles: vec![RoleConfig {
+                name: "User".into(),
+                permissions: vec!["*:read".into()],
+            }],
+        }
+    }
+}
+
 // =============================================================================
 // Security Configuration - REQUIRED
 // =============================================================================
@@ -380,11 +410,72 @@ impl Default for PasswordSecurity {
 pub struct Security {
     #[serde(skip_serializing)]
     pub secret_key: String,
+
+    #[serde(default)]
+    pub rate_limit: RateLimit,
+
     #[serde(default = "default_headers")]
     pub headers: Vec<(String, String)>,
-    // pub headers: std::collections::HashMap<String, String>,
 }
 
+// RateLimit
+// ------------------------------------------------------------
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize)]
+pub struct RateLimit {
+    #[serde(default)]
+    pub enabled: bool,
+
+    #[serde(default = "RateLimitConfig::ip")]
+    pub ip: RateLimitConfig,
+
+    #[serde(default = "RateLimitConfig::strict")]
+    pub strict: RateLimitConfig,
+
+    #[serde(default = "RateLimitConfig::defaults")]
+    pub default: RateLimitConfig,
+}
+
+impl Default for RateLimit {
+    fn default() -> Self {
+        Self {
+            enabled: false,
+            ip: RateLimitConfig::ip(),
+            strict: RateLimitConfig::strict(),
+            default: RateLimitConfig::defaults(),
+        }
+    }
+}
+
+// RateLimitConfig
+// ------------------------------------------------------------
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize)]
+pub struct RateLimitConfig {
+    pub capacity: u32,
+    pub duration_minutes: u32,
+}
+impl RateLimitConfig {
+    fn ip() -> RateLimitConfig {
+        RateLimitConfig {
+            duration_minutes: 1,
+            capacity: 100,
+        }
+    }
+    fn strict() -> RateLimitConfig {
+        RateLimitConfig {
+            duration_minutes: 60,
+            capacity: 5,
+        }
+    }
+    fn defaults() -> RateLimitConfig {
+        RateLimitConfig {
+            duration_minutes: 15,
+            capacity: 20,
+        }
+    }
+}
+
+// Headers
+// ------------------------------------------------------------
 fn default_headers() -> Vec<(String, String)> {
     vec![
         ("X-Content-Type-Options".into(), "nosniff".into()),

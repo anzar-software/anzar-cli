@@ -56,10 +56,10 @@ fn check_config_values(verbose: bool, config: &AnzarConfiguration) {
             "environment:".dimmed(),
             config.app.environment.cyan()
         );
-        println!(
-            "    {} {}",
-            "secret_key length:".dimmed(),
-            config.security.secret_key.len().to_string().cyan()
-        );
+        // println!(
+        //     "    {} {}",
+        //     "secret_key length:".dimmed(),
+        //     config.security.secret_key.len().to_string().cyan()
+        // );
     }
 }

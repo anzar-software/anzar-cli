@@ -10,16 +10,16 @@ app:
 # =============================================================================
 database:
   driver: {{DATABASE_DRIVER}}
-  connection_string: {{DATABASE_URI}}
+  connection_string: "${DATABASE_URL}"
   cache:
     driver: {{CACHE_DRIVER}}
-    url: {{CACHE_URI}}
+    url: "${CACHE_URL}"
 
 # =============================================================================
 # Security Configuration - REQUIRED
 # =============================================================================
 security:
-  secret_key: "REPLACE_THIS_WITH_A_CRYPTOGRAPHIC_SECURE_RANDOM_NUMBER"
+  secret_key: "${SECRET_KEY}"
   headers:
     - ["X-Content-Type-Options", "nosniff"]
     - ["Content-Type", "application/json"]
