@@ -215,12 +215,12 @@ impl Default for JwtConfig {
 //
 #[derive(Debug, Default, Clone, PartialEq, Eq, Deserialize, Serialize)]
 pub enum AlgorithmConfig {
-    #[default]
     HS256,
     HS384,
     HS512,
     ES256,
     ES384,
+    #[default]
     RS256,
     RS384,
     RS512,
