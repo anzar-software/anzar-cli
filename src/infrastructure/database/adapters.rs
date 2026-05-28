@@ -5,7 +5,7 @@ use sqlx::{Pool, Postgres, Sqlite};
 use crate::domain::database::DatabaseAdapter;
 use crate::domain::model::{
     Account, EmailVerificationToken, PasswordResetToken, Permission, RefreshToken, Role,
-    RolePermission, Session, User, UserRole,
+    RolePermission, Session, SigningKeys, User, UserRole,
 };
 
 use super::{mongodb::MongodbAdapter, postgres::PostgreSQLAdapter, sqlite::SQLiteAdapter};
@@ -16,12 +16,11 @@ const REFRESH_TOKEN: &str = "refresh_tokens";
 const PASSWORD_RESET_TOKEN: &str = "password_reset_tokens";
 const EMAIL_VERIFICATION_TOKEN: &str = "email_verification_tokens";
 const SESSION: &str = "sessions";
-
 const ROLE: &str = "roles";
 const USER_ROLE: &str = "user_roles";
-
 const PERMISSIONS: &str = "permissions";
 const ROLE_PERMISSIONS: &str = "role_permissions";
+const SIGNING_KEYS: &str = "signing_keys";
 
 pub struct DatabaseAdapters {
     pub user_adapter: Arc<dyn DatabaseAdapter<User>>,
@@ -34,6 +33,7 @@ pub struct DatabaseAdapters {
     pub user_role_adapter: Arc<dyn DatabaseAdapter<UserRole>>,
     pub permission_adapter: Arc<dyn DatabaseAdapter<Permission>>,
     pub role_permission_adapter: Arc<dyn DatabaseAdapter<RolePermission>>,
+    pub signing_keys_adapter: Arc<dyn DatabaseAdapter<SigningKeys>>,
     // pub transaction_adapter: MongodbTransaction,
 }
 
@@ -75,6 +75,11 @@ impl DatabaseAdapters {
                 conn_string,
                 ROLE_PERMISSIONS,
             )),
+            signing_keys_adapter: Arc::new(MongodbAdapter::<SigningKeys>::new(
+                client,
+                conn_string,
+                SIGNING_KEYS,
+            )),
             // transaction_adapter: MongodbTransaction::new(client),
         }
     }
@@ -100,6 +105,7 @@ impl DatabaseAdapters {
                 pool,
                 ROLE_PERMISSIONS,
             )),
+            signing_keys_adapter: Arc::new(SQLiteAdapter::<SigningKeys>::new(pool, SIGNING_KEYS)),
             // transaction_adapter: todo!(),
         }
     }
@@ -124,6 +130,10 @@ impl DatabaseAdapters {
             role_permission_adapter: Arc::new(PostgreSQLAdapter::<RolePermission>::new(
                 pool,
                 ROLE_PERMISSIONS,
+            )),
+            signing_keys_adapter: Arc::new(PostgreSQLAdapter::<SigningKeys>::new(
+                pool,
+                SIGNING_KEYS,
             )),
             // transaction_adapter: todo!(),
         }

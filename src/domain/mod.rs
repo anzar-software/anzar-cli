@@ -2,14 +2,14 @@ mod account;
 mod auth;
 mod email;
 mod password_reset;
+mod permission;
 mod refresh_token;
 mod role;
+mod role_permission;
 mod session;
+mod signing_keys;
 mod user;
 mod user_role;
-
-mod permission;
-mod role_permission;
 
 mod serde;
 
@@ -29,6 +29,7 @@ pub mod model {
     pub use super::role::model::Role;
     pub use super::role_permission::model::RolePermission;
     pub use super::session::model::Session;
+    pub use super::signing_keys::model::SigningKeys;
     pub use super::user::model::{CreateUserOutcome, User};
     pub use super::user_role::model::UserRole;
 }
@@ -37,12 +38,12 @@ pub mod repositories {
     pub use super::account::repository::AccountRepository;
     pub use super::email::repository::EmailVerificationTokenRepository;
     pub use super::password_reset::repository::PasswordResetTokenRepository;
+    pub use super::permission::repository::PermissionRepository;
     pub use super::refresh_token::repository::JWTRepository;
     pub use super::role::repository::RoleRepository;
+    pub use super::role_permission::repository::RolePermissionRepository;
     pub use super::session::repository::SessionRepository;
+    pub use super::signing_keys::repository::SigningKeysRepository;
     pub use super::user::repository::UserRepository;
     pub use super::user_role::repository::UserRoleRepository;
-
-    pub use super::permission::repository::PermissionRepository;
-    pub use super::role_permission::repository::RolePermissionRepository;
 }

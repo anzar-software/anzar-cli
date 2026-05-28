@@ -7,11 +7,11 @@ use std::collections::HashMap;
 #[derive(Debug)]
 struct Cookie {
     id: Option<String>,
-    path: Option<String>,
+    _path: Option<String>,
     same_site: Option<String>,
     http_only: bool,
     secure: bool,
-    extras: HashMap<String, Option<String>>,
+    _extras: HashMap<String, Option<String>>,
 }
 
 impl Cookie {
@@ -52,11 +52,11 @@ impl Cookie {
 
         Ok(Cookie {
             id: Some(session_id.to_string()),
-            path,
+            _path: path,
             same_site,
             http_only,
             secure,
-            extras,
+            _extras: extras,
         })
     }
 }

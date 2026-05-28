@@ -6,6 +6,7 @@ mod refresh_token;
 mod role;
 mod role_permission;
 mod session;
+mod signing_keys;
 mod user;
 mod user_role;
 
@@ -22,6 +23,7 @@ pub mod traits {
     pub use crate::application::role::traits::RoleServiceTrait;
     pub use crate::application::role_permission::traits::RolePermissionServiceTrait;
     pub use crate::application::session::traits::SessionServiceTrait;
+    pub use crate::application::signing_keys::traits::SigningKeysServiceTrait;
     pub use crate::application::user::traits::UserServiceTrait;
     pub use crate::application::user_role::traits::UserRoleServiceTrait;
 }

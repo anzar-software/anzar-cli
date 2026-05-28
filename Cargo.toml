@@ -70,6 +70,8 @@ base64 = "0.22.1"
 hmac = "0.12.1"
 rustls = { version = "0.23.32", features = ["ring"] }
 rustls-pemfile = "2.2.0"
+openssl = { version = "0.10.80", features = ["vendored"] }
+aes-gcm = "0.10.3"
 
 # Tracing
 tracing = { version = "0.1.40", features = ["log"] }
@@ -95,6 +97,7 @@ utoipa-swagger-ui = { version = "9.0.2", features = ["actix-web", "vendored"] }
 opentelemetry = "0.31.0"
 futures = "0.3.32"
 dotenvy = "0.15.7"
+hex = "0.4.3"
 
 
 [dev-dependencies]

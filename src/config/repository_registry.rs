@@ -8,7 +8,7 @@ use crate::infrastructure::{
 use crate::domain::repositories::{
     AccountRepository, EmailVerificationTokenRepository, JWTRepository,
     PasswordResetTokenRepository, PermissionRepository, RolePermissionRepository, RoleRepository,
-    SessionRepository, UserRepository, UserRoleRepository,
+    SessionRepository, SigningKeysRepository, UserRepository, UserRoleRepository,
 };
 
 use super::Database;
@@ -28,6 +28,7 @@ pub struct RepositoryRegistry {
     pub(crate) user_role_repository: UserRoleRepository,
     pub(crate) permission_repository: PermissionRepository,
     pub(crate) role_permission_repository: RolePermissionRepository,
+    pub(crate) signing_keys_repository: SigningKeysRepository,
     // pub(crate) transaction_repository: TransactionRepository,
 }
 
@@ -53,6 +54,9 @@ impl RepositoryRegistry {
             permission_repository: PermissionRepository::new(database_adapters.permission_adapter),
             role_permission_repository: RolePermissionRepository::new(
                 database_adapters.role_permission_adapter,
+            ),
+            signing_keys_repository: SigningKeysRepository::new(
+                database_adapters.signing_keys_adapter,
             ),
             // transaction_repository: TransactionRepository::new(adapters.transaction_adapter),
         }

@@ -72,6 +72,10 @@ impl AnzarConfiguration {
                     default: RateLimitConfig::defaults(),
                 },
                 headers: vec![],
+                auth: AuthSecurity {
+                    max_failed_attempts: 5,
+                    lockout_duration: 1800,
+                },
             },
         }
     }
@@ -253,12 +257,9 @@ impl Default for JwtConfig {
 //
 #[derive(Debug, Default, Clone, PartialEq, Eq, Deserialize, Serialize, ToSchema)]
 pub enum AlgorithmConfig {
-    #[default]
-    HS256,
-    HS384,
-    HS512,
     ES256,
     ES384,
+    #[default]
     RS256,
     RS384,
     RS512,
@@ -267,12 +268,24 @@ pub enum AlgorithmConfig {
     PS512,
     EdDSA,
 }
+impl AlgorithmConfig {
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            AlgorithmConfig::ES256 => "ES256",
+            AlgorithmConfig::ES384 => "ES384",
+            AlgorithmConfig::RS256 => "RS256",
+            AlgorithmConfig::RS384 => "RS384",
+            AlgorithmConfig::RS512 => "RS512",
+            AlgorithmConfig::PS256 => "PS256",
+            AlgorithmConfig::PS384 => "PS384",
+            AlgorithmConfig::PS512 => "PS512",
+            AlgorithmConfig::EdDSA => "EdDSA",
+        }
+    }
+}
 impl From<AlgorithmConfig> for jsonwebtoken::Algorithm {
     fn from(value: AlgorithmConfig) -> Self {
         match value {
-            AlgorithmConfig::HS256 => jsonwebtoken::Algorithm::HS256,
-            AlgorithmConfig::HS384 => jsonwebtoken::Algorithm::HS384,
-            AlgorithmConfig::HS512 => jsonwebtoken::Algorithm::HS512,
             AlgorithmConfig::ES256 => jsonwebtoken::Algorithm::ES256,
             AlgorithmConfig::ES384 => jsonwebtoken::Algorithm::ES384,
             AlgorithmConfig::RS256 => jsonwebtoken::Algorithm::RS256,
@@ -359,7 +372,6 @@ pub struct PasswordConfig {
     pub algorithm: HashingAlgorithm,
     pub requirements: PasswordRequirements,
     pub reset: PasswordReset,
-    pub security: PasswordSecurity,
 }
 // ************************************************************
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize, ToSchema)]
@@ -430,21 +442,6 @@ impl Default for PasswordReset {
         }
     }
 }
-// ************************************************************
-#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize, ToSchema)]
-#[serde(default)]
-pub struct PasswordSecurity {
-    pub max_failed_attempts: u8,
-    pub lockout_duration: i64,
-}
-impl Default for PasswordSecurity {
-    fn default() -> Self {
-        Self {
-            max_failed_attempts: 5,
-            lockout_duration: 1800,
-        }
-    }
-}
 
 // RbacConfig
 // ------------------------------------------------------------
@@ -459,6 +456,8 @@ pub struct RbacConfig {
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize, ToSchema)]
 pub struct RoleConfig {
     pub name: String,
+    #[serde(default)]
+    pub inherits: Vec<String>,
     pub permissions: Vec<String>,
 }
 
@@ -466,9 +465,10 @@ impl Default for RbacConfig {
     fn default() -> Self {
         Self {
             enabled: false,
-            default_role: "User".into(),
+            default_role: "user".into(),
             roles: vec![RoleConfig {
-                name: "User".into(),
+                name: "user".into(),
+                inherits: vec!["user".into()],
                 permissions: vec!["*:read".into()],
             }],
         }
@@ -484,10 +484,29 @@ pub struct Security {
     pub secret_key: String,
 
     #[serde(default)]
+    pub auth: AuthSecurity,
+
+    #[serde(default)]
     pub rate_limit: RateLimit,
 
     #[serde(default = "default_headers")]
     pub headers: Vec<(String, String)>,
+}
+
+// ************************************************************
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize, ToSchema)]
+#[serde(default)]
+pub struct AuthSecurity {
+    pub max_failed_attempts: u8,
+    pub lockout_duration: i64,
+}
+impl Default for AuthSecurity {
+    fn default() -> Self {
+        Self {
+            max_failed_attempts: 5,
+            lockout_duration: 1800,
+        }
+    }
 }
 
 // RateLimit

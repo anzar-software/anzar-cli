@@ -69,9 +69,8 @@ impl UserServiceTrait for AppState {
 
                 let remaining = &self
                     .configuration
-                    .auth
-                    .password
                     .security
+                    .auth
                     .max_failed_attempts
                     .saturating_sub(attempts);
 
@@ -95,15 +94,15 @@ impl UserServiceTrait for AppState {
     ) -> Result<u8> {
         let user_repo = &self.repositories.user_repository;
 
-        let pass_config = &self.configuration.auth.password;
-        let expiry = pass_config.security.lockout_duration as u64;
+        let auth_security = &self.configuration.security.auth;
+        let expiry = auth_security.lockout_duration as u64;
 
         let attempts = user_repo.increment(identity, expiry).await;
 
         // max_failed_attempts of authentication within for this specific cookie
         let max_failed_attempts = match device_cookie {
-            Some(_) => pass_config.security.max_failed_attempts * 2,
-            None => pass_config.security.max_failed_attempts,
+            Some(_) => auth_security.max_failed_attempts * 2,
+            None => auth_security.max_failed_attempts,
         };
         if attempts >= max_failed_attempts {
             user_repo.put_cookie_in_lockout(identity, expiry).await?;

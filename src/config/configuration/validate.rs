@@ -1,5 +1,5 @@
 use crate::config::{
-    AuthStrategy, Authentication, PasswordConfig, PasswordRequirements, PasswordSecurity,
+    AuthSecurity, AuthStrategy, Authentication, PasswordConfig, PasswordRequirements,
     SameSiteConfig, Security, SessionConfig,
 };
 use crate::error::{Error, InternalError};
@@ -19,6 +19,33 @@ impl Validate for Security {
             errors.push(Error::Internal(InternalError::MissingField {
                 field: "security.secret_key".into(),
                 reason: "must be at least 32 characters".into(),
+            }));
+        }
+        if let Err(e) = self.auth.validate() {
+            errors.extend(e);
+        }
+
+        if errors.is_empty() {
+            Ok(())
+        } else {
+            Err(errors)
+        }
+    }
+}
+impl Validate for AuthSecurity {
+    fn validate(&self) -> Result<(), Vec<Error>> {
+        let mut errors = vec![];
+
+        if self.max_failed_attempts == 0 {
+            errors.push(Error::Internal(InternalError::MissingField {
+                field: "auth.password.security.max_failed_attempts".into(),
+                reason: "must be greater than 0".into(),
+            }));
+        }
+        if self.lockout_duration <= 0 {
+            errors.push(Error::Internal(InternalError::MissingField {
+                field: "auth.password.security.lockout_duration".into(),
+                reason: "must be greater than 0".into(),
             }));
         }
 
@@ -113,9 +140,6 @@ impl Validate for PasswordConfig {
         if let Err(e) = self.requirements.validate() {
             errors.extend(e);
         }
-        if let Err(e) = self.security.validate() {
-            errors.extend(e);
-        }
 
         if errors.is_empty() {
             Ok(())
@@ -139,30 +163,6 @@ impl Validate for PasswordRequirements {
             errors.push(Error::Internal(InternalError::MissingField {
                 field: "auth.password.requirements.max_length".into(),
                 reason: "must be greater than or equal to min_length".into(),
-            }));
-        }
-
-        if errors.is_empty() {
-            Ok(())
-        } else {
-            Err(errors)
-        }
-    }
-}
-impl Validate for PasswordSecurity {
-    fn validate(&self) -> Result<(), Vec<Error>> {
-        let mut errors = vec![];
-
-        if self.max_failed_attempts == 0 {
-            errors.push(Error::Internal(InternalError::MissingField {
-                field: "auth.password.security.max_failed_attempts".into(),
-                reason: "must be greater than 0".into(),
-            }));
-        }
-        if self.lockout_duration <= 0 {
-            errors.push(Error::Internal(InternalError::MissingField {
-                field: "auth.password.security.lockout_duration".into(),
-                reason: "must be greater than 0".into(),
             }));
         }
 

@@ -41,14 +41,12 @@ impl AppState {
             .add_source(env_overrides)
             .build()?
             .try_deserialize::<AnzarConfiguration>()?;
+        configuration.validate()?;
 
         let repositories = RepositoryRegistry::from_database(&configuration.database).await?;
 
-        configuration.validate()?;
-        let crypto = Crypto::from_configuration(&configuration)?;
-
         Ok(Self {
-            crypto,
+            crypto: Crypto::from_configuration(&configuration),
             repositories,
             configuration,
             rate_limiter: RateLimiter::default(),
@@ -60,7 +58,9 @@ impl AppState {
         let repositories = Self::build_authservice(&configuration.database).await?;
 
         configuration.validate()?;
-        let crypto = Crypto::from_configuration(&configuration)?;
+        // FIXME push it to tests/common like in main.rs
+        let crypto =
+            Crypto::from_configuration(&configuration).validate(&configuration.auth.strategy)?;
 
         Ok(Self {
             crypto,

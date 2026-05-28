@@ -1,5 +1,7 @@
+mod aes;
 mod hmac;
 mod jwt;
+mod openssl;
 mod password_hasher;
 mod secure_token;
 
@@ -8,12 +10,15 @@ use std::sync::Arc;
 use hmac::HmacSigner;
 use secrecy::SecretString;
 
+pub use aes::Aes;
 pub use jwt::JwtSigner;
+pub use openssl::Openssl;
 pub use password_hasher::{Argon2Password, BcryptPassword, Hashable};
 pub use secure_token::SecureToken;
 
 use crate::{
-    config::{AnzarConfiguration, AuthStrategy, HashingAlgorithm},
+    config::{AnzarConfiguration, AuthStrategy, HashingAlgorithm, JwtConfig},
+    domain::model::SigningKeys,
     error::{Error, InternalError, Result},
 };
 
@@ -22,6 +27,8 @@ pub struct Crypto {
     pub password_hasher: Arc<dyn Hashable>,
     pub token: SecureToken,
     pub hmac: HmacSigner,
+    pub aes: Aes,
+    pub openssl: Openssl,
     jwt: Option<JwtSigner>,
 }
 
@@ -31,6 +38,8 @@ impl Default for Crypto {
             password_hasher: Arc::new(Argon2Password::default()),
             token: SecureToken::default(),
             hmac: HmacSigner::default(),
+            aes: Aes::default(),
+            openssl: Openssl::default(),
             jwt: None,
         }
     }
@@ -52,8 +61,27 @@ impl Crypto {
 }
 
 impl Crypto {
-    pub fn with_hmac_secret(mut self, key: &str) -> Self {
-        self.hmac = HmacSigner::new(&SecretString::from(key));
+    pub fn with_initializations(mut self, configuration: &AnzarConfiguration) -> Self {
+        let key = &configuration.security.secret_key;
+
+        self.hmac = HmacSigner::new(&SecretString::from(key.clone()));
+        self.aes = Aes::new(&SecretString::from(key.clone()));
+
+        if let Ok(conf) = configuration.auth.jwt() {
+            self.openssl = Openssl::new(&conf.algorithm);
+        }
+        self
+    }
+}
+
+impl Crypto {
+    pub fn with_jwt(
+        mut self,
+        private: &str,
+        signing_key: &SigningKeys,
+        jwt_config: &JwtConfig,
+    ) -> Self {
+        self.jwt = Some(JwtSigner::new(private, signing_key, jwt_config));
         self
     }
 }
@@ -70,9 +98,17 @@ impl Crypto {
 }
 
 impl Crypto {
-    pub fn with_jwt(mut self, config: crate::config::AnzarConfiguration) -> Self {
-        self.jwt = Some(JwtSigner::new(config));
-        self
+    pub fn from_configuration(configuration: &AnzarConfiguration) -> Self {
+        match configuration.auth.password.algorithm {
+            HashingAlgorithm::Argon2 {
+                memory_kib,
+                iterations,
+                parallelism,
+            } => Crypto::with_argon(memory_kib, iterations, parallelism),
+            HashingAlgorithm::Bcrypt { cost } => Crypto::with_bcrypt(cost),
+        }
+        .with_initializations(configuration)
+        .with_token_size64()
     }
 }
 
@@ -110,27 +146,6 @@ impl Crypto {
     }
 }
 
-impl Crypto {
-    pub fn from_configuration(configuration: &AnzarConfiguration) -> Result<Self> {
-        let base = match configuration.auth.password.algorithm {
-            HashingAlgorithm::Argon2 {
-                memory_kib,
-                iterations,
-                parallelism,
-            } => Crypto::with_argon(memory_kib, iterations, parallelism),
-            HashingAlgorithm::Bcrypt { cost } => Crypto::with_bcrypt(cost),
-        }
-        .with_hmac_secret(&configuration.security.secret_key)
-        .with_token_size64();
-
-        match configuration.auth.strategy {
-            AuthStrategy::Jwt(..) => base.with_jwt(configuration.clone()),
-            _ => base,
-        }
-        .validate(&configuration.auth.strategy)
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use crate::config::RateLimit;
@@ -143,13 +158,13 @@ mod tests {
         pub const DEFAULT_P_COST: u32 = 1;
 
         Crypto::with_argon(DEFAULT_M_COST, DEFAULT_T_COST, DEFAULT_P_COST)
-            .with_hmac_secret(&"a".repeat(32))
+            .with_initializations(&mock_configuration())
             .with_token_size64()
     }
     fn bcrypt_crypto() -> Crypto {
         let cost = 12;
         Crypto::with_bcrypt(cost)
-            .with_hmac_secret(&"a".repeat(32))
+            .with_initializations(&mock_configuration())
             .with_token_size64()
     }
     fn mock_configuration() -> AnzarConfiguration {
@@ -176,7 +191,7 @@ mod tests {
                 ..Default::default()
             },
             security: crate::config::Security {
-                secret_key: String::default(),
+                secret_key: "a".repeat(32),
                 rate_limit: RateLimit::default(),
                 headers: vec![],
             },
@@ -195,7 +210,9 @@ mod tests {
 
     #[test]
     fn test_valid_jwt_strategy() {
-        let crypto = base_crypto().with_jwt(mock_configuration());
+        let binding = mock_configuration();
+        let jwt_config = binding.auth.jwt().unwrap();
+        let crypto = base_crypto().with_jwt("", "", jwt_config);
         let strategy = &AuthStrategy::Jwt(crate::config::JwtConfig {
             ..Default::default()
         });
@@ -214,7 +231,9 @@ mod tests {
 
     #[test]
     fn test_valid_jwt_strategy_with_bcrypt() {
-        let crypto = bcrypt_crypto().with_jwt(mock_configuration());
+        let binding = mock_configuration();
+        let jwt_config = binding.auth.jwt().unwrap();
+        let crypto = base_crypto().with_jwt("", "", jwt_config);
         let strategy = &AuthStrategy::Jwt(crate::config::JwtConfig {
             ..Default::default()
         });
@@ -238,7 +257,7 @@ mod tests {
         pub const DEFAULT_T_COST: u32 = 2;
         pub const DEFAULT_P_COST: u32 = 1;
         let crypto = Crypto::with_argon(DEFAULT_M_COST, DEFAULT_T_COST, DEFAULT_P_COST)
-            .with_hmac_secret("")
+            .with_initializations(&mock_configuration())
             .with_token_size64();
         let strategy = &AuthStrategy::Session(crate::config::SessionConfig {
             ..Default::default()
