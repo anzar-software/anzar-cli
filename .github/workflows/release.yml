@@ -283,8 +283,6 @@ jobs:
       - plan
       - host
     runs-on: "ubuntu-22.04"
-    permissions:
-      id-token: write  # 👈 add this
     env:
       GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       PLAN: ${{ needs.plan.outputs.val }}
@@ -303,11 +301,10 @@ jobs:
       - run: |
           for release in $(echo "$PLAN" | jq --compact-output '.releases[] | select([.artifacts[] | endswith("-npm-package.tar.gz")] | any)'); do
             pkg=$(echo "$release" | jq '.artifacts[] | select(endswith("-npm-package.tar.gz"))' --raw-output)
-            npm publish --access public --provenance "./npm/${pkg}"
+            npm publish --access public "./npm/${pkg}"
           done
-        # env:
-        #   NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
-        #   npm publish --access public "./npm/${pkg}"
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
   announce:
     needs:
