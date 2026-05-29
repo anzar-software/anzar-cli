@@ -5,6 +5,8 @@ All notable changes to this project will be documented here.
 ## [Unreleased]
 
 ### Added
+- update SigninKey attribute active -> status: active, retired, revoked
+- add retired_at,expires_at to SigningKey model
 ### Fixed
 
 ## [0.8.6] - 2026-05-28

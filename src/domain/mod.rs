@@ -29,7 +29,7 @@ pub mod model {
     pub use super::role::model::Role;
     pub use super::role_permission::model::RolePermission;
     pub use super::session::model::Session;
-    pub use super::signing_keys::model::SigningKeys;
+    pub use super::signing_keys::model::{SigningKey, SigningKeys};
     pub use super::user::model::{CreateUserOutcome, User};
     pub use super::user_role::model::UserRole;
 }

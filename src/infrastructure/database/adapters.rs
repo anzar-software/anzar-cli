@@ -5,7 +5,7 @@ use sqlx::{Pool, Postgres, Sqlite};
 use crate::domain::database::DatabaseAdapter;
 use crate::domain::model::{
     Account, EmailVerificationToken, PasswordResetToken, Permission, RefreshToken, Role,
-    RolePermission, Session, SigningKeys, User, UserRole,
+    RolePermission, Session, SigningKey, User, UserRole,
 };
 
 use super::{mongodb::MongodbAdapter, postgres::PostgreSQLAdapter, sqlite::SQLiteAdapter};
@@ -33,7 +33,7 @@ pub struct DatabaseAdapters {
     pub user_role_adapter: Arc<dyn DatabaseAdapter<UserRole>>,
     pub permission_adapter: Arc<dyn DatabaseAdapter<Permission>>,
     pub role_permission_adapter: Arc<dyn DatabaseAdapter<RolePermission>>,
-    pub signing_keys_adapter: Arc<dyn DatabaseAdapter<SigningKeys>>,
+    pub signing_keys_adapter: Arc<dyn DatabaseAdapter<SigningKey>>,
     // pub transaction_adapter: MongodbTransaction,
 }
 
@@ -75,7 +75,7 @@ impl DatabaseAdapters {
                 conn_string,
                 ROLE_PERMISSIONS,
             )),
-            signing_keys_adapter: Arc::new(MongodbAdapter::<SigningKeys>::new(
+            signing_keys_adapter: Arc::new(MongodbAdapter::<SigningKey>::new(
                 client,
                 conn_string,
                 SIGNING_KEYS,
@@ -105,7 +105,7 @@ impl DatabaseAdapters {
                 pool,
                 ROLE_PERMISSIONS,
             )),
-            signing_keys_adapter: Arc::new(SQLiteAdapter::<SigningKeys>::new(pool, SIGNING_KEYS)),
+            signing_keys_adapter: Arc::new(SQLiteAdapter::<SigningKey>::new(pool, SIGNING_KEYS)),
             // transaction_adapter: todo!(),
         }
     }
@@ -131,7 +131,7 @@ impl DatabaseAdapters {
                 pool,
                 ROLE_PERMISSIONS,
             )),
-            signing_keys_adapter: Arc::new(PostgreSQLAdapter::<SigningKeys>::new(
+            signing_keys_adapter: Arc::new(PostgreSQLAdapter::<SigningKey>::new(
                 pool,
                 SIGNING_KEYS,
             )),

@@ -5,7 +5,7 @@ mod openssl;
 mod password_hasher;
 mod secure_token;
 
-use std::sync::Arc;
+use std::sync::{Arc, RwLock};
 
 use hmac::HmacSigner;
 use secrecy::SecretString;
@@ -18,8 +18,8 @@ pub use secure_token::SecureToken;
 
 use crate::{
     config::{AnzarConfiguration, AuthStrategy, HashingAlgorithm, JwtConfig},
-    domain::model::SigningKeys,
-    error::{Error, InternalError, Result},
+    domain::model::SigningKey,
+    error::{AuthError, Error, InternalError, Result},
 };
 
 #[derive(Clone)]
@@ -29,7 +29,7 @@ pub struct Crypto {
     pub hmac: HmacSigner,
     pub aes: Aes,
     pub openssl: Openssl,
-    jwt: Option<JwtSigner>,
+    jwt: Arc<RwLock<Option<JwtSigner>>>,
 }
 
 impl Default for Crypto {
@@ -40,7 +40,7 @@ impl Default for Crypto {
             hmac: HmacSigner::default(),
             aes: Aes::default(),
             openssl: Openssl::default(),
-            jwt: None,
+            jwt: Arc::new(RwLock::new(None)),
         }
     }
 }
@@ -78,10 +78,14 @@ impl Crypto {
     pub fn with_jwt(
         mut self,
         private: &str,
-        signing_key: &SigningKeys,
+        signing_key: &SigningKey,
         jwt_config: &JwtConfig,
     ) -> Self {
-        self.jwt = Some(JwtSigner::new(private, signing_key, jwt_config));
+        self.jwt = Arc::new(RwLock::new(Some(JwtSigner::new(
+            private,
+            signing_key,
+            jwt_config,
+        ))));
         self
     }
 }
@@ -114,7 +118,7 @@ impl Crypto {
 
 impl Crypto {
     pub fn validate(self, strategy: &AuthStrategy) -> Result<Self> {
-        if matches!(strategy, AuthStrategy::Jwt(..)) && self.jwt.is_none() {
+        if matches!(strategy, AuthStrategy::Jwt(..)) && self.jwt().is_err() {
             return Err(Error::Internal(InternalError::MissingConfiguration(
                 "JWT strategy requires a JWT signer, but none was configured".into(),
             )));
@@ -137,12 +141,16 @@ impl Crypto {
         Ok(self)
     }
 
-    pub fn jwt(&self) -> Result<&JwtSigner> {
-        self.jwt
-            .as_ref()
-            .ok_or(Error::Internal(InternalError::MissingConfiguration(
-                "JwtSigner".to_string(),
-            )))
+    pub fn jwt(&self) -> Result<JwtSigner> {
+        let jwt = self.jwt.read().unwrap();
+
+        jwt.clone()
+            .ok_or(Error::Unauthenticated(AuthError::JwtNotConfigured))
+    }
+
+    pub fn rotate_jwt(&self, new_signer: JwtSigner) {
+        let mut jwt = self.jwt.write().unwrap();
+        *jwt = Some(new_signer);
     }
 }
 

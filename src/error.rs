@@ -79,6 +79,9 @@ pub enum AuthError {
 
     #[error("account is not verified")]
     AccountNotVerified,
+
+    #[error("jwt was not configured successfully")]
+    JwtNotConfigured,
 }
 
 #[derive(thiserror::Error, Debug)]
@@ -403,6 +406,7 @@ pub enum ErrorCode {
     TokenInvalid,
     InvalidCredentials,
     AccountNotVerified,
+    JwtNotConfigured,
     TokenInvalidSignature,
     TokenInvalidAudience,
     TokenInvalidIssuer,
@@ -439,6 +443,7 @@ impl Error {
                 AuthError::TokenInvalid { .. } => ErrorCode::TokenInvalid,
                 AuthError::InvalidCredentials { .. } => ErrorCode::InvalidCredentials,
                 AuthError::AccountNotVerified => ErrorCode::AccountNotVerified,
+                AuthError::JwtNotConfigured => ErrorCode::JwtNotConfigured,
                 AuthError::TokenInvalidSignature { .. } => ErrorCode::TokenInvalidSignature,
                 AuthError::TokenInvalidAudience { .. } => ErrorCode::TokenInvalidAudience,
                 AuthError::TokenInvalidIssuer { .. } => ErrorCode::TokenInvalidIssuer,

@@ -56,13 +56,13 @@ async fn sync_rbac(app_state: &AppState) -> Result<()> {
 
 async fn sync_signing_keys(app_state: &AppState) -> Result<Crypto> {
     let crypto = if let Ok(jwt_config) = app_state.configuration.auth.jwt() {
-        let (private_key, signing_key) = match app_state.find_signing_key().await {
+        let (private_key, signing_key) = match app_state.load_active_key().await {
             Ok(response) => response,
             Err(_) => {
                 let (private, public) = app_state.crypto.openssl.gen_prv_pub_key();
                 app_state.insert_signing_keys(&private, &public).await?;
 
-                let (_, key) = app_state.find_signing_key().await?;
+                let (_, key) = app_state.load_active_key().await?;
                 (private, key)
             }
         };

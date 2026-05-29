@@ -6,18 +6,18 @@ use serde::de::DeserializeOwned;
 
 use crate::application::model::Claims;
 use crate::config::JwtConfig;
-use crate::domain::model::SigningKeys;
+use crate::domain::model::SigningKey;
 use crate::error::{AuthError, Error, Result, TokenErrorType};
 
 #[derive(Clone)]
 pub struct JwtSigner {
     jwt_config: JwtConfig,
     private: String,
-    signing_key: SigningKeys,
+    signing_key: SigningKey,
 }
 
 impl JwtSigner {
-    pub fn new(private: &str, signing_key: &SigningKeys, jwt_config: &JwtConfig) -> Self {
+    pub fn new(private: &str, signing_key: &SigningKey, jwt_config: &JwtConfig) -> Self {
         Self {
             jwt_config: jwt_config.clone(),
             private: private.into(),

@@ -20,6 +20,15 @@ impl QueryBuilder {
         }
     }
 
+    pub fn ne(mut self, field: &'static str, value: impl Into<DbValue>) -> Self {
+        self.filters.push(Operation {
+            field,
+            op: Op::Ne,
+            value: value.into(),
+        });
+        self
+    }
+
     pub fn eq(mut self, field: &'static str, value: impl Into<DbValue>) -> Self {
         self.filters.push(Operation {
             field,

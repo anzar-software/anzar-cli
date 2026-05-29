@@ -12,26 +12,31 @@ use crate::error::Result;
 
 // #[tracing::instrument(name = "Jwks")]
 async fn load_jwks(AppStateExtractor(app_state): AppStateExtractor) -> Result<HttpResponse> {
-    let (_, key) = app_state.find_signing_key().await?;
+    let signing_keys = app_state.find_signing_keys().await?;
 
-    let public_key_pem: Vec<u8> = BASE64_URL_SAFE_NO_PAD.decode(key.public_key).unwrap();
+    let mut response = Vec::new();
 
-    // let public_key_pem = key.public_key.as_bytes();
-    let rsa = Rsa::public_key_from_pem(&public_key_pem).expect("Failed to parse public key PEM");
+    for signing_key in signing_keys {
+        let key = signing_key.key;
+        let public_key_pem: Vec<u8> = BASE64_URL_SAFE_NO_PAD.decode(key.public_key).unwrap();
 
-    let n = BASE64_URL_SAFE_NO_PAD.encode(rsa.n().to_vec());
-    let e = BASE64_URL_SAFE_NO_PAD.encode(rsa.e().to_vec());
+        let rsa =
+            Rsa::public_key_from_pem(&public_key_pem).expect("Failed to parse public key PEM");
 
-    let payload = json!({
-        "keys": [{
+        let n = BASE64_URL_SAFE_NO_PAD.encode(rsa.n().to_vec());
+        let e = BASE64_URL_SAFE_NO_PAD.encode(rsa.e().to_vec());
+
+        response.push(json!({
             "kty": key.kty,
             "alg": key.algorithm,
             "use": "sig",
             "kid": key.kid,
             "n": n,
             "e": e
-        }]
-    });
+        }))
+    }
+
+    let payload = json!({ "keys": response });
 
     Ok(HttpResponse::Ok()
         .insert_header((

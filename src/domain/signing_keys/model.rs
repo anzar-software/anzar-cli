@@ -8,8 +8,13 @@ use super::super::serde::{
     deserialize_datetime, deserialize_object_id_as_string, deserialize_option_datetime,
 };
 
-#[derive(Clone, Debug, PartialEq, Eq, Deserialize, Serialize, FromRow, ToSchema)]
 pub struct SigningKeys {
+    pub private_key: String,
+    pub key: SigningKey,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Deserialize, Serialize, FromRow, ToSchema)]
+pub struct SigningKey {
     #[serde(
         rename = "_id",
         default,
@@ -26,15 +31,20 @@ pub struct SigningKeys {
     #[serde(rename = "rotatedAt", deserialize_with = "deserialize_option_datetime")]
     pub rotated_at: Option<DateTime<Utc>>,
 
+    #[sqlx(rename = "expiresAt")]
+    #[serde(rename = "expiresAt", deserialize_with = "deserialize_option_datetime")]
+    pub expires_at: Option<DateTime<Utc>>,
+
+    pub status: String,
+
     pub encrypted_private_key: String,
     pub public_key: String,
     pub algorithm: String,
-    pub active: bool,
     pub kid: String,
     pub kty: String,
 }
 
-impl SigningKeys {
+impl SigningKey {
     pub fn id(&self) -> Result<&str, crate::error::Error> {
         self.id.as_deref().ok_or_else(|| {
             tracing::error!(
@@ -48,13 +58,14 @@ impl SigningKeys {
     }
 }
 
-impl SigningKeys {
+impl SigningKey {
     pub fn new(prv: &str, public: &str) -> Self {
         Self {
             id: None,
             created_at: Utc::now(),
             rotated_at: None,
-            active: true,
+            expires_at: None,
+            status: "active".into(),
             encrypted_private_key: prv.into(),
             public_key: public.into(),
             algorithm: String::from("RS256"),
@@ -63,7 +74,7 @@ impl SigningKeys {
         }
     }
 }
-impl SigningKeys {
+impl SigningKey {
     pub fn with_algorithm(mut self, algorithm: &str) -> Self {
         self.algorithm = algorithm.into();
         self
@@ -78,11 +89,11 @@ impl SigningKeys {
     }
 }
 
-impl IntoBsonDocument for SigningKeys {
+impl IntoBsonDocument for SigningKey {
     fn into_bson_document(self) -> Result<mongodb::bson::Document, mongodb::bson::ser::Error> {
         let mut doc = mongodb::bson::to_document(&self)?;
 
-        for key in &["createdAt", "rotatedAt"] {
+        for key in &["createdAt", "rotatedAt", "expiresAt"] {
             if let Some(mongodb::bson::Bson::String(s)) = doc.get(*key).cloned() {
                 if let Ok(dt) = chrono::DateTime::parse_from_rfc3339(&s) {
                     doc.insert(

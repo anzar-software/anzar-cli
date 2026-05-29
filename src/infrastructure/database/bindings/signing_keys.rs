@@ -1,13 +1,13 @@
 use sqlx::{Postgres, Sqlite, postgres::PgArguments, query::QueryAs, sqlite::SqliteArguments};
 
-use crate::domain::model::SigningKeys;
+use crate::domain::model::SigningKey;
 
 use super::traits::{IdResult, MongoInsert, PgInsert, SqliteInsert};
 
-impl PgInsert for SigningKeys {
+impl PgInsert for SigningKey {
     fn columns() -> Vec<&'static str> {
         vec![
-            "active",
+            "status",
             "encrypted_private_key",
             "public_key",
             "algorithm",
@@ -15,6 +15,7 @@ impl PgInsert for SigningKeys {
             "kty",
             "createdAt",
             "rotatedAt",
+            "expiresAt",
         ]
     }
     fn uniques() -> Vec<&'static str> {
@@ -26,7 +27,7 @@ impl PgInsert for SigningKeys {
         query: QueryAs<'q, Postgres, IdResult, PgArguments>,
     ) -> QueryAs<'q, Postgres, IdResult, PgArguments> {
         query
-            .bind(self.active)
+            .bind(self.status)
             .bind(self.encrypted_private_key)
             .bind(self.public_key)
             .bind(self.algorithm)
@@ -34,13 +35,14 @@ impl PgInsert for SigningKeys {
             .bind(self.kty)
             .bind(self.created_at)
             .bind(self.rotated_at)
+            .bind(self.expires_at)
     }
 }
 
-impl SqliteInsert for SigningKeys {
+impl SqliteInsert for SigningKey {
     fn columns() -> Vec<&'static str> {
         vec![
-            "active",
+            "status",
             "encrypted_private_key",
             "public_key",
             "algorithm",
@@ -48,6 +50,7 @@ impl SqliteInsert for SigningKeys {
             "kty",
             "createdAt",
             "rotatedAt",
+            "expiresAt",
         ]
     }
     fn uniques() -> Vec<&'static str> {
@@ -59,7 +62,7 @@ impl SqliteInsert for SigningKeys {
         query: QueryAs<'q, Sqlite, IdResult, SqliteArguments<'q>>,
     ) -> QueryAs<'q, Sqlite, IdResult, SqliteArguments<'q>> {
         query
-            .bind(self.active)
+            .bind(self.status)
             .bind(self.encrypted_private_key)
             .bind(self.public_key)
             .bind(self.algorithm)
@@ -67,13 +70,14 @@ impl SqliteInsert for SigningKeys {
             .bind(self.kty)
             .bind(self.created_at)
             .bind(self.rotated_at)
+            .bind(self.expires_at)
     }
 }
 
-impl MongoInsert for SigningKeys {
+impl MongoInsert for SigningKey {
     fn columns() -> Vec<&'static str> {
         vec![
-            "active",
+            "status",
             "encrypted_private_key",
             "public_key",
             "algorithm",
@@ -81,6 +85,7 @@ impl MongoInsert for SigningKeys {
             "kty",
             "createdAt",
             "rotatedAt",
+            "expiresAt",
         ]
     }
     fn uniques() -> Vec<&'static str> {
