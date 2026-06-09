@@ -1,0 +1,6 @@
+  type: Jwt
+    access_token_expires_in: 86400  # seconds (24 hours)
+    refresh_token_expires_in: 604800  # seconds (7 days)
+    algorithm: "RS256"
+    issuer: "http://locahost:3000"
+    audience: "web-app"

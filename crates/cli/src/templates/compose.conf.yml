@@ -1,0 +1,19 @@
+name: {{NAME}}
+services:
+  auth:
+    image: hakouguelfen79/anzar
+    ports:
+      - 3000:3000
+    user: 1000:1000
+    env_file:
+      - .env
+    volumes:
+      - ./anzar.yml:/app/anzar.yml{{VOLUME}}
+    depends_on:{{DB_CONDITION}}
+      cache:
+        condition: service_healthy
+  {{DATABASE}}
+  {{CACHE}}
+volumes:
+  {{NAME}}_volume:
+

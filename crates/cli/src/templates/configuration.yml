@@ -1,0 +1,42 @@
+# =============================================================================
+# API Configuration - REQUIRED
+# =============================================================================
+app:
+  environment: "development"  # development | staging | production
+  url: "http://localhost:3000"
+
+# =============================================================================
+# Database Configuration - REQUIRED
+# =============================================================================
+database:
+  driver: {{DATABASE_DRIVER}}
+  connection_string: "${DATABASE_URL}"
+  cache:
+    driver: {{CACHE_DRIVER}}
+    url: "${CACHE_URL}"
+
+# =============================================================================
+# Security Configuration - REQUIRED
+# =============================================================================
+security:
+  secret_key: "${SECRET_KEY}"
+  headers:
+    - ["X-Content-Type-Options", "nosniff"]
+    - ["Content-Type", "application/json"]
+
+# =============================================================================
+# Authentication Configuration - OPTIONAL
+# =============================================================================
+auth:
+  strategy:
+  {{AUTH}}
+
+# =============================================================================
+# Server Configuration - OPTIONAL
+# =============================================================================
+# For further reading: [https://anzar_software.gitlab.io/docs/configuration/#server-configuration]
+server:
+  cors:
+    enabled: true
+    allowed_origins:
+      - "http://localhost:5000"

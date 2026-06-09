@@ -1,0 +1,14 @@
+cache:
+    image: memcached:1.6-alpine
+    restart: always
+    ports:
+      - "11211:11211"
+    healthcheck:
+      test: ["CMD", "nc", "-z", "localhost", "11211"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+    command:
+      - --conn-limit=1024
+      - --memory-limit=64
+      - --threads=4

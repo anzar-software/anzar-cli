@@ -1,0 +1,3 @@
+cache:
+  driver: Redis
+  url: "redis://cache/"

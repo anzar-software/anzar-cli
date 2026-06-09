@@ -65,7 +65,7 @@ impl AppConfig {
         let auth_path = format!("auth/{}.yaml", auth_driver.as_str(),);
 
         let value = match environment {
-            Environment::Dev => "app/configuration",
+            Environment::Dev => "../../app/configuration",
             Environment::Prod => "/app/configuration",
         };
         let config_dir = std::path::PathBuf::from(value);

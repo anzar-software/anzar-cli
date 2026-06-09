@@ -37,7 +37,7 @@ impl PostgreSQL {
     }
 
     pub async fn run_migrations(&self) -> Result<()> {
-        let path = std::path::Path::new("migrations/postgres");
+        let path = std::path::Path::new("../../migrations/postgres");
         if path.exists() {
             let migrator = sqlx::migrate::Migrator::new(path).await?;
             migrator

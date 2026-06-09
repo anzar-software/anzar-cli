@@ -39,39 +39,6 @@ where
         + Unpin
         + SqliteInsert,
 {
-    async fn insert_many(&self, data: Vec<T>) -> Result<Vec<String>, CoreError> {
-        let columns: String = T::columns()
-            .iter()
-            .map(|k| format!("\"{}\"", k))
-            .collect::<Vec<String>>()
-            .join(", ");
-
-        let mut count = 0;
-        let mut rows: Vec<String> = Vec::new();
-        for _ in 0..data.len() {
-            let values = T::columns()
-                .iter()
-                .map(|_| {
-                    count += 1;
-                    format!("${}", count)
-                })
-                .collect::<Vec<String>>()
-                .join(", ");
-            rows.push(format!("({values})"));
-        }
-        let placeholders = rows.join(", ");
-
-        let sql = format!(
-            "INSERT INTO {} ({}) VALUES {} RETURNING id",
-            self.table, columns, placeholders
-        );
-
-        let query = sqlx::query_as::<_, IdResult>(&sql);
-        let query = data.into_iter().fold(query, |q, d| d.bind_query(q));
-
-        let rows: Vec<IdResult> = query.fetch_all(&self.pool).await?;
-        Ok(rows.into_iter().map(|r| r.id).collect())
-    }
     async fn insert(&self, data: T) -> Result<String, CoreError> {
         let columns: String = T::columns()
             .iter()
@@ -119,6 +86,40 @@ where
 
         let row: IdResult = data.bind_query(query).fetch_one(&self.pool).await?;
         Ok(row.id)
+    }
+
+    async fn insert_many(&self, data: Vec<T>) -> Result<Vec<String>, CoreError> {
+        let columns: String = T::columns()
+            .iter()
+            .map(|k| format!("\"{}\"", k))
+            .collect::<Vec<String>>()
+            .join(", ");
+
+        let mut count = 0;
+        let mut rows: Vec<String> = Vec::new();
+        for _ in 0..data.len() {
+            let values = T::columns()
+                .iter()
+                .map(|_| {
+                    count += 1;
+                    format!("${}", count)
+                })
+                .collect::<Vec<String>>()
+                .join(", ");
+            rows.push(format!("({values})"));
+        }
+        let placeholders = rows.join(", ");
+
+        let sql = format!(
+            "INSERT INTO {} ({}) VALUES {} RETURNING id",
+            self.table, columns, placeholders
+        );
+
+        let query = sqlx::query_as::<_, IdResult>(&sql);
+        let query = data.into_iter().fold(query, |q, d| d.bind_query(q));
+
+        let rows: Vec<IdResult> = query.fetch_all(&self.pool).await?;
+        Ok(rows.into_iter().map(|r| r.id).collect())
     }
     async fn upsert_many(&self, data: Vec<T>) -> Result<Vec<String>, CoreError> {
         let columns: String = T::columns()

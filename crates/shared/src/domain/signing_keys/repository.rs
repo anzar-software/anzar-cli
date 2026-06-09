@@ -22,7 +22,7 @@ impl SigningKeysRepository {
 impl SigningKeysRepository {
     #[tracing::instrument(name = "db.signing_key.insert", skip(self, signing_key))]
     pub async fn insert(&self, signing_key: SigningKey) -> Result<String> {
-        match self.adapter.upsert(signing_key).await {
+        match self.adapter.insert(signing_key).await {
             Ok(id) => Ok(id),
             Err(err) => {
                 tracing::error!("Failed to insert signing_key to database - {err}");

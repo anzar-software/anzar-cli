@@ -8,9 +8,9 @@
 
 target/
 
-crates/shared/app/
-crates/shared/logs/
-crates/shared/migrations/
+app/anzar.yml
+app/cert/
+logs/
 
 crates/cli/dist/
 crates/cli/target/

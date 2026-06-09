@@ -1,0 +1,5 @@
+database:
+  driver: "MongoDB"
+  name: "prod"
+  port: 27017
+  host: "db"
