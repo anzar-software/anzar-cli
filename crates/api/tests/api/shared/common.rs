@@ -57,19 +57,26 @@ impl Common {
         let port = listener.local_addr()?.port();
         let address = format!("http://localhost:{port}");
 
-        let mut app_state = AppState::testing(&address).await?;
-        let crypto = app_state.clone().startup().await?;
-        app_state.crypto = crypto;
+        let app_state = AppState::testing(&address)
+            .await
+            .expect("failed to start appstate");
+
+        let jwt_signer = app_state
+            .clone()
+            .startup()
+            .await
+            .expect("Failed to run startup");
+        app_state.crypto.rotate_jwt(jwt_signer);
+
         let server = startup::run(listener, app_state.clone()).await?;
+        actix_web::rt::spawn(server);
+
+        self.clean_cache(&app_state.configuration).await;
 
         let client = reqwest::Client::builder()
             .danger_accept_invalid_certs(true)
             .build()
             .expect("Failed to initiate reqwest Client");
-
-        actix_web::rt::spawn(server);
-        self.clean_cache(&app_state.configuration).await;
-
         Ok(TestApp {
             address,
             client,

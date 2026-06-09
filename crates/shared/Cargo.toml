@@ -1,8 +1,19 @@
 [package]
-name = "shared"
+name = "anzar-shared"
+description = "Anzar is a lightweight authentication and authorization framework that runs as a separate microservice"
+license = "GPL-3.0"
+repository = "https://github.com/anzar-software/anzar-cli"
 version.workspace = true
 edition.workspace = true
 
+[package.metadata.release]
+publish = true
+push = true
+tag = false
+push-remote = "gitlab"
+
+[package.metadata.dist]
+dist = false
 
 [lib]
 name = "shared"

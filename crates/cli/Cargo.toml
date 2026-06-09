@@ -1,0 +1,43 @@
+[package]
+name = "anzar-cli"
+repository = "https://github.com/anzar-software/anzar-cli"
+description = "Anzar is a lightweight authentication and authorization framework that runs as a separate microservice"
+license = "GPL-3.0"
+version.workspace = true
+edition.workspace = true
+
+[package.metadata.release]
+publish = true       # ← only this gets published to crates.io
+push = true
+push-remote = "gitlab"
+tag-name = "v{{version}}"
+
+[[bin]]
+name = "anzar"
+path = "src/main.rs"
+
+[dependencies]
+anzar-shared = { workspace = true }
+
+tokio = { workspace = true }
+chrono = { workspace = true }
+
+serde = { workspace = true }
+serde_yaml = { workspace = true }
+serde_json = { workspace = true }
+
+sqlx = {workspace = true}
+
+config = { workspace = true }
+dotenvy = { workspace = true }
+
+thiserror = {workspace = true}
+
+#------------------------------------------
+clap = { version = "4.6.0", features = ["derive"] }
+console = "0.16.3"
+dialoguer = "0.12.0"
+owo-colors = "4.3.0"
+
+minreq = "2.14.1"
+

@@ -1,0 +1,5 @@
+database:
+  driver: "MongoDB"
+  name: "dev"
+  port: 27017
+  host: "localhost"

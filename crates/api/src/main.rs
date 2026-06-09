@@ -25,9 +25,9 @@ async fn main() -> std::io::Result<()> {
     let address = format!("{}:{}", app_config.server.host, app_config.server.port);
     let listener = TcpListener::bind(address)?;
 
-    let mut app_state = AppState::new(&app_config.config_path).await?;
-    let crypto = app_state.clone().startup().await?;
-    app_state.crypto = crypto;
+    let app_state = AppState::new(&app_config.config_path).await?;
+    let jwt_signer = app_state.clone().startup().await?;
+    app_state.crypto.rotate_jwt(jwt_signer);
 
     let server = startup::run(listener, app_state).await?;
 

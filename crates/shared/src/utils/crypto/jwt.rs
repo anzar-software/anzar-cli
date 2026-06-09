@@ -13,7 +13,7 @@ use crate::error::{AuthError, CoreError, Result, TokenErrorType};
 pub struct JwtSigner {
     jwt_config: JwtConfig,
     private: String,
-    signing_key: SigningKey,
+    pub signing_key: SigningKey,
 }
 
 impl JwtSigner {

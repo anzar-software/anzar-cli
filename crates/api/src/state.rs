@@ -1,3 +1,5 @@
+use shared::utils::crypto::JwtSigner;
+use sqlx::types::Uuid;
 use std::collections::HashMap;
 use std::env::var;
 
@@ -11,9 +13,7 @@ use shared::intern::{
     rbac::RbacService,
     session::SessionService,
 };
-use shared::utils::crypto::SecureToken;
 use shared::utils::{crypto::Crypto, rate_limiting::RateLimiter};
-use sqlx::types::Uuid;
 
 use crate::error::{Error, Result};
 
@@ -163,11 +163,12 @@ impl AppState {
         Ok(crypto)
     }
 
-    pub async fn startup(self) -> Result<Crypto> {
+    pub async fn startup(self) -> Result<JwtSigner> {
         let _ = self.clone().sync_rbac().await;
 
         let crypto = self.clone().sync_signing_keys().await?;
-        Ok(crypto)
+        let jwt = crypto.jwt()?;
+        Ok(jwt)
     }
 
     pub async fn collect_user_permissions(&self, user_id: &str) -> Result<Vec<String>> {
@@ -254,8 +255,8 @@ async fn build_config(address: &str) -> Result<AnzarConfiguration> {
         }
     };
 
-    let secret = SecureToken::with_size64().generate()?;
+    let secret = "40146ea996771990c4912566e14795d65d2cbd90988d03ba9a0a94943a6b8866";
     Ok(AnzarConfiguration::new(app_config)
         .with_appurl(address)
-        .with_secret(&secret))
+        .with_secret(secret))
 }

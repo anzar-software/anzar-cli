@@ -20,7 +20,7 @@ impl SQLite {
     }
 
     pub async fn run_migrations(&self) -> Result<()> {
-        let path = std::path::Path::new("migrations/sqlite");
+        let path = std::path::Path::new("../../migrations/sqlite");
         if path.exists() {
             let migrator = sqlx::migrate::Migrator::new(path).await?;
             migrator.run(&self.pool).await.expect("migrations to run");

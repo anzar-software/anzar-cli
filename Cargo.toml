@@ -9,11 +9,10 @@ resolver = "2"
 [workspace.package]
 edition = "2024"
 rust-version = "1.85"
-name = "anzar"
 description = "Anzar is a lightweight authentication and authorization framework that runs as a separate microservice"
 readme = "README.md"
 license = "GPL-3.0"
-version = "0.8.6"
+version = "0.9.21"
 authors = ["Hakou Guelfen <hakoudev@gmail.com>"]
 homepage = "https://anzar_software.gitlab.io/docs"
 repository = "https://gitlab.com/anzar_software/api"
@@ -25,7 +24,15 @@ keywords = [
   "MicroService"
 ]
 
+[workspace.metadata.release]
+shared-version = true
+publish = false
+push-remote = "gitlab"
+tag-name = "v{{version}}"
+
 [workspace.dependencies]
+anzar-shared = { path = "crates/shared", version = "0.9.21" }
+
 # Define shared dependencies here to manage versions in one place
 tokio = "1.48.0"
 chrono = { version = "0.4.37", features = ["serde"] }
@@ -79,3 +86,8 @@ strip = true             # Strip symbols in cargo
 [profile.release.package."*"]
 opt-level = 'z'
 strip = true
+
+# The profile that 'dist' will build with
+[profile.dist]
+inherits = "release"
+lto = "thin"

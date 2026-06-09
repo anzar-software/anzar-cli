@@ -1,0 +1,11 @@
+CREATE TABLE refresh_tokens (
+    id TEXT PRIMARY KEY DEFAULT gen_random_uuid()::TEXT,
+    "userId" TEXT NOT NULL,
+    "issuedAt" TIMESTAMPTZ,
+    "expiresAt" TIMESTAMPTZ,
+    "usedAt" TIMESTAMPTZ,
+    jti TEXT NOT NULL,
+
+    CONSTRAINT fk_user FOREIGN KEY ("userId") REFERENCES users(id) ON DELETE CASCADE
+);
+

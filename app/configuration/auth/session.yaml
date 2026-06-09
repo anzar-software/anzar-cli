@@ -1,0 +1,7 @@
+auth:
+  type: Session
+  name: "id"
+  max_age: 3600
+  secure: true
+  http_only: true
+  same_site: "Strict"

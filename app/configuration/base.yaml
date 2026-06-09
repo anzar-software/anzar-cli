@@ -1,0 +1,6 @@
+name: "Anzar"
+config_dir: "app/configuration"
+database:
+  username: "hakou"
+  password: "password"
+
