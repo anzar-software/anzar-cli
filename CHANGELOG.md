@@ -5,9 +5,11 @@ All notable changes to this project will be documented here.
 ## [Unreleased]
 
 ### Added
-- update SigninKey attribute active -> status: active, retired, revoked
-- add retired_at,expires_at to SigningKey model
+- migrate to a multi-crate project (monorepo)
+- add retired_at, expires_at to SigningKey model
+- add keys command with subcommands (list, rotate, prune, revoke)
 ### Fixed
+- update SigninKey attribute active -> status: active, retired, revoked
 
 ## [0.8.6] - 2026-05-28
 ### Added

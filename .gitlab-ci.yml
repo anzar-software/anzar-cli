@@ -70,7 +70,7 @@ prepare:
         - target/
       policy: push
   script:
-    - cargo build --release
+    - cargo build -p api --release
     - strip target/release/anzar
   artifacts:
     paths:
@@ -91,7 +91,7 @@ lint:
   before_script:
     - rustup component add rustfmt 
   script:
-    - cargo fmt --all -- --check
+    - cargo fmt -p api --all -- --check
   rules:
     - if: $CI_COMMIT_TAG
 
@@ -103,7 +103,7 @@ clippy:
   before_script:
     - rustup component add clippy
   script:
-    - cargo clippy -- -D warnings
+    - cargo clippy -p api -- -D warnings
   rules:
     - if: $CI_COMMIT_TAG
 
@@ -112,8 +112,8 @@ security-audit:
   stage: test
   allow_failure: true
   script:
-    - cargo audit --version || cargo install cargo-audit
-    - cargo audit
+    - cargo audit -p api --version || cargo install cargo-audit
+    - cargo audit -p api
   rules:
     - if: $CI_COMMIT_TAG
 
@@ -137,7 +137,7 @@ test:mongodb:
     - name: memcached:latest
       alias: cache
   script:
-    - DB=mongodb CACHE=memcached cargo test --jobs $(nproc)
+    - DB=mongodb CACHE=memcached cargo test -p api --jobs $(nproc)
   rules:
     - if: $CI_COMMIT_TAG
 
@@ -153,7 +153,7 @@ test:postgres:
     - name: memcached:latest
       alias: cache
   script:
-    - DB=postgres CACHE=memcached cargo test --jobs $(nproc)
+    - DB=postgres CACHE=memcached cargo test -p api --jobs $(nproc)
   rules:
     - if: $CI_COMMIT_TAG
 

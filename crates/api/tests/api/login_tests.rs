@@ -1,0 +1,65 @@
+use super::shared::{Helpers, InvalidTestCases};
+
+#[actix_web::test]
+async fn test_login_success() {
+    let helpers = Helpers::init_config().await;
+    let test_app = helpers.test_app.clone();
+
+    // Create User
+    let response = test_app.register(None).await;
+    assert!(response.status().is_success());
+
+    // Login
+    let response = test_app.login(None).await;
+    assert!(response.status().is_success());
+}
+
+#[actix_web::test]
+async fn test_login_failure() {
+    // Arrange
+    let helpers = Helpers::init_config().await;
+    let test_app = helpers.test_app.clone();
+
+    for (body, message, code) in InvalidTestCases::login_credentials().into_iter() {
+        // Act
+        let response = test_app.login(Some(body)).await;
+
+        // Assert
+        assert_eq!(
+            code,
+            response.status().as_u16(),
+            "The API did not fail when the payload was: {}",
+            message
+        );
+    }
+}
+
+#[actix_web::test]
+async fn test_account_lockout() {
+    // Arrange
+    let helpers = Helpers::init_config().await;
+    let test_app = helpers.test_app.clone();
+
+    // Create User
+    let unique_email = format!("failure_{}@test.com", uuid::Uuid::new_v4());
+    let response = Helpers::create_user_with_email(&test_app, &unique_email).await;
+    assert!(response.status().is_success());
+
+    for _ in 0..test_app
+        .app_state
+        .configuration
+        .security
+        .auth
+        .max_failed_attempts
+    {
+        // Act
+        let response = Helpers::login_with_email(&test_app, &unique_email).await;
+        // Assert
+        assert_eq!(401, response.status().as_u16());
+    }
+
+    // Act
+    let response = Helpers::login_with_email(&test_app, &unique_email).await;
+    // Assert
+    assert_eq!(403, response.status().as_u16());
+}

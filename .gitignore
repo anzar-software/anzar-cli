@@ -8,12 +8,11 @@
 
 target/
 
-app/cert/
-app/anzar.yml
-compose.yml
-migrations/
-logs/
+crates/shared/app/
+crates/shared/logs/
+crates/shared/migrations/
 
-entrypoint.sh
+crates/cli/dist/
+crates/cli/target/
+
 TODO.md
-anzar.db

@@ -1,0 +1,66 @@
+[package]
+name = "api"
+version.workspace = true
+edition.workspace = true
+
+[[bin]]
+name = "api"
+path = "src/main.rs"
+
+[dependencies]
+shared = { path = "../shared" }
+
+# Inherit the serde version defined in the root Cargo.toml
+actix-session = { workspace = true }
+tokio = { workspace = true }
+chrono = { workspace = true }
+
+serde = { workspace = true }
+serde_yaml = { workspace = true }
+serde_json = { workspace = true }
+
+jsonwebtoken = { workspace = true }
+
+# Database
+sqlx = {workspace = true}
+mongodb = {workspace = true}
+memcache = {workspace = true}
+redis = {workspace = true}
+
+# Tracing
+tracing = { workspace = true }
+tracing-bunyan-formatter = { workspace = true }
+tracing-subscriber = { workspace = true }
+tracing-actix-web = { workspace = true }
+tracing-opentelemetry = { workspace = true }
+opentelemetry = { workspace = true }
+opentelemetry-otlp = { workspace = true }
+opentelemetry_sdk = { workspace = true }
+
+# Utoipa
+utoipa = { workspace = true }
+utoipa-swagger-ui = { workspace = true }
+
+# Cryptography
+base64 = { workspace = true }
+openssl = { workspace = true }
+rand = { workspace = true }
+
+validator = { workspace = true }
+secrecy = { workspace = true }
+config = { workspace = true }
+dotenvy = { workspace = true }
+
+thiserror = { workspace = true }
+
+#------------------------------------------
+actix-cors = "0.7.0"
+# NOTE maybe use secure_coockie from actiw-web
+actix-web = { version = "4.11.0", features = ["rustls-0_23"] } 
+
+rustls = { version = "0.23.32", features = ["ring"] }
+rustls-pemfile = "2.2.0"
+uuid = "1.18.1"
+
+[dev-dependencies]
+reqwest = { version = "0.12.8", default-features = false, features = ["json", "rustls-tls"] }

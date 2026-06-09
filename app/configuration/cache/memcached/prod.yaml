@@ -1,3 +1,0 @@
-cache:
-  driver: MemCached
-  url: "memcache://cache:11211"
