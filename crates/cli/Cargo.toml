@@ -1,5 +1,5 @@
 [package]
-name = "cli"
+name = "anzar-cli"
 repository = "https://github.com/anzar_software/api"
 description = "Anzar is a lightweight authentication and authorization framework that runs as a separate microservice"
 license = "GPL-3.0"
@@ -10,13 +10,14 @@ edition.workspace = true
 publish = true       # ← only this gets published to crates.io
 push = true
 push-remote = "gitlab"
+tag-name = "v{{version}}"
 
 [[bin]]
 name = "anzar"
 path = "src/main.rs"
 
 [dependencies]
-shared = { workspace = true }
+anzar-shared = { workspace = true }
 
 tokio = { workspace = true }
 chrono = { workspace = true }

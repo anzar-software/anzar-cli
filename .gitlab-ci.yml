@@ -86,15 +86,15 @@ prepare:api:
       - target/release/api
     expire_in: 1 day
 
-prepare:cli:
-  extends: .prepare_base
-  script:
-    - cargo build -p cli --release
-    - strip target/release/cli
-  artifacts:
-    paths:
-      - target/release/cli
-    expire_in: 1 day
+# prepare:cli:
+#   extends: .prepare_base
+#   script:
+#     - cargo build -p anzar-cli --release
+#     - strip target/release/anzar-cli
+#   artifacts:
+#     paths:
+#       - target/release/anzar-cli
+#     expire_in: 1 day
 
 # Lint
 #-------------------------
@@ -113,7 +113,7 @@ lint:clippy:
   image: rust:latest
   stage: lint
   allow_failure: true
-  needs: [prepare]
+  needs: [prepare:api]
   before_script:
     - rustup component add clippy
   script:
@@ -139,12 +139,22 @@ security-audit:
 .test_base:
   image: rust:latest
   stage: test
-  needs: [prepare:api]
+  # needs: [prepare:api]
+  needs: []
+
+
+test:sqlite:
+  extends: .test_base
+  script:
+    - ENV=ci DB=sqlite cargo test -p api
+  rules:
+    - if: $CI_COMMIT_TAG
+
 
 test:mongodb:
   extends: .test_base
   services:
-    - name: mongo:8.0
+    - name: mongo:7.0
       alias: db
       variables:
         MONGO_INITDB_ROOT_USERNAME: hakou
@@ -153,7 +163,7 @@ test:mongodb:
     - name: memcached:latest
       alias: cache
   script:
-    - DB=mongodb CACHE=memcached cargo test -p api --jobs $(nproc)
+    - ENV=ci DB=mongodb CACHE=memcached cargo test -p api --jobs $(nproc)
   rules:
     - if: $CI_COMMIT_TAG
 
@@ -169,7 +179,7 @@ test:postgres:
     - name: memcached:latest
       alias: cache
   script:
-    - DB=postgres CACHE=memcached cargo test -p api --jobs $(nproc)
+    - ENV=ci DB=postgresql CACHE=memcached cargo test -p api --jobs $(nproc)
   rules:
     - if: $CI_COMMIT_TAG
 
@@ -180,7 +190,7 @@ test:postgres:
 build:api:
   image: docker:latest
   stage: deploy
-  needs: [prepare, test:mongodb, test:postgres]
+  needs: [prepare:api, test:mongodb, test:postgres]
   services:
     - docker:24-dind
   variables:

@@ -1,12 +1,14 @@
 pub enum Environment {
     Dev,
     Prod,
+    Ci,
 }
 impl Environment {
     pub fn as_str(&self) -> &'static str {
         match self {
             Environment::Dev => "dev",
             Environment::Prod => "prod",
+            Environment::Ci => "prod",
         }
     }
     pub fn _is_dev(&self) -> bool {
@@ -28,6 +30,7 @@ impl TryFrom<String> for Environment {
         match s.to_lowercase().as_str() {
             "dev" => Ok(Self::Dev),
             "prod" => Ok(Self::Prod),
+            "ci" => Ok(Self::Ci),
             other => Err(format!(
                 "{} is not supported enironment. Use either `dev` or  `prod`",
                 other

@@ -12,7 +12,7 @@ rust-version = "1.85"
 description = "Anzar is a lightweight authentication and authorization framework that runs as a separate microservice"
 readme = "README.md"
 license = "GPL-3.0"
-version = "0.9.6"
+version = "0.9.14"
 authors = ["Hakou Guelfen <hakoudev@gmail.com>"]
 homepage = "https://anzar_software.gitlab.io/docs"
 repository = "https://gitlab.com/anzar_software/api"
@@ -27,9 +27,11 @@ keywords = [
 [workspace.metadata.release]
 shared-version = true
 publish = false
+push-remote = "gitlab"
+tag-name = "v{{version}}"
 
 [workspace.dependencies]
-shared = { path = "crates/shared", version = "0.9.6" }
+anzar-shared = { path = "crates/shared", version = "0.9.14" }
 
 # Define shared dependencies here to manage versions in one place
 tokio = "1.48.0"

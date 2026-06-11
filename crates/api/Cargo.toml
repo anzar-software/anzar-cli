@@ -11,7 +11,7 @@ name = "api"
 path = "src/main.rs"
 
 [dependencies]
-shared = { workspace = true }
+anzar-shared = { workspace = true }
 
 # Inherit the serde version defined in the root Cargo.toml
 actix-session = { workspace = true }

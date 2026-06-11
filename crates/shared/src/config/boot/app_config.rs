@@ -67,6 +67,7 @@ impl AppConfig {
         let value = match environment {
             Environment::Dev => "../../app/configuration",
             Environment::Prod => "/app/configuration",
+            Environment::Ci => "../../app/configuration",
         };
         let config_dir = std::path::PathBuf::from(value);
 

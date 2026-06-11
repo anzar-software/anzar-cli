@@ -9,8 +9,8 @@ CREATE TABLE signing_keys (
   algorithm             VARCHAR(10)  NOT NULL DEFAULT 'RS256',
   kid                   VARCHAR      NOT NULL UNIQUE,
   kty                   VARCHAR      NOT NULL UNIQUE,
-  created_at            TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
-  rotated_at            TIMESTAMPTZ,
+  createdAt             TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
+  rotatedAt             TIMESTAMPTZ,
   expiresAt             TIMESTAMPTZ,
   status                TEXT         NOT NULL
 );

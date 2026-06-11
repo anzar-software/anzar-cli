@@ -389,12 +389,78 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7f202df86484c868dbad7eaa557ef785d5c66295e41b460ef922eca0723b842c"
 
 [[package]]
+name = "anzar-cli"
+version = "0.9.14"
+dependencies = [
+ "anzar-shared",
+ "chrono",
+ "clap",
+ "config",
+ "console",
+ "dialoguer",
+ "dotenvy",
+ "minreq",
+ "owo-colors",
+ "serde",
+ "serde_json",
+ "serde_yaml",
+ "sqlx",
+ "thiserror",
+ "tokio",
+]
+
+[[package]]
+name = "anzar-shared"
+version = "0.9.14"
+dependencies = [
+ "actix-session",
+ "aes-gcm",
+ "argon2",
+ "async-trait",
+ "base64 0.22.1",
+ "bcrypt",
+ "chrono",
+ "config",
+ "dashmap",
+ "futures",
+ "hex",
+ "hmac",
+ "jsonwebtoken",
+ "memcache",
+ "mongodb",
+ "openssl",
+ "opentelemetry",
+ "opentelemetry-otlp",
+ "opentelemetry_sdk",
+ "rand 0.9.4",
+ "redis 1.2.2",
+ "secrecy",
+ "serde",
+ "serde_json",
+ "serde_yaml",
+ "sha2",
+ "sqlx",
+ "thiserror",
+ "tokio",
+ "tracing",
+ "tracing-actix-web",
+ "tracing-bunyan-formatter",
+ "tracing-opentelemetry",
+ "tracing-subscriber",
+ "utoipa",
+ "utoipa-swagger-ui",
+ "uuid",
+ "validator",
+]
+
+[[package]]
 name = "api"
-version = "0.9.6"
+version = "0.9.14"
 dependencies = [
  "actix-cors",
  "actix-session",
  "actix-web",
+ "anzar-shared",
  "base64 0.22.1",
  "chrono",
  "config",
@@ -415,7 +481,6 @@ dependencies = [
  "serde",
  "serde_json",
  "serde_yaml",
- "shared",
  "sqlx",
  "thiserror",
  "tokio",
@@ -820,27 +885,6 @@ name = "clap_lex"
 version = "1.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c8d4a3bb8b1e0c1050499d1815f5ab16d04f0959b233085fb31653fbfc9d98f9"
-
-[[package]]
-name = "cli"
-version = "0.9.6"
-dependencies = [
- "chrono",
- "clap",
- "config",
- "console",
- "dialoguer",
- "dotenvy",
- "minreq",
- "owo-colors",
- "serde",
- "serde_json",
- "serde_yaml",
- "shared",
- "sqlx",
- "thiserror",
- "tokio",
-]
 
 [[package]]
 name = "cmake"
@@ -4104,50 +4148,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f40ca3c46823713e0d4209592e8d6e826aa57e928f09752619fc696c499637f6"
 dependencies = [
  "lazy_static",
-]
-
-[[package]]
-name = "shared"
-version = "0.9.6"
-dependencies = [
- "actix-session",
- "aes-gcm",
- "argon2",
- "async-trait",
- "base64 0.22.1",
- "bcrypt",
- "chrono",
- "config",
- "dashmap",
- "futures",
- "hex",
- "hmac",
- "jsonwebtoken",
- "memcache",
- "mongodb",
- "openssl",
- "opentelemetry",
- "opentelemetry-otlp",
- "opentelemetry_sdk",
- "rand 0.9.4",
- "redis 1.2.2",
- "secrecy",
- "serde",
- "serde_json",
- "serde_yaml",
- "sha2",
- "sqlx",
- "thiserror",
- "tokio",
- "tracing",
- "tracing-actix-web",
- "tracing-bunyan-formatter",
- "tracing-opentelemetry",
- "tracing-subscriber",
- "utoipa",
- "utoipa-swagger-ui",
- "uuid",
- "validator",
 ]
 
 [[package]]
