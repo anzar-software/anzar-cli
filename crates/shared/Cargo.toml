@@ -12,6 +12,9 @@ push = true
 tag = false
 push-remote = "gitlab"
 
+[package.metadata.dist]
+dist = false
+
 [lib]
 name = "shared"
 path = "src/lib.rs"

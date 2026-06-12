@@ -6,6 +6,9 @@ edition.workspace = true
 [package.metadata.release]
 publish = false
 
+[package.metadata.dist]
+dist = false
+
 [[bin]]
 name = "api"
 path = "src/main.rs"
