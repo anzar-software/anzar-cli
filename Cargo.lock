@@ -390,7 +390,7 @@ checksum = "7f202df86484c868dbad7eaa557ef785d5c66295e41b460ef922eca0723b842c"
 
 [[package]]
 name = "anzar-cli"
-version = "0.9.18"
+version = "0.9.19"
 dependencies = [
  "anzar-shared",
  "chrono",
@@ -411,7 +411,7 @@ dependencies = [
 
 [[package]]
 name = "anzar-shared"
-version = "0.9.18"
+version = "0.9.19"
 dependencies = [
  "actix-session",
  "aes-gcm",
@@ -455,7 +455,7 @@ dependencies = [
 
 [[package]]
 name = "api"
-version = "0.9.18"
+version = "0.9.19"
 dependencies = [
  "actix-cors",
  "actix-session",
