@@ -20,6 +20,7 @@ targets = [
 ]
 # A namespace to use when publishing this package to the npm registry
 npm-scope = "@anzar-auth"
+npm-package = "anzar"
 # Publish jobs to run in CI
 publish-jobs = ["npm"]
 # Path that installers should place binaries in
