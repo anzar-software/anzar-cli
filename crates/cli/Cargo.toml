@@ -12,6 +12,9 @@ push = true
 push-remote = "gitlab"
 tag-name = "v{{version}}"
 
+[package.metadata.dist]
+npm-package = "@anzar-auth/anzar"
+
 [[bin]]
 name = "anzar"
 path = "src/main.rs"
