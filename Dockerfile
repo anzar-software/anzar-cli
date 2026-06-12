@@ -40,7 +40,7 @@ COPY --from=build /etc/passwd.minimal /etc/passwd
 COPY --from=build /etc/group.minimal /etc/group
 
 COPY --from=build /bin/$APP_NAME ./$APP_NAME
-COPY --chown=10001:10001 crates/shared/app/configuration /app/configuration
+COPY --chown=10001:10001 app/configuration /app/configuration
 
 USER 10001:10001
 

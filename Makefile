@@ -1,7 +1,7 @@
 .PHONY: publish
 
 install:
-	cargo install --path crates/cli
+	cargo install --path crates/cli/
 
 publish:
 	cargo release $(bump) --package anzar-shared --package anzar-cli --execute
