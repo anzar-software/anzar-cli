@@ -50,7 +50,7 @@ cache:
     policy: pull
 
 stages:
-  - prepare
+  # - prepare
   - lint
   - test
   - deploy
@@ -58,33 +58,33 @@ stages:
 # Prepare
 #-------------------------
 
-.prepare_base:
-  image: rust:latest
-  stage: prepare
-  cache:
-    - key: cargo-registry-${CI_COMMIT_REF_SLUG}
-      paths:
-        - $CARGO_HOME/registry
-    - key: cargo-tools-${CI_COMMIT_REF_SLUG}
-      paths:
-        - $CARGO_HOME/bin
-    - key: rust-target-${CI_COMMIT_REF_SLUG}
-      paths:
-        - target/
-      policy: push
-  rules:
-    - if: $CI_COMMIT_TAG
-
-
-prepare:api:
-  extends: .prepare_base
-  script:
-    - cargo build -p api --release
-    - strip target/release/api
-  artifacts:
-    paths:
-      - target/release/api
-    expire_in: 1 day
+# .prepare_base:
+#   image: rust:latest
+#   stage: prepare
+#   cache:
+#     - key: cargo-registry-${CI_COMMIT_REF_SLUG}
+#       paths:
+#         - $CARGO_HOME/registry
+#     - key: cargo-tools-${CI_COMMIT_REF_SLUG}
+#       paths:
+#         - $CARGO_HOME/bin
+#     - key: rust-target-${CI_COMMIT_REF_SLUG}
+#       paths:
+#         - target/
+#       policy: push
+#   rules:
+#     - if: $CI_COMMIT_TAG
+#
+#
+# prepare:api:
+#   extends: .prepare_base
+#   script:
+#     - cargo build -p api --release
+#     - strip target/release/api
+#   artifacts:
+#     paths:
+#       - target/release/api
+#     expire_in: 1 day
 
 # prepare:cli:
 #   extends: .prepare_base
@@ -151,37 +151,37 @@ test:sqlite:
     - if: $CI_COMMIT_TAG
 
 
-test:mongodb:
-  extends: .test_base
-  services:
-    - name: mongo:7.0
-      alias: db
-      variables:
-        MONGO_INITDB_ROOT_USERNAME: hakou
-        MONGO_INITDB_ROOT_PASSWORD: password
-        MONGO_INITDB_DATABASE: prod
-    - name: memcached:latest
-      alias: cache
-  script:
-    - ENV=ci DB=mongodb CACHE=memcached cargo test -p api --jobs $(nproc)
-  rules:
-    - if: $CI_COMMIT_TAG
-
-test:postgres:
-  extends: .test_base
-  services:
-    - name: postgres:16-alpine
-      alias: db
-      variables:
-        POSTGRES_PASSWORD: password
-        POSTGRES_USER: hakou
-        POSTGRES_DB: prod
-    - name: memcached:latest
-      alias: cache
-  script:
-    - ENV=ci DB=postgresql CACHE=memcached cargo test -p api --jobs $(nproc)
-  rules:
-    - if: $CI_COMMIT_TAG
+# test:mongodb:
+#   extends: .test_base
+#   services:
+#     - name: mongo:7.0
+#       alias: db
+#       variables:
+#         MONGO_INITDB_ROOT_USERNAME: hakou
+#         MONGO_INITDB_ROOT_PASSWORD: password
+#         MONGO_INITDB_DATABASE: prod
+#     - name: memcached:latest
+#       alias: cache
+#   script:
+#     - ENV=ci DB=mongodb CACHE=memcached cargo test -p api --jobs $(nproc)
+#   rules:
+#     - if: $CI_COMMIT_TAG
+#
+# test:postgres:
+#   extends: .test_base
+#   services:
+#     - name: postgres:16-alpine
+#       alias: db
+#       variables:
+#         POSTGRES_PASSWORD: password
+#         POSTGRES_USER: hakou
+#         POSTGRES_DB: prod
+#     - name: memcached:latest
+#       alias: cache
+#   script:
+#     - ENV=ci DB=postgresql CACHE=memcached cargo test -p api --jobs $(nproc)
+#   rules:
+#     - if: $CI_COMMIT_TAG
 
 
 ## =============================================================================
@@ -190,7 +190,7 @@ test:postgres:
 build:api:
   image: docker:latest
   stage: deploy
-  needs: [prepare:api, test:mongodb, test:postgres]
+  # needs: [prepare:api, test:mongodb, test:postgres]
   services:
     - docker:24-dind
   variables:
