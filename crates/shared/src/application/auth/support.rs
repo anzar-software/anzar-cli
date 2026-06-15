@@ -26,7 +26,7 @@ pub async fn resolve_user_with_password(
                     let fake_gen =
                         FakeUserGenerator::new(&app_state.configuration.security.secret_key);
                     (
-                        fake_gen.generate_fake_user(email),
+                        fake_gen.generate_fake_user(email)?,
                         fake_gen.generate_fake_account(&app_state.crypto.password_hasher),
                     )
                 }
@@ -35,7 +35,7 @@ pub async fn resolve_user_with_password(
         None => {
             let fake_gen = FakeUserGenerator::new(&app_state.configuration.security.secret_key);
             (
-                fake_gen.generate_fake_user(email),
+                fake_gen.generate_fake_user(email)?,
                 fake_gen.generate_fake_account(&app_state.crypto.password_hasher),
             )
         }
@@ -51,7 +51,7 @@ pub async fn resolve_user(email: &str, app_state: &AuthService) -> Result<(User,
         Some(user) => Ok((user, true)),
         None => {
             let fake_gen = FakeUserGenerator::new(&app_state.configuration.security.secret_key);
-            Ok((fake_gen.generate_fake_user(email), false))
+            Ok((fake_gen.generate_fake_user(email)?, false))
         }
     }
 }

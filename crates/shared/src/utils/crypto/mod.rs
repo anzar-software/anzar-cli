@@ -18,7 +18,7 @@ pub use secure_token::SecureToken;
 
 use crate::{
     config::{AnzarConfiguration, AuthStrategy, HashingAlgorithm, JwtConfig},
-    domain::model::SigningKey,
+    domain::model::SigningKeys,
     error::{AuthError, CoreError, InternalError, Result},
 };
 
@@ -75,17 +75,8 @@ impl Crypto {
 }
 
 impl Crypto {
-    pub fn with_jwt(
-        mut self,
-        private: &str,
-        signing_key: &SigningKey,
-        jwt_config: &JwtConfig,
-    ) -> Self {
-        self.jwt = Arc::new(RwLock::new(Some(JwtSigner::new(
-            private,
-            signing_key,
-            jwt_config,
-        ))));
+    pub fn with_jwt(mut self, keys: Vec<SigningKeys>, jwt_config: &JwtConfig) -> Self {
+        self.jwt = Arc::new(RwLock::new(Some(JwtSigner::new(keys, jwt_config))));
         self
     }
 }

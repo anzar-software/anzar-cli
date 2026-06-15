@@ -4,6 +4,7 @@ use base64::{Engine, prelude::BASE64_URL_SAFE_NO_PAD};
 use hmac::Mac;
 use rand::TryRngCore;
 
+use crate::error::{CoreError, InternalError, Result};
 use crate::{
     domain::model::{Account, User},
     utils::crypto::Hashable,
@@ -20,10 +21,10 @@ impl FakeUserGenerator {
         }
     }
 
-    pub fn generate_fake_user(&self, email: &str) -> User {
+    pub fn generate_fake_user(&self, email: &str) -> Result<User> {
         // Use HMAC to derive deterministic but unpredictable fake user ID
         let mut mac = hmac::Hmac::<sha2::Sha256>::new_from_slice(self.secret_key.as_bytes())
-            .expect("HMAC can take key of any size");
+            .map_err(|e| CoreError::Internal(InternalError::Crypto(e.to_string())))?;
         mac.update(b"fake_user_id");
         mac.update(email.as_bytes());
         let result = mac.finalize().into_bytes();
@@ -33,12 +34,12 @@ impl FakeUserGenerator {
         uuid_bytes.copy_from_slice(&result[..16]);
         let fake_id = uuid::Uuid::from_bytes(uuid_bytes);
 
-        User {
+        Ok(User {
             id: Some(fake_id.to_string()),
             username: "some name".to_string(),
             email: email.to_string(),
             created_at: chrono::Utc::now(),
-        }
+        })
     }
 
     pub fn generate_fake_account(&self, password_hasher: &Arc<dyn Hashable>) -> Account {

@@ -99,8 +99,8 @@ impl SigningKeysRepository {
     }
 
     #[tracing::instrument(name = "db.signing_keys.revoke", skip(self))]
-    pub async fn revoke_key(&self, id: &str) -> Result<SigningKey> {
-        let filter = QueryBuilder::default().eq("kid", id);
+    pub async fn revoke_key(&self, kid: &str) -> Result<SigningKey> {
+        let filter = QueryBuilder::default().eq("kid", kid);
         let update = QueryBuilder::default().set("status", "revoked");
 
         match self.adapter.find_one_and_update(filter, update).await {

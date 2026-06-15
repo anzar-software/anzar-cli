@@ -1,3 +1,5 @@
+use std::collections::HashSet;
+
 use crate::error::Result;
 
 use crate::domain::model::Permission;
@@ -12,7 +14,7 @@ impl RbacService {
     }
 
     #[tracing::instrument(name = "auth.insert_permissions", skip(self, names))]
-    pub async fn upsert_permissions(&self, names: Vec<String>) -> Result<Vec<String>> {
+    pub async fn upsert_permissions(&self, names: &HashSet<String>) -> Result<Vec<String>> {
         let permissions: Vec<Permission> = names.iter().map(|n| Permission::new(n)).collect();
 
         self.permission_repository.upsert_many(permissions).await

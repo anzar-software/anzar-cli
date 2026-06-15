@@ -5,7 +5,7 @@ use aes_gcm::{
 use base64::{Engine, prelude::BASE64_URL_SAFE_NO_PAD};
 use secrecy::{ExposeSecret, SecretString};
 
-use crate::error::{CoreError, Result};
+use crate::error::{CoreError, InternalError, Result};
 
 #[derive(Clone, Default)]
 pub struct Aes {
@@ -24,8 +24,10 @@ impl Aes {
     pub fn encrypt(self, msg: &str) -> Result<String> {
         let nonce = Aes256Gcm::generate_nonce(OsRng); // 96-bit / 12 bytes
 
-        let key_bytes = hex::decode(&self.secret_key).expect("Invalid hex key");
-        let key: &[u8; 32] = key_bytes.as_slice().try_into().expect("Invalid key length");
+        let key_bytes = hex::decode(&self.secret_key)?;
+        let key: &[u8; 32] = key_bytes.as_slice().try_into().map_err(|_| {
+            CoreError::Internal(InternalError::Crypto("Invalid key length - ".to_string()))
+        })?;
 
         let cipher = Aes256Gcm::new(key.into());
 
@@ -53,8 +55,11 @@ impl Aes {
                 .map_err(|_| CoreError::Internal(crate::error::InternalError::Hashing))?,
         );
 
-        let key_bytes = hex::decode(&self.secret_key).expect("Invalid hex key");
-        let key: &[u8; 32] = key_bytes.as_slice().try_into().expect("Invalid key length");
+        let key_bytes = hex::decode(&self.secret_key)?;
+        let key: &[u8; 32] = key_bytes.as_slice().try_into().map_err(|_| {
+            CoreError::Internal(InternalError::Crypto("Invalid key length - ".to_string()))
+        })?;
+
         let cipher = Aes256Gcm::new(key.into());
 
         let data = cipher

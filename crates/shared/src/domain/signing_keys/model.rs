@@ -9,6 +9,7 @@ use super::super::serde::{
     deserialize_datetime, deserialize_object_id_as_string, deserialize_option_datetime,
 };
 
+#[derive(Clone)]
 pub struct SigningKeys {
     pub private_key: String,
     pub key: SigningKey,

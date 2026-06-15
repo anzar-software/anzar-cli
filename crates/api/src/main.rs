@@ -8,8 +8,8 @@ use shared::config::AppConfig;
 
 #[actix_web::main]
 async fn main() -> std::io::Result<()> {
-    // FIXME allow users to send emails, make some callbacks in you SDK
-    let app_config = AppConfig::load().expect("Failed to read configuration");
+    let app_config =
+        AppConfig::load().inspect_err(|e| tracing::error!("Failed to read configuration - {e}"))?;
 
     // let file = std::fs::OpenOptions::new()
     //     .create(true)

@@ -28,6 +28,8 @@ pub async fn run(path: Option<String>) -> Result<()> {
         return Ok(());
     }
 
+    // let s = DB::migrate(&config.database, migration_path).await;
+
     let database_pool: DatabasePool = match connect(config, path).await {
         Ok(pool) => pool,
         Err(e) => {

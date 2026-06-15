@@ -132,8 +132,7 @@ pub async fn login(
             let cookie = app_state.crypto.hmac.issue(&req.email)?;
             let user_id = user.id()?;
 
-            let full_permissions = app_state.clone().collect_user_permissions(user_id).await?;
-
+            let full_permissions = app_state.rbac_service.get_permissions(user_id).await?;
             match &app_state.configuration.auth.strategy {
                 AuthStrategy::Session(..) => app_state
                     .session_service
@@ -273,7 +272,7 @@ pub async fn register(
                     response = response.with_verification(&link, email_config.token_expires_in);
                 }
 
-                let full_permissions = app_state.clone().collect_user_permissions(user_id).await?;
+                let full_permissions = app_state.rbac_service.get_permissions(user_id).await?;
                 let http_response = match &app_state.configuration.auth.strategy {
                     AuthStrategy::Session(..) => {
                         let token = app_state
@@ -438,7 +437,7 @@ pub async fn refresh_token(
     // FIXME maybe don't return User here, its not needed
     let user: User = app_state.auth_service.find_user(&user_id).await?;
 
-    let full_permissions = app_state.clone().collect_user_permissions(&user_id).await?;
+    let full_permissions = app_state.rbac_service.get_permissions(&user_id).await?;
     let jwt = app_state.configuration.auth.jwt()?;
     app_state
         .session_service

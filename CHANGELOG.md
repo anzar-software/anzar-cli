@@ -3,7 +3,27 @@
 All notable changes to this project will be documented here.
 
 ## [Unreleased]
+### TODO
+- Email sending
+- Admin API
+- Admin UI
+- Social logins
+- Social UI
+- dart SDk
+- maybe OIDC provider layer !!!
+### Added
+### Fixed
 
+
+## [] - 2026-.-.
+### Added
+- add support for EC/EDDCA algorithms in jwks endpoint.
+### Fixed
+- Decode jwt using matching signing key not new one after rotation.
+- resolve multiple deep layer RBAC inheritence.
+- remove expects from code.
+
+## [0.9.21] - 2026-06-12
 ### Added
 - migrate to a multi-crate project (monorepo)
 - add retired_at, expires_at to SigningKey model

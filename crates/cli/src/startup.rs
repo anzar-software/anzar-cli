@@ -29,7 +29,7 @@ pub async fn start() -> KeyService {
     configuration.validate().unwrap();
 
     let crypto = Crypto::from_configuration(&configuration);
-    let db = DB::new(&configuration.database).await.unwrap();
+    let database = DB::connect(&configuration.database).await.unwrap();
 
-    KeyService::new(&db.database, &crypto, &configuration)
+    KeyService::new(&database, &crypto, &configuration)
 }

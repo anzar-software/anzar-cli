@@ -20,7 +20,7 @@ pub async fn run(key_service: KeyService, kid: Option<String>) -> Result<()> {
             return Ok(());
         }
 
-        let keys = key_service.list_keys().await?;
+        let keys = key_service.list().await?;
         if keys
             .into_iter()
             .filter(|k| k.kid == id)

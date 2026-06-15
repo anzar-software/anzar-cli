@@ -9,10 +9,7 @@ pub async fn run(key_service: KeyService) -> Result<()> {
     println!("  {}", "Rotating signing key...".dimmed().bold());
     println!();
 
-    let (retired_key, activekey) = key_service
-        .rotate_signing_key()
-        .await
-        .map_err(Error::from)?;
+    let (retired_key, activekey) = key_service.rotate().await.map_err(Error::from)?;
     println!(
         "  {} New key generated             kid: {}  algorithm: {}",
         "✔".green().bold(),

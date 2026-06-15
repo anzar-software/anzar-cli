@@ -6,6 +6,8 @@ use super::cache::{CacheConfig, CacheDriver};
 use super::database::{DatabaseConfig, DatabaseDriver};
 use crate::config::AuthStrategy;
 
+use crate::error::{CoreError, InternalError, Result};
+
 #[derive(Debug, serde::Deserialize)]
 pub struct AppConfig {
     pub name: String,
@@ -18,51 +20,51 @@ pub struct AppConfig {
 }
 
 impl AppConfig {
-    fn env() -> Environment {
+    fn env() -> Result<Environment> {
         std::env::var("ENV")
             .unwrap_or_else(|_| Environment::Dev.as_str().into())
             .try_into()
-            .expect("Failed to parse ENV")
+            .map_err(|e| CoreError::Internal(InternalError::Io(e)))
     }
-    fn db() -> DatabaseDriver {
+    fn db() -> Result<DatabaseDriver> {
         std::env::var("DB")
             .unwrap_or_else(|_| DatabaseDriver::SQLite.as_str().into())
             .try_into()
-            .expect("Failed to parse DB")
+            .map_err(|e| CoreError::Internal(InternalError::Io(e)))
     }
-    fn cache() -> CacheDriver {
+    fn cache() -> Result<CacheDriver> {
         std::env::var("CACHE")
             .unwrap_or_else(|_| CacheDriver::InMemory.as_str().into())
             .try_into()
-            .expect("Failed to parse CACHE")
+            .map_err(|e| CoreError::Internal(InternalError::Io(e)))
     }
-    fn auth() -> AuthDriver {
+    fn auth() -> Result<AuthDriver> {
         std::env::var("AUTH")
             .unwrap_or_else(|_| AuthDriver::Jwt.as_str().into())
             .try_into()
-            .expect("Failed to parse AUTH")
+            .map_err(|e| CoreError::Internal(InternalError::Io(e)))
     }
 
-    pub fn load() -> Result<AppConfig, config::ConfigError> {
-        let environment: Environment = Self::env();
+    pub fn load() -> Result<AppConfig> {
+        let environment: Environment = Self::env()?;
         let environment_path = format!("{}.yaml", environment.as_str());
 
-        let environment_database: DatabaseDriver = Self::db();
+        let environment_database: DatabaseDriver = Self::db()?;
         let database_path = format!(
             "database/{}/{}.yaml",
             environment_database.as_str(),
             environment.as_str(),
         );
 
-        let environment_cache = Self::cache();
+        let environment_cache = Self::cache()?;
         let cache_path = format!(
             "cache/{}/{}.yaml",
             environment_cache.as_str(),
             environment.as_str(),
         );
 
-        let auth_driver = Self::auth();
-        let auth_path = format!("auth/{}.yaml", auth_driver.as_str(),);
+        let auth_driver = Self::auth()?;
+        let auth_path = format!("auth/{}.yaml", auth_driver.as_str());
 
         let value = match environment {
             Environment::Dev => "../../app/configuration",
@@ -79,6 +81,6 @@ impl AppConfig {
             .add_source(config::File::from(config_dir.join(auth_path)))
             .build()?;
 
-        settings.try_deserialize::<AppConfig>()
+        settings.try_deserialize::<AppConfig>().map_err(Into::into)
     }
 }

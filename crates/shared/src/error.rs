@@ -124,6 +124,8 @@ pub enum InternalError {
     Database(String),
     #[error("hashing failure")]
     Hashing,
+    #[error("crypto failure - {0}")]
+    Crypto(String),
     #[error("failed to create {token_type:?}")]
     TokenCreation { token_type: TokenErrorType },
     #[error("failed to deliver email to {to}")]
@@ -227,6 +229,17 @@ impl From<jsonwebtoken::errors::Error> for InternalError {
     }
 }
 
+impl From<openssl::error::ErrorStack> for InternalError {
+    fn from(e: openssl::error::ErrorStack) -> Self {
+        InternalError::Crypto(e.to_string())
+    }
+}
+impl From<hex::FromHexError> for InternalError {
+    fn from(e: hex::FromHexError) -> Self {
+        InternalError::Crypto(e.to_string())
+    }
+}
+
 // Convenience From impls so callers can use `?` without going through InternalError explicitly
 
 impl From<std::io::Error> for CoreError {
@@ -285,6 +298,17 @@ impl From<serde_yaml::Error> for CoreError {
 }
 impl From<config::ConfigError> for CoreError {
     fn from(e: config::ConfigError) -> Self {
+        CoreError::Internal(e.into())
+    }
+}
+
+impl From<openssl::error::ErrorStack> for CoreError {
+    fn from(e: openssl::error::ErrorStack) -> Self {
+        CoreError::Internal(e.into())
+    }
+}
+impl From<hex::FromHexError> for CoreError {
+    fn from(e: hex::FromHexError) -> Self {
         CoreError::Internal(e.into())
     }
 }

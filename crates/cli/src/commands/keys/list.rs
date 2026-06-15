@@ -4,7 +4,7 @@ use shared::{domain::model::SigningKey, intern::key::KeyService};
 use crate::error::Result;
 
 pub async fn run(key_service: KeyService) -> Result<()> {
-    match key_service.list_keys().await {
+    match key_service.list().await {
         Ok(keys) => print_keys(keys),
         Err(_) => println!("no keys found"),
     }
